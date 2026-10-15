@@ -188,6 +188,11 @@ footer .page{display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-bet
 .tab-res td small{color:var(--ink2);display:block;font-size:11px}
 .tab-res td.vide{color:var(--ink2)}
 .revue li{margin-bottom:8px}
+.remarque{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);padding:16px 20px}
+.remarque h2{font-size:18px;font-weight:600;margin:0 0 8px}
+.remarque p,.remarque li{color:var(--ink2);font-size:14px;max-width:95ch}
+.remarque b{color:var(--ink)}
+.remarque .phrase{font-style:italic;color:var(--ink);border-top:1px solid var(--sunk);padding-top:10px;margin-bottom:0}
 </style>
 </head>
 <body>
@@ -209,6 +214,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-bet
 
   <div class="onglets" role="tablist">
     <button type="button" data-vue="pricer">Pricer</button>
+    <button type="button" data-vue="homogene">Δ constant</button>
     <button type="button" data-vue="courbes">Courbes</button>
     <button type="button" data-vue="convergence">Convergence et biais</button>
     <button type="button" data-vue="methode">Méthode et revue</button>
@@ -295,6 +301,60 @@ footer .page{display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-bet
           <p class="aide">Quelques chemins avec leur minimum (call) ou maximum (put) courant : le gain du lookback est l'écart final
             entre la trajectoire et son extremum. Illustration.</p>
           <div class="graphe haut" id="g-traj"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== Δ CONSTANT ============================== -->
+  <section class="vue" id="homogene" hidden>
+    <div class="remarque">
+      <h2>Remarque : pourquoi le Δ d'un lookback flottant est constant à l'émission</h2>
+      <p>Sous Black-Scholes, toute la trajectoire est proportionnelle au spot : S<sub>t</sub> = S · exp((r − q − σ²/2) t + σ W<sub>t</sub>).
+        À l'émission, l'extremum de départ est le spot lui-même, donc <b>S se met en facteur de tout le gain</b> :</p>
+      <div class="formule">S_T − min S = S · ( S_T/S − min S/S )      ⇒      V(S) = S · f(r, q, σ, T)</div>
+      <p>où f ne dépend pas de S. Le prix est <b>linéaire en S</b> (homogène de degré 1), d'où :</p>
+      <ul>
+        <li><b>Δ = ∂V/∂S = f = V/S</b> : le même quel que soit le spot ; il se lit directement sur le prix, sans différences finies ;</li>
+        <li><b>Γ = 0</b> : la valeur de Γ que renvoient les moteurs Monte-Carlo n'est que du bruit autour de zéro ;</li>
+        <li><b>Vega, ρ et Θ sont proportionnels à S</b> : doubler le spot double toutes les autres grecques.</li>
+      </ul>
+      <p>En cours de vie, l'extremum déjà observé m ne bouge pas avec le spot : V(S, m) = S · g(m/S) reste homogène en (S, m) mais plus
+        en S seul. Par Euler, V = S ∂V/∂S + m ∂V/∂m, donc <b>Δ = V/S − (m/S) ∂V/∂m</b> varie avec le spot et <b>Γ ≠ 0</b>.</p>
+      <p class="phrase">En une phrase : « À l'émission, le prix d'un lookback flottant est homogène de degré 1 en S : on peut sortir S de
+        l'espérance, donc Δ = V/S est constant et Γ = 0 ; en cours de vie, l'extremum déjà observé casse cette invariance d'échelle. »</p>
+    </div>
+    <div class="espace" style="margin-top:20px">
+      <aside class="panneau reglages">
+        <p class="aide" style="margin-top:0">Type, taux, dividende, volatilité et maturité : ceux de l'onglet Pricer. Les graphes se calculent à
+          l'ouverture de l'onglet (formule fermée et Monte-Carlo du pont exact).</p>
+        <div class="champ"><label for="h-s0">Spot de référence S<sub>0</sub></label><input type="number" id="h-s0" value="100"></div>
+        <div class="champ"><label for="h-min">Spot minimum</label><input type="number" id="h-min" value="50"></div>
+        <div class="champ"><label for="h-max">Spot maximum</label><input type="number" id="h-max" value="150"></div>
+        <div class="champ"><label for="h-ext" id="h-ext-l">Extremum observé (en cours de vie)</label><input type="number" id="h-ext" value="110"></div>
+        <p class="aide">Pour le cas en cours de vie : un minimum ≤ au spot pour le call, un maximum ≥ au spot pour le put.</p>
+        <div class="btns"><button type="button" class="btn" id="h-go">Recalculer</button></div>
+        <div class="etat" id="h-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="grille-res">
+          <div class="carte-res"><h2>1. À l'émission, le prix est une droite</h2>
+            <p class="aide">V(S) = S · f : une droite qui passe par l'origine. En cours de vie (extremum fixé), la courbe se courbe.</p>
+            <div class="graphe haut" id="g-h-prix"></div></div>
+          <div class="carte-res"><h2>2. Le Δ est constant, égal à V/S</h2>
+            <p class="aide">Δ par différences finies sur la formule fermée, et V/S : les deux se confondent à l'émission. En cours de vie, Δ varie.</p>
+            <div class="graphe haut" id="g-h-delta"></div></div>
+          <div class="carte-res"><h2>3. Γ est nul à l'émission</h2>
+            <p class="aide">Γ par différences finies : nul à l'émission, positif en cours de vie.</p>
+            <div class="graphe haut" id="g-h-gamma"></div></div>
+          <div class="carte-res"><h2>4. Les autres grecques sont proportionnelles à S</h2>
+            <p class="aide">Vega, ρ et Θ divisés par S : constants à l'émission.</p>
+            <div class="graphe haut" id="g-h-autres"></div></div>
+        </div>
+        <div class="carte-res">
+          <h2>Contrôle sur le Monte-Carlo</h2>
+          <p class="aide">Pont exact, mêmes réglages que l'onglet Pricer : le Δ estimé par bump coïncide avec V/S estimé sur les mêmes chemins.</p>
+          <div class="defile"><table id="t-h"><thead><tr><th>spot</th><th>V (MC)</th><th>V/S (MC)</th><th>Δ par bump (MC)</th><th>Δ formule</th><th>Γ (MC)</th></tr></thead><tbody></tbody></table></div>
         </div>
       </div>
     </div>
@@ -1086,12 +1146,37 @@ function descriptif(p) {
     nuage: {x: Array.from(d.lx.slice(0, k)), y: Array.from(d.le.slice(0, k))}, eExt: se / n, eST: ss / n,
     eSTexact: p.spot * Math.exp(-p.q * p.ttm)};
 }
+// homogénéité : grecques de la formule fermée le long du spot, à l'émission et en cours de vie, et contrôle Monte-Carlo
+function homogene(p, e) {
+  const put = p.type === 1, F = (S, ext) => LB.prixFermeGeneral(put, S, ext == null ? S : ext, p.rate, p.q, p.vol, p.ttm);
+  const greques = (S, ext) => {
+    const h = S * 1e-4, V = F(S, ext), Vu = F(S + h, ext == null ? null : ext), Vd = F(S - h, ext == null ? null : ext);
+    const hs = 1e-4, ht = 1e-4, hr = 1e-4;
+    const avecM = o => LB.prixFermeGeneral(put, S, ext == null ? S : ext, o.r, p.q, o.sig, o.T);
+    const vega = (avecM({r: p.rate, sig: p.vol + hs, T: p.ttm}) - avecM({r: p.rate, sig: p.vol - hs, T: p.ttm})) / (2 * hs);
+    const rho = (avecM({r: p.rate + hr, sig: p.vol, T: p.ttm}) - avecM({r: p.rate - hr, sig: p.vol, T: p.ttm})) / (2 * hr);
+    const theta = -(avecM({r: p.rate, sig: p.vol, T: p.ttm + ht}) - avecM({r: p.rate, sig: p.vol, T: Math.max(1e-8, p.ttm - ht)})) / (2 * ht);
+    return {V, delta: (Vu - Vd) / (2 * h), gamma: (Vu - 2 * V + Vd) / (h * h), vega, rho, theta};
+  };
+  const xs = [], emis = [], vie = [];
+  for (let k = 0; k <= 60; k++) {
+    const S = e.min + (e.max - e.min) * k / 60; xs.push(S);
+    emis.push(greques(S, null));
+    vie.push((put ? e.ext >= S : e.ext <= S) ? greques(S, e.ext) : null);
+  }
+  const mc = [0.5, 0.75, 1, 1.25, 1.5].map(f => {
+    const S = e.s0 * f, R = LB.priceLookback(1, p.ttm, p.type, S, p.rate, p.vol, p.pc, 0, p.seed, true, false, {q: p.q, antithetique: p.anti, bumpsBarnicha: p.bB});
+    return {S, V: R[0], delta: R[4], gamma: R[8], dF: greques(S, null).delta};
+  });
+  return {xs, emis, vie, mc};
+}
 self.onmessage = ev => {
   const {id, type, p, e} = ev.data;
   try {
     const prog = f => self.postMessage({id, progres: f});
     let res;
-    if (type === "calcul") {
+    if (type === "homogene") res = homogene(p, e);
+    else if (type === "calcul") {
       const t0 = performance.now(), cond = appel(1, p), t1 = performance.now(), bgk = appel(0, p), t2 = performance.now();
       res = {cond, bgk, tc: t1 - t0, tb: t2 - t1, desc: descriptif(p)};
     } else if (type === "courbe") {
@@ -1223,6 +1308,38 @@ $("go").onclick = calculer;
 $("defaut").onclick = () => { appliquer(DEFAUT); calculer(); };
 const auto = differe(calculer, 350);
 document.querySelector("#pricer .reglages").addEventListener("change", auto);
+
+// ---------- Δ constant ----------
+let homogeneFait = false;
+function majExtH() { const put = $("type").value === "1"; $("h-ext-l").textContent = put ? "Maximum observé (en cours de vie)" : "Minimum observé (en cours de vie)";
+  const s0 = lireNombre($("h-s0"), 100); $("h-ext").value = put ? Math.round(s0 * 1.1) : Math.round(s0 * 0.9); }
+$("type").addEventListener("change", () => { majExtH(); homogeneFait = false; });
+async function lancerHomogene() {
+  let p; try { p = lire(); } catch (err) { erreurIci("h-etat", err.message); return; }
+  const e = {s0: lireNombre($("h-s0"), 100), min: lireNombre($("h-min"), 50), max: lireNombre($("h-max"), 150), ext: lireNombre($("h-ext"), 110)};
+  if (!(e.min > 0 && e.max > e.min && e.s0 > 0 && e.ext > 0)) { erreurIci("h-etat", "spots et extremum positifs, minimum < maximum"); return; }
+  $("h-etat").textContent = "Calcul…"; $("h-etat").className = "etat";
+  const m = await demander("homogene", p, e);
+  if (!m.ok) { erreurIci("h-etat", m.msg); return; }
+  homogeneFait = true;
+  const r = m.res, put = p.type === 1, nomExt = put ? "max" : "min";
+  $("h-etat").textContent = `Formule fermée sur ${r.xs.length} spots · Monte-Carlo ${p.pc} chemins par spot`; $("h-etat").className = "etat ok";
+  const serie = (nom, arr, cle, coul, tir, f) => ({nom, x: r.xs, y: arr.map((g, k) => g ? (f ? f(g, r.xs[k]) : g[cle]) : NaN), couleur: coul, tirets: tir, epaisseur: tir ? 1.8 : 2.5});
+  const vie = `en cours de vie (${nomExt} observé = ${e.ext})`;
+  const f0 = r.emis[0].V / r.xs[0];
+  Graphe.tracer($("g-h-prix"), {series: [serie("à l'émission : V = S · f", r.emis, "V", "c1"),
+    {nom: "prolongement jusqu'à l'origine", x: [0, r.xs[0]], y: [0, f0 * r.xs[0]], couleur: "c1", tirets: true, epaisseur: 1.2, sansLegende: true},
+    serie(vie, r.vie, "V", "c4", true)], xlab: "spot S", ylab: "prix", zero: true, xmin: 0, xfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-h-delta"), {series: [serie("Δ à l'émission", r.emis, "delta", "c1"), serie("V/S à l'émission", r.emis, null, "c3", true, g => g.V / 1),
+    serie("Δ " + vie, r.vie, "delta", "c4", true)].map((s0, k) => k === 1 ? Object.assign(s0, {y: r.emis.map((g, j) => g.V / r.xs[j])}) : s0), xlab: "spot S", ylab: "Δ", yfmt: v => v.toFixed(4), xfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-h-gamma"), {series: [serie("Γ à l'émission", r.emis, "gamma", "c1"), serie("Γ " + vie, r.vie, "gamma", "c4", true)], xlab: "spot S", ylab: "Γ", yfmt: v => v.toPrecision(2), zero: true, xfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-h-autres"), {series: [serie("vega / S", r.emis, null, "c2", false, (g, S) => g.vega / S), serie("ρ / S", r.emis, null, "c5", false, (g, S) => g.rho / S),
+    serie("Θ / S", r.emis, null, "c6", false, (g, S) => g.theta / S)], xlab: "spot S", ylab: "grecque / S", yfmt: v => v.toFixed(3), xfmt: v => v.toFixed(0)});
+  $("t-h").tBodies[0].innerHTML = r.mc.map(o => `<tr><td>${o.S.toFixed(1)}</td><td>${o.V.toFixed(4)}</td><td>${(o.V / o.S).toFixed(6)}</td><td>${o.delta.toFixed(6)}</td><td>${o.dF.toFixed(6)}</td><td>${o.gamma.toExponential(1)}</td></tr>`).join("");
+}
+$("h-go").onclick = lancerHomogene;
+document.addEventListener("vue", ev => { if (ev.detail === "homogene" && !homogeneFait) lancerHomogene(); });
+majExtH();
 
 // ---------- courbes ----------
 const BORNES = {spot: [80, 120], vol: [0.1, 0.5], rate: [0, 0.1], q: [0, 0.08], ttm: [0.25, 3]};

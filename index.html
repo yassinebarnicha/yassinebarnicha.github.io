@@ -73,6 +73,18 @@ h3{font-size:17px;margin:0 0 6px;letter-spacing:-.01em}
 .etiquettes{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:0;list-style:none}
 .etiquettes li{font:12px var(--mono);background:var(--tag);color:var(--tag-ink);padding:2px 8px}
 
+/* applications en ligne */
+.apps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.app{background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;text-decoration:none;color:var(--ink)}
+.app:hover{border-color:var(--accent)}
+.app:hover .ouvrir{background:var(--accent-hover)}
+.app img{width:100%;aspect-ratio:900/579;object-fit:cover;object-position:top;border-bottom:1px solid var(--line)}
+.app .corps{padding:16px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.app h3{margin:0;font-size:17px}
+.app p{margin:0;font-size:14px;color:var(--ink2)}
+.app .ouvrir{margin-top:auto;align-self:flex-start;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:14px;padding:10px 16px}
+@media (max-width:900px){.apps{grid-template-columns:minmax(0,1fr)}}
+
 /* projet vedette */
 .vedette{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;align-items:start}
 .cadre{background:var(--panel);border:1px solid var(--line);padding:6px}
@@ -128,7 +140,9 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
 @media (max-width:600px){
   .page{padding:0 16px}
   .barre .nom{display:none}
-  .barre nav a{padding:6px 7px;font-size:12.5px}
+  .barre nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-width:0}
+  .barre nav::-webkit-scrollbar{display:none}
+  .barre nav a{padding:6px 7px;font-size:12.5px;white-space:nowrap}
   .entete{padding:36px 0 32px}
   section{padding:36px 0}
   .grille{grid-template-columns:minmax(0,1fr)}
@@ -144,7 +158,8 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
     <span class="mono-nom" aria-hidden="true">MYB</span>
     <span class="nom">Mohammed-Yassine Barnicha</span>
     <nav aria-label="Sections">
-      <a href="#calibration">Application</a>
+      <a href="#applications">Applications</a>
+      <a href="#calibration">BTC</a>
       <a href="#finance">Finance</a>
       <a href="#data">Data &amp; IA</a>
       <a href="#methodes">Méthodes</a>
@@ -162,8 +177,10 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
       l'application utilisable. Cette page présente chaque projet, ce qu'il fait et comment il est construit ; tout le
       code est public.</p>
     <div class="boutons">
-      <a class="btn plein" href="https://yassinebarnicha.github.io/calibration-btc-svjd/">▶ Ouvrir l'application de calibration</a>
-      <a class="btn creux" href="#finance">Voir les projets</a>
+      <a class="btn plein" href="calibration-btc-svjd/">▶ Calibration d'options BTC</a>
+      <a class="btn plein" href="swaptions-hjm/">▶ Swaptions bermudéennes HJM</a>
+      <a class="btn plein" href="options-lookback/">▶ Options lookback</a>
+      <a class="btn creux" href="#finance">Tous les projets</a>
       <a class="btn creux" href="https://github.com/yassinebarnicha">GitHub</a>
     </div>
     <div class="chiffres">
@@ -174,6 +191,34 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
     </div>
   </div>
 </header>
+
+<section id="applications">
+  <div class="page">
+    <p class="surtitre">Applications en ligne</p>
+    <h2>Trois projets à utiliser directement</h2>
+    <p class="intro">Chaque application tourne entièrement dans le navigateur, sans installation ; toutes les entrées sont modifiables
+      et le code d'origine du projet est consultable dans l'onglet « Code source ».</p>
+    <div class="apps">
+      <a class="app" href="calibration-btc-svjd/">
+        <img src="img/calibration.webp" width="900" height="570" loading="lazy" alt="Calibration du modèle de Bates sur les smiles Deribit">
+        <div class="corps"><h3>Calibration d'options Bitcoin</h3>
+          <p>28 modèles à sauts et volatilité stochastique calibrés en direct sur Deribit : grecques, surface de volatilité 3D, GEX, exotiques.</p>
+          <span class="ouvrir">▶ Ouvrir</span></div></a>
+      <a class="app" href="swaptions-hjm/">
+        <img src="img/hjm.webp" width="900" height="579" loading="lazy" alt="Pricer de swaptions bermudéennes sous HJM">
+        <div class="corps"><h3>Swaptions bermudéennes sous HJM</h3>
+          <p>Calibration par bootstrap, EDP et Longstaff-Schwartz ; effet du retour à la moyenne après recalibration ; erreur de signe
+            trouvée et corrigée dans le modèle.</p>
+          <span class="ouvrir">▶ Ouvrir</span></div></a>
+      <a class="app" href="options-lookback/">
+        <img src="img/lookback.webp" width="900" height="579" loading="lazy" alt="Pricer d'options lookback">
+        <div class="corps"><h3>Options lookback</h3>
+          <p>Les deux moteurs C++ (pont brownien exact, schéma en temps avec BGK) en JavaScript ; Δ constant à l'émission ; option en
+            cours de vie.</p>
+          <span class="ouvrir">▶ Ouvrir</span></div></a>
+    </div>
+  </div>
+</section>
 
 <section id="calibration">
   <div class="page">

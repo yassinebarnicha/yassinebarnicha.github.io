@@ -11,6 +11,11 @@
 /*__STYLE__*/
 .revue li{margin-bottom:8px}
 .alerte{background:var(--warn-bg);color:var(--warn);padding:10px 14px;font-size:13px;border-left:3px solid var(--warn)}
+.remarque{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);padding:16px 20px}
+.remarque h2{font-size:18px;font-weight:600;margin:0 0 8px}
+.remarque p,.remarque li{color:var(--ink2);font-size:14px;max-width:95ch}
+.remarque b{color:var(--ink)}
+.remarque .phrase{font-style:italic;color:var(--ink);border-top:1px solid var(--sunk);padding-top:10px;margin-bottom:0}
 </style>
 </head>
 <body>
@@ -34,6 +39,7 @@
 
   <div class="onglets" role="tablist">
     <button type="button" data-vue="pricer">Pricer et calibration</button>
+    <button type="button" data-vue="lambda">Retour à la moyenne</button>
     <button type="button" data-vue="etudes">Études de sensibilité</button>
     <button type="button" data-vue="methode">Méthode et revue</button>
     <button type="button" data-vue="code">Code source</button>
@@ -138,6 +144,76 @@
             <p class="aide">Prix Monte-Carlo des zéro-coupons avec l'actualisation choisie, contre la courbe : ils doivent coïncider.</p>
             <div class="defile"><table id="t-mart"><thead><tr><th>T</th><th>P(0,T) courbe</th><th>Monte-Carlo</th><th>écart</th></tr></thead><tbody></tbody></table></div>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== RETOUR À LA MOYENNE ============================== -->
+  <section class="vue" id="lambda" hidden>
+    <div class="remarque">
+      <h2>Remarque : retour à la moyenne, recalibration et valeur de la bermudéenne</h2>
+      <p>Pour une swaption bermudéenne, augmenter le retour à la moyenne λ <b>après recalibration sur les swaptions européennes</b>
+        tend généralement à <b>augmenter son prix</b>. Pourquoi ?</p>
+      <ul>
+        <li><b>La recalibration maintient les prix des européennes</b> : la hausse de λ est compensée par une hausse de σ.</li>
+        <li><b>Un retour à la moyenne plus rapide réduit la persistance des taux</b> et diminue leur corrélation entre les dates
+          d'exercice.</li>
+        <li><b>Le choix entre plusieurs dates devient plus précieux</b> : si l'exercice n'est pas intéressant aujourd'hui, les
+          conditions peuvent être différentes à une date suivante.</li>
+      </ul>
+      <p>La bermudéenne profite donc davantage de sa flexibilité d'exercice, alors que les européennes de calibration gardent
+        leurs prix. C'est une tendance, pas une règle universelle : le résultat dépend du modèle, des instruments de calibration
+        et de la structure de la bermudéenne.</p>
+      <p class="phrase">En une phrase : « Après recalibration aux européennes, une hausse du retour à la moyenne tend à augmenter la
+        valeur de la bermudéenne, car elle réduit la dépendance entre les opportunités d'exercice et valorise le choix de la date. »</p>
+    </div>
+
+    <div class="espace" style="margin-top:20px">
+      <aside class="panneau reglages" aria-label="Retour à la moyenne">
+        <p class="aide" style="margin-top:0">Les graphes reprennent les entrées de l'onglet Pricer (courbe, produit, cotations, formule,
+          EDP) ; ils se calculent à l'ouverture de l'onglet.</p>
+        <h3>Valeurs de λ</h3>
+        <div class="champ"><label for="l-vals">λ</label><input type="text" id="l-vals" value="0 0.01 0.03 0.05 0.1 0.15 0.2 0.3"></div>
+        <label class="case"><input type="checkbox" id="l-sans" checked> Comparer sans recalibration (σ figées)</label>
+        <h3>Impact de chaque paramètre</h3>
+        <div class="champ"><label for="i-lam">Choc sur λ</label><input type="number" id="i-lam" value="0.02" step="0.01"></div>
+        <div class="champ"><label for="i-vol">Choc sur les vols (%)</label><input type="number" id="i-vol" value="10" step="1"></div>
+        <div class="champ"><label for="i-k">Choc sur K (bp)</label><input type="number" id="i-k" value="25" step="5"></div>
+        <div class="champ"><label for="i-c">Choc sur la courbe (bp)</label><input type="number" id="i-c" value="25" step="5"></div>
+        <div class="btns"><button type="button" class="btn" id="l-go">Recalculer</button></div>
+        <progress id="l-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="l-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="grille-res">
+          <div class="carte-res"><h2>1. Les européennes restent fixes, la bermudéenne monte</h2>
+            <p class="aide">Après recalibration, chaque européenne coterminale garde son prix de marché ; la bermudéenne (EDP) monte avec λ.
+              En tirets : sans recalibration (σ figées à la calibration de λ de l'onglet Pricer), tout baisse.</p>
+            <div class="graphe haut" id="g-l-prix"></div></div>
+          <div class="carte-res"><h2>2. La recalibration compense λ par σ</h2>
+            <p class="aide">Les σ calibrées, segment par segment : plus le retour à la moyenne amortit les chocs, plus la volatilité
+              instantanée doit monter pour reproduire les mêmes européennes.</p>
+            <div class="graphe haut" id="g-l-sig"></div></div>
+          <div class="carte-res"><h2>3. La corrélation entre dates d'exercice diminue</h2>
+            <p class="aide">corr(X<sub>T<sub>i</sub></sub>, X<sub>T<sub>j</sub></sub>) = √(α(T<sub>i</sub>) / α(T<sub>j</sub>)), avec
+              α(t) = ∫₀ᵗ σ² e<sup>2λu</sup> du. Le taux court étant affine en X, c'est aussi sa corrélation entre les deux dates.</p>
+            <div class="graphe haut" id="g-l-corr"></div></div>
+          <div class="carte-res"><h2>4. La prime d'exercice anticipé grandit</h2>
+            <p class="aide">Bermudéenne − plus chère des européennes : la valeur du choix de la date, tracée contre la corrélation entre
+              la première et la dernière date d'exercice.</p>
+            <div class="graphe haut" id="g-l-eep"></div></div>
+        </div>
+        <div class="carte-res">
+          <h2>Les chiffres</h2>
+          <div class="defile"><table id="t-l"><thead><tr><th>λ</th><th>σ calibrées (bp)</th><th>corr(T<sub>1</sub>, T<sub>n</sub>)</th><th>plus chère des européennes</th><th>bermudéenne</th><th>prime d'exercice</th><th>bermudéenne sans recalibration</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="carte-res">
+          <h2>Impact de chaque paramètre (avec recalibration)</h2>
+          <p class="aide">Variation du prix de la bermudéenne, en points de base de nominal, pour un choc à la baisse et à la hausse de chaque
+            entrée, le modèle étant recalibré à chaque fois. La dernière ligne montre λ sans recalibration : l'effet s'inverse.</p>
+          <div class="graphe haut" id="g-impact"></div>
+          <div class="defile"><table id="t-impact"><thead><tr><th>paramètre</th><th>choc</th><th>Δ bermudéenne (bas)</th><th>Δ bermudéenne (haut)</th><th>Δ européenne max (bas)</th><th>Δ européenne max (haut)</th></tr></thead><tbody></tbody></table></div>
         </div>
       </div>
     </div>
@@ -314,10 +390,51 @@ function etudes(p, e, progres) {
   });
   return out;
 }
+// retour à la moyenne : recalibration pour chaque λ, corrélations, et comparaison à σ figées
+function etudeLambda(p, e, progres) {
+  const q0 = Object.assign({}, p, {mode: "calibree"}), b0 = construire(q0), cal0 = caler(q0, b0);
+  const tMax = p.ex[p.ex.length - 1], n = p.ex.length;
+  const edp = (modele, berm, q) => HJM.prixEDP(modele, berm, HJM.grilleEcartsTypes(modele, tMax, q.nstd, q.nx, q.nt), false, optEDP(q));
+  const total = e.lams.length * (e.sans ? 2 : 1) + 8; let fait = 0; const pas = () => progres(++fait / total);
+  const lignes = e.lams.map(l => {
+    const q = Object.assign({}, q0, {lam: l});
+    let r;
+    try {
+      const b = construire(q), c = caler(q, b), M = c.modele;
+      const corr = [];
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) corr.push({i, j, v: Math.sqrt(M.alpha(p.ex[i]) / M.alpha(p.ex[j]))});
+      r = {l, sig: c.sigmas, eur: c.modeles, berm: edp(M, b.berm, q), corr};
+    } catch (err) { r = {l, erreur: err.message}; }
+    pas();
+    if (e.sans && !r.erreur) {
+      const M = HJM.Modele(b0.courbe, l, p.ex, cal0.sigmas, p.conv);
+      r.bermSans = edp(M, b0.berm, q); r.eurSans = Math.max(...b0.inst.map(it => M.jamshidian(it.swaption))); pas();
+    }
+    return r;
+  });
+  // impact de chaque paramètre, recalibré
+  const base = edp(cal0.modele, b0.berm, q0), eurBase = Math.max(...cal0.modeles);
+  const scen = (q, recal = true) => {
+    const b = construire(q);
+    const c = recal ? caler(q, b) : (() => { const M = HJM.Modele(b.courbe, q.lam, q.ex, cal0.sigmas, q.conv); return {modele: M, modeles: b.inst.map(it => M.jamshidian(it.swaption))}; })();
+    pas(); return {berm: edp(c.modele, b.berm, q) - base, eur: Math.max(...c.modeles) - eurBase};
+  };
+  const decale = (q, bp) => Object.assign({}, q, {courbeP: q.courbeP.map((d, k) => d * Math.exp(-bp * q.courbeT[k]))});
+  const essai = f => { try { return f(); } catch (err) { pas(); return {erreur: err.message}; } };
+  const chocs = [
+    {nom: "λ (recalibré)", choc: "± " + e.dl, bas: essai(() => scen(Object.assign({}, q0, {lam: Math.max(0, q0.lam - e.dl)}))), haut: essai(() => scen(Object.assign({}, q0, {lam: q0.lam + e.dl})))},
+    {nom: "vols de marché", choc: "± " + (e.dv * 100) + " %", bas: essai(() => scen(Object.assign({}, q0, {vols: q0.vols.map(v => v * (1 - e.dv))}))), haut: essai(() => scen(Object.assign({}, q0, {vols: q0.vols.map(v => v * (1 + e.dv))})))},
+    {nom: "strike K", choc: "± " + (e.dk * 1e4) + " bp", bas: essai(() => scen(Object.assign({}, q0, {K: q0.K - e.dk}))), haut: essai(() => scen(Object.assign({}, q0, {K: q0.K + e.dk})))},
+    {nom: "courbe (parallèle)", choc: "± " + (e.dc * 1e4) + " bp", bas: essai(() => scen(decale(q0, -e.dc))), haut: essai(() => scen(decale(q0, e.dc)))},
+    {nom: "λ sans recalibration", choc: "± " + e.dl, bas: essai(() => scen(Object.assign({}, q0, {lam: Math.max(0, q0.lam - e.dl)}), false)), haut: essai(() => scen(Object.assign({}, q0, {lam: q0.lam + e.dl}), false))},
+  ];
+  return {lignes, base, eurBase, chocs, lam0: q0.lam};
+}
 self.onmessage = ev => {
   const {id, type, p, e} = ev.data;
   try {
-    const res = type === "etudes" ? etudes(p, e, f => self.postMessage({id, progres: f})) : calculer(p);
+    const prog = f => self.postMessage({id, progres: f});
+    const res = type === "etudes" ? etudes(p, e, prog) : type === "lambda" ? etudeLambda(p, e, prog) : calculer(p);
     self.postMessage({id, ok: true, res});
   } catch (err) { self.postMessage({id, ok: false, msg: err.message}); }
 };
@@ -573,6 +690,55 @@ $("e-go").onclick = async () => {
   const echecs = r.parConv.flatMap(pc => [...pc.lam, ...pc.k, ...pc.vol]).filter(o => o.erreur);
   if (echecs.length) { $("e-etat").textContent += ` · ${echecs.length} point(s) sans calibration possible : ${echecs[0].erreur}`; $("e-etat").className = "etat err"; }
 };
+
+// ---------- retour à la moyenne ----------
+let lambdaFait = false;
+async function lancerLambda() {
+  let p; try { p = lire(); } catch (err) { $("l-etat").textContent = err.message; $("l-etat").className = "etat err"; return; }
+  const lams = listeNombres($("l-vals").value).filter(v => v >= 0 && v <= 2).sort((a, b) => a - b);
+  if (lams.length < 2) { $("l-etat").textContent = "au moins deux valeurs de λ (entre 0 et 2)"; $("l-etat").className = "etat err"; return; }
+  const e = {lams, sans: $("l-sans").checked, dl: Math.abs(lireNombre($("i-lam"), 0.02)), dv: Math.abs(lireNombre($("i-vol"), 10)) / 100,
+    dk: Math.abs(lireNombre($("i-k"), 25)) / 1e4, dc: Math.abs(lireNombre($("i-c"), 25)) / 1e4};
+  $("l-go").disabled = true; $("l-prog").hidden = false; $("l-prog").value = 0; $("l-etat").className = "etat"; $("l-etat").textContent = "Recalibrations…";
+  const t0 = Date.now();
+  const m = await demander("lambda", p, e, f => { $("l-prog").value = f; });
+  $("l-go").disabled = false; $("l-prog").hidden = true;
+  if (!m.ok) { $("l-etat").textContent = m.msg; $("l-etat").className = "etat err"; return; }
+  lambdaFait = true;
+  const r = m.res, L = r.lignes.filter(o => !o.erreur), n = p.ex.length, f6 = v => v.toFixed(6);
+  $("l-etat").textContent = `${L.length} recalibrations en ${((Date.now() - t0) / 1000).toFixed(1)} s` + (L.length < r.lignes.length ? ` · ${r.lignes.length - L.length} λ sans calibration possible` : "");
+  $("l-etat").className = "etat " + (L.length < r.lignes.length ? "err" : "ok");
+  const xs = L.map(o => o.l), eurMax = L.map(o => Math.max(...o.eur));
+  const sPrix = [{nom: "bermudéenne (recalibrée)", x: xs, y: L.map(o => o.berm), couleur: "c1", marqueurs: true, epaisseur: 2.5},
+    {nom: "plus chère des européennes (recalibrée)", x: xs, y: eurMax, couleur: "c3", marqueurs: true}];
+  p.ex.forEach((t, i) => { if (i < n - 1) sPrix.push({nom: `européenne T = ${t}`, x: xs, y: L.map(o => o.eur[i]), couleur: "c3", epaisseur: 1, sansLegende: true}); });
+  if (e.sans) {
+    sPrix.push({nom: "bermudéenne sans recalibration", x: xs, y: L.map(o => o.bermSans), couleur: "c1", tirets: true});
+    sPrix.push({nom: "européenne max sans recalibration", x: xs, y: L.map(o => o.eurSans), couleur: "c3", tirets: true});
+  }
+  Graphe.tracer($("g-l-prix"), {series: sPrix, xlab: "λ", ylab: "prix", yfmt: f6});
+  Graphe.tracer($("g-l-sig"), {series: p.ex.map((t, j) => ({nom: `σ sur ]${j ? p.ex[j - 1] : 0}, ${t}]`, x: xs, y: L.map(o => o.sig[j] * 1e4), couleur: "c" + (1 + j % 8), marqueurs: true})),
+    xlab: "λ", ylab: "σ calibrée (bp)", yfmt: v => v.toFixed(0)});
+  const paires = L[0].corr;
+  Graphe.tracer($("g-l-corr"), {series: paires.map((c, k) => ({nom: `corr(T = ${p.ex[c.i]}, T = ${p.ex[c.j]})`, x: xs, y: L.map(o => o.corr[k].v), couleur: "c" + (1 + k % 8), marqueurs: true})),
+    xlab: "λ", ylab: "corrélation", yfmt: v => v.toFixed(2)});
+  const k1n = paires.findIndex(c => c.i === 0 && c.j === n - 1);
+  Graphe.tracer($("g-l-eep"), {series: [{nom: "prime d'exercice anticipé", x: L.map(o => o.corr[k1n].v), y: L.map((o, k) => o.berm - eurMax[k]), couleur: "c4", marqueurs: true,
+    etiquettes: L.map(o => `λ = ${o.l}, corrélation = ${o.corr[k1n].v.toFixed(3)}`)}], xlab: `corr(T = ${p.ex[0]}, T = ${p.ex[n - 1]})`, ylab: "bermudéenne − européenne max", yfmt: f6, xfmt: v => v.toFixed(2)});
+  $("t-l").tBodies[0].innerHTML = L.map((o, k) => `<tr><td>${o.l}</td><td>${o.sig.map(s => (s * 1e4).toFixed(1)).join(" / ")}</td><td>${o.corr[k1n].v.toFixed(4)}</td>
+    <td>${f6(eurMax[k])}</td><td>${f6(o.berm)}</td><td>${f6(o.berm - eurMax[k])}</td><td>${o.bermSans != null ? f6(o.bermSans) : "—"}</td></tr>`).join("");
+  // impact de chaque paramètre
+  const C = r.chocs, bpN = v => v == null || !isFinite(v) ? NaN : v * 1e4;
+  Graphe.tracer($("g-impact"), {series: [
+    {nom: "choc à la baisse", x: C.map((c, k) => k), y: C.map(c => bpN(c.bas.berm)), type: "barres", couleur: "c2", etiquettes: C.map(c => c.nom + " (baisse)")},
+    {nom: "choc à la hausse", x: C.map((c, k) => k), y: C.map(c => bpN(c.haut.berm)), type: "barres", couleur: "c4", etiquettes: C.map(c => c.nom + " (hausse)")}],
+    xlab: "paramètre", ylab: "Δ bermudéenne (bp)", yfmt: v => v.toFixed(1),
+    xfmt: v => { const k = Math.round(v); return Math.abs(v - k) < 1e-9 && C[k] ? C[k].nom : ""; }});
+  const cel = (o, cle) => o.erreur ? `<td class="vide">non calibrable</td>` : `<td>${(o[cle] * 1e4 >= 0 ? "+" : "") + (o[cle] * 1e4).toFixed(2)} bp</td>`;
+  $("t-impact").tBodies[0].innerHTML = C.map(c => `<tr><td>${c.nom}</td><td>${c.choc}</td>${cel(c.bas, "berm")}${cel(c.haut, "berm")}${cel(c.bas, "eur")}${cel(c.haut, "eur")}</tr>`).join("");
+}
+$("l-go").onclick = lancerLambda;
+document.addEventListener("vue", ev => { if (ev.detail === "lambda" && !lambdaFait) lancerLambda(); });
 
 // ---------- code source ----------
 const CODE = /*__CODE__*/;
