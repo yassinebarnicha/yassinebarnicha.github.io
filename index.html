@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mohammed-Yassine Barnicha — Finance quantitative</title>
+<meta name="description" content="Projets de Mohammed-Yassine Barnicha : calibration d'options Bitcoin dans le navigateur, deep optimal stopping, swaptions bermudéennes sous HJM, options lookback en C++, EDP de Black-Scholes, apprentissage profond.">
+<meta property="og:title" content="Mohammed-Yassine Barnicha — Finance quantitative">
+<meta property="og:description" content="Pricing, calibration et méthodes numériques : applications et code source.">
+<meta property="og:image" content="https://yassinebarnicha.github.io/img/calibration.webp">
+<meta name="theme-color" content="#161616">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23161616'/%3E%3Cpath d='M5 24 Q11 6 16 16 T27 8' stroke='%230f62fe' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<style>
+/* Même langage visuel que l'application de calibration : fond neutre, angles droits, chiffres en chasse fixe.
+   Aucune police ni bibliothèque externe : la page reste autonome. */
+:root{
+  color-scheme:light;
+  --ground:#f4f4f4;--panel:#fff;--sunk:#e8e8e8;--ink:#161616;--ink2:#525252;--line:#c6c6c6;
+  --accent:#0f62fe;--accent-hover:#0050e6;--accent-ink:#fff;--tag:#edf5ff;--tag-ink:#0043ce;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){color-scheme:dark;
+    --ground:#161616;--panel:#262626;--sunk:#393939;--ink:#f4f4f4;--ink2:#c6c6c6;--line:#525252;
+    --accent:#4589ff;--accent-hover:#78a9ff;--accent-ink:#161616;--tag:#002d9c;--tag-ink:#d0e2ff}
+}
+:root[data-theme="dark"]{color-scheme:dark;
+  --ground:#161616;--panel:#262626;--sunk:#393939;--ink:#f4f4f4;--ink2:#c6c6c6;--line:#525252;
+  --accent:#4589ff;--accent-hover:#78a9ff;--accent-ink:#161616;--tag:#002d9c;--tag-ink:#d0e2ff}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.6 var(--sans);-webkit-text-size-adjust:100%}
+a{color:var(--accent)}
+a:hover{color:var(--accent-hover)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+img{max-width:100%;height:auto;display:block}
+.page{max-width:1180px;margin:0 auto;padding:0 24px}
+code,.mono{font-family:var(--mono);font-size:.9em}
+
+/* barre du haut */
+.barre{position:sticky;top:0;z-index:10;background:#161616;color:#fff;border-bottom:2px solid var(--accent)}
+.barre .page{display:flex;align-items:center;gap:16px;min-height:52px}
+.mono-nom{font:600 13px var(--mono);padding-right:16px;border-right:1px solid #525252}
+.barre .nom{font-weight:600;font-size:14px;white-space:nowrap}
+.barre nav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+.barre nav a{color:#c6c6c6;text-decoration:none;font-size:13px;padding:6px 10px}
+.barre nav a:hover{color:#fff;background:#393939}
+
+/* en-tête */
+.entete{padding:56px 0 40px;border-bottom:1px solid var(--line)}
+.surtitre{font:12px var(--mono);color:var(--ink2);text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px}
+h1{font-weight:400;font-size:clamp(32px,5vw,52px);line-height:1.1;letter-spacing:-.03em;margin:0 0 16px}
+.chapeau{font-size:clamp(16px,1.8vw,19px);color:var(--ink2);max-width:72ch;margin:0 0 28px}
+.chapeau b{color:var(--ink);font-weight:600}
+.boutons{display:flex;flex-wrap:wrap;gap:12px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;border:1px solid var(--accent);
+  text-decoration:none;font-weight:600;font-size:14px}
+.btn.plein{background:var(--accent);color:var(--accent-ink)}
+.btn.plein:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:var(--accent-ink)}
+.btn.creux{color:var(--accent);background:transparent}
+.btn.creux:hover{background:var(--tag)}
+.chiffres{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:40px}
+.chiffres div{background:var(--panel);padding:16px 18px}
+.chiffres b{display:block;font:500 26px/1.2 var(--mono);letter-spacing:-.02em}
+.chiffres span{font-size:12.5px;color:var(--ink2)}
+
+/* sections */
+section{padding:48px 0;border-bottom:1px solid var(--line)}
+h2{font-weight:400;font-size:clamp(24px,3vw,32px);letter-spacing:-.02em;margin:0 0 8px}
+.intro{color:var(--ink2);max-width:75ch;margin:0 0 28px}
+h3{font-size:17px;margin:0 0 6px;letter-spacing:-.01em}
+.etiquettes{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:0;list-style:none}
+.etiquettes li{font:12px var(--mono);background:var(--tag);color:var(--tag-ink);padding:2px 8px}
+
+/* projet vedette */
+.vedette{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;align-items:start}
+.cadre{background:var(--panel);border:1px solid var(--line);padding:6px}
+.cadre figcaption{font-size:12px;color:var(--ink2);padding:8px 4px 2px}
+figure{margin:0}
+.vedette ul.points{margin:0 0 20px;padding-left:18px}
+.vedette ul.points li{margin-bottom:6px}
+.galerie{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:24px}
+.galerie a{display:block;text-decoration:none;color:var(--ink2)}
+.galerie a:hover .cadre{border-color:var(--accent)}
+.galerie figcaption{font-size:12px}
+.colonnes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:36px}
+.colonnes h3{font-size:15px}
+.colonnes p,.colonnes li{font-size:14px;color:var(--ink2)}
+.colonnes ul{margin:0;padding-left:18px}
+.onglets-app{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:16px 0 0;padding:0;list-style:none}
+.onglets-app li{background:var(--panel);padding:12px 14px;font-size:13.5px;color:var(--ink2)}
+.onglets-app b{color:var(--ink);font-weight:600}
+.onglets-app .num{font:12px var(--mono);color:var(--accent);margin-right:6px}
+details.plus{margin-top:28px}
+details.plus summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+
+/* grille de projets */
+.grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.carte{background:var(--panel);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column}
+.carte:hover{border-color:var(--ink2)}
+.carte .langue{font:12px var(--mono);color:var(--ink2);margin:0 0 8px}
+.carte p{margin:0 0 10px;font-size:14px}
+.carte ul{margin:0 0 14px;padding-left:18px;font-size:13.5px;color:var(--ink2)}
+.carte ul li{margin-bottom:3px}
+.carte .liens{margin-top:auto;display:flex;flex-wrap:wrap;gap:16px;font-size:14px;font-weight:600}
+.carte .liens a{text-decoration:none}
+.carte .liens a:hover{text-decoration:underline}
+
+/* méthodes */
+.methodes{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.methodes div{background:var(--panel);padding:18px}
+.methodes h3{font-size:14px;text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);font-weight:500;color:var(--ink2);margin-bottom:10px}
+.methodes ul{margin:0;padding:0;list-style:none;font-size:14px}
+.methodes li{padding:3px 0;border-bottom:1px solid var(--sunk)}
+.methodes li:last-child{border-bottom:0}
+.methodes .ou{color:var(--ink2);font-size:12.5px}
+
+footer{padding:32px 0 48px;color:var(--ink2);font-size:13px}
+footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-between}
+
+@media (max-width:900px){
+  .vedette{grid-template-columns:minmax(0,1fr)}
+  .colonnes{grid-template-columns:minmax(0,1fr)}
+  .galerie{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .chiffres{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:600px){
+  .page{padding:0 16px}
+  .barre .nom{display:none}
+  .barre nav a{padding:6px 7px;font-size:12.5px}
+  .entete{padding:36px 0 32px}
+  section{padding:36px 0}
+  .grille{grid-template-columns:minmax(0,1fr)}
+  .btn{flex:1 1 auto;justify-content:center}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<div class="barre">
+  <div class="page">
+    <span class="mono-nom" aria-hidden="true">MYB</span>
+    <span class="nom">Mohammed-Yassine Barnicha</span>
+    <nav aria-label="Sections">
+      <a href="#calibration">Application</a>
+      <a href="#finance">Finance</a>
+      <a href="#data">Data &amp; IA</a>
+      <a href="#methodes">Méthodes</a>
+    </nav>
+  </div>
+</div>
+
+<main>
+<header class="entete">
+  <div class="page">
+    <p class="surtitre">Finance quantitative · pricing · calibration · méthodes numériques</p>
+    <h1>Mohammed-Yassine Barnicha</h1>
+    <p class="chapeau">Je construis des outils de <b>pricing et de calibration de produits dérivés</b> : transformées de
+      Fourier, Monte-Carlo, équations aux dérivées partielles et réseaux de neurones, du modèle mathématique jusqu'à
+      l'application utilisable. Cette page présente chaque projet, ce qu'il fait et comment il est construit ; tout le
+      code est public.</p>
+    <div class="boutons">
+      <a class="btn plein" href="https://yassinebarnicha.github.io/calibration-btc-svjd/">▶ Ouvrir l'application de calibration</a>
+      <a class="btn creux" href="#finance">Voir les projets</a>
+      <a class="btn creux" href="https://github.com/yassinebarnicha">GitHub</a>
+    </div>
+    <div class="chiffres">
+      <div><b>28</b><span>modèles de pricing composables, calibrés en direct</span></div>
+      <div><b>270+</b><span>jours de chaînes d'options Deribit, mis à jour chaque matin</span></div>
+      <div><b>≈ 650/s</b><span>évaluations complètes de la chaîne pendant une optimisation</span></div>
+      <div><b>12</b><span>projets publics : Python, C++, JavaScript, R</span></div>
+    </div>
+  </div>
+</header>
+
+<section id="calibration">
+  <div class="page">
+    <p class="surtitre">Projet phare · application en ligne</p>
+    <h2>Calibration d'options Bitcoin dans le navigateur</h2>
+    <p class="intro">Pricer, calibrer et analyser les options BTC de Deribit avec des modèles à sauts et à volatilité
+      stochastique, sans serveur de calcul ni installation : tout tourne dans le navigateur du visiteur, sur ordinateur
+      comme sur téléphone.</p>
+
+    <div class="vedette">
+      <figure class="cadre">
+        <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/"><img src="img/calibration.webp" width="1200" height="760"
+          alt="Smiles de volatilité implicite du marché et du modèle de Bates calibré, une courbe par échéance"></a>
+        <figcaption>Le modèle de Bates calibré sur les smiles Deribit : marché (points) et modèle (courbe), par échéance.</figcaption>
+      </figure>
+      <div>
+        <ul class="etiquettes"><li>JavaScript</li><li>Python</li><li>COS / PROJ</li><li>GitHub Actions</li></ul>
+        <ul class="points">
+          <li><b>Calibration interactive</b> : chaque curseur reprice toute la chaîne du jour en quelques millisecondes ;
+            cinq optimiseurs (Nelder–Mead classique et adaptatif, évolution différentielle, hybride).</li>
+          <li><b>Modèles composables</b> : Black-Scholes, Heston, double Heston ou Heston à sauts de variance, combinés
+            avec des sauts Merton, bi-log-normaux, Kou, CGMY, Variance Gamma ou NIG.</li>
+          <li><b>Analyse</b> : grecques du modèle contre Black-76, surface de volatilité en 3D, gamma exposure (GEX).</li>
+          <li><b>Pricer libre</b> : options saisies à la main ou fichier CSV ; exotiques par Monte-Carlo (asiatiques,
+            barrières, lookbacks, américaines par Longstaff-Schwartz, payoff en formule libre).</li>
+        </ul>
+        <div class="boutons">
+          <a class="btn plein" href="https://yassinebarnicha.github.io/calibration-btc-svjd/">▶ Démo</a>
+          <a class="btn creux" href="https://github.com/yassinebarnicha/calibration-btc-svjd">Code</a>
+          <a class="btn creux" href="https://github.com/yassinebarnicha/calibration-btc-svjd/blob/main/docs/GUIDE.md">Guide</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="galerie">
+      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/#Surface%20de%20vol"><figure class="cadre">
+        <img src="img/surface.webp" width="900" height="570" loading="lazy" alt="Surface de volatilité implicite en 3D, modèle et points de marché">
+        <figcaption>Surface de vol 3D</figcaption></figure></a>
+      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/#GEX"><figure class="cadre">
+        <img src="img/gex.webp" width="900" height="570" loading="lazy" alt="Gamma exposure par strike et niveau de bascule">
+        <figcaption>Gamma exposure (GEX)</figcaption></figure></a>
+      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/#Grecques"><figure class="cadre">
+        <img src="img/grecques.webp" width="900" height="570" loading="lazy" alt="Grecques du modèle comparées à Black-76, par strike">
+        <figcaption>Grecques modèle / Black-76</figcaption></figure></a>
+      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/"><figure class="cadre">
+        <img src="img/mobile.webp" width="900" height="645" loading="lazy" alt="Version téléphone : page, volet des onglets, volet des réglages">
+        <figcaption>Sur téléphone</figcaption></figure></a>
+    </div>
+
+    <div class="colonnes">
+      <div>
+        <h3>Les mathématiques</h3>
+        <p>Chaque modèle est défini par sa fonction caractéristique : un bloc de variance multiplié par une loi de sauts
+          compensée. Les prix viennent de la méthode <b>COS</b> (Fang–Oosterlee) ou de <b>PROJ</b> (Kirkby), puis sont
+          inversés en volatilités implicites. La perte compare modèle et marché en volatilité ou en prix, avec des
+          pondérations au choix.</p>
+      </div>
+      <div>
+        <h3>L'ingénierie</h3>
+        <p>Un site <b>100 % statique</b> : la page embarque ses pricers, chaque jour de données est un fichier chargé à la
+          demande. Une <b>GitHub Action</b> télécharge chaque matin la chaîne Deribit (API publique) et republie le site.
+          L'optimisation tourne par tranches de 12 ms pour que l'écran reste fluide.</p>
+      </div>
+      <div>
+        <h3>La validation</h3>
+        <ul>
+          <li>Parité call–put et martingalité vérifiées sur les 28 modèles.</li>
+          <li>Pricer JavaScript égal au pricer Python de référence à 6·10⁻⁶ $ près.</li>
+          <li>Monte-Carlo contrôlé contre le prix de Fourier (moins de 2 erreurs standard).</li>
+          <li>Temps à l'échéance compté à l'heure près.</li>
+        </ul>
+      </div>
+    </div>
+
+    <details class="plus">
+      <summary>Les onze onglets de l'application, un par un</summary>
+      <ol class="onglets-app">
+        <li><span class="num">01</span><b>Futures</b> — la trajectoire de chaque future depuis son émission.</li>
+        <li><span class="num">02</span><b>Échéances</b> — le choix des maturités à calibrer.</li>
+        <li><span class="num">03</span><b>Cible et filtres</b> — le prix visé (mid, bid, ask), les spreads, la moneyness.</li>
+        <li><span class="num">04</span><b>Pricer</b> — COS ou PROJ, options à la main, CSV, exotiques par Monte-Carlo.</li>
+        <li><span class="num">05</span><b>Modèle</b> — variance × sauts, avec la dynamique écrite en clair.</li>
+        <li><span class="num">06</span><b>Paramètres et optimiseur</b> — curseurs, bornes, contrainte de Feller, cinq optimiseurs.</li>
+        <li><span class="num">07</span><b>Perte</b> — la mesure et la pondération de l'erreur.</li>
+        <li><span class="num">08</span><b>Grecques</b> — Δ, Γ, Vega, Θ du modèle contre Black-76.</li>
+        <li><span class="num">09</span><b>Surface de vol</b> — en 3D, avec l'extrapolation du modèle.</li>
+        <li><span class="num">10</span><b>GEX</b> — exposition gamma par strike, niveau de bascule, call / put walls.</li>
+        <li><span class="num">11</span><b>Réglages</b> — enregistrer, comparer et exporter les jeux de paramètres.</li>
+      </ol>
+    </details>
+  </div>
+</section>
+
+<section id="finance">
+  <div class="page">
+    <p class="surtitre">Finance quantitative</p>
+    <h2>Pricing de dérivés et méthodes numériques</h2>
+    <p class="intro">Options exotiques, exercice anticipé et taux : chaque projet implémente une méthode de pricing et la
+      contrôle contre une référence (formule fermée, autre méthode ou valeurs publiées).</p>
+    <div class="grille">
+
+      <article class="carte">
+        <p class="langue">Python · PyTorch</p>
+        <h3>Deep Optimal Stopping</h3>
+        <p>Pricing d'options bermudéennes en grande dimension par réseaux de neurones, d'après Becker, Cheridito et
+          Jentzen (2019).</p>
+        <ul>
+          <li>Un réseau par date d'exercice apprend la règle d'arrêt.</li>
+          <li>Borne basse (politique apprise) et borne haute (dual), avec intervalle de confiance à 95 %.</li>
+          <li>Max-call bermudéen comparé à Longstaff-Schwartz ; convertible callable sur plusieurs actifs.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/Deep-Optimal-Stopping-">Code →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">Python</p>
+        <h3>Swaptions bermudéennes sous HJM</h3>
+        <p>Modèle HJM à un facteur avec retour à la moyenne et volatilité constante par morceaux.</p>
+        <ul>
+          <li>Calibration par bootstrap sur des swaptions coterminales (volatilités normales de Bachelier).</li>
+          <li>Swaption bermudéenne pricée par EDP, contrôlée par Monte-Carlo de Longstaff-Schwartz.</li>
+          <li>Sensibilités au strike, au niveau de volatilité et au retour à la moyenne.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/Bermudian-Swaptions-pricer-under-HJM-">Code →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">C++ · DLL · Excel</p>
+        <h3>Options lookback à strike flottant</h3>
+        <p>Bibliothèque C++ unifiée, réalisée en binôme, pour les lookbacks européens sous Black-Scholes.</p>
+        <ul>
+          <li>Moteur exact en un pas : l'extremum est tiré du pont brownien, sans biais de discrétisation.</li>
+          <li>Moteur à pas de temps avec correction BGK.</li>
+          <li>Grecques par bump-and-revalue à nombres aléatoires communs, appelables depuis Excel.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/Lookback_Options_Pricer">Code →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">Python · réseau de neurones</p>
+        <h3>Surrogate neuronal du modèle de Bates</h3>
+        <p>Un réseau qui approxime le prix Bates en une seule évaluation, pour tout jeu de paramètres d'une boîte
+          réaliste.</p>
+        <ul>
+          <li>Entraîné sur des prix COS (le professeur), sur les futures BTC.</li>
+          <li>Sert à accélérer la boucle de calibration par évolution différentielle.</li>
+          <li>Les paramètres finaux sont toujours revérifiés avec COS.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/DEEP_LEARNING/blob/main/amortized_bates_surrogate_colab.ipynb">Notebook →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">Python</p>
+        <h3>Longstaff-Schwartz</h3>
+        <p>L'algorithme de régression Monte-Carlo pour l'exercice américain.</p>
+        <ul>
+          <li>Put américain : trajectoires dans la monnaie, régression de la valeur de continuation.</li>
+          <li>Extension aux diffusions à sauts et comparaison avec le cas sans sauts.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/Longstaff-schwartz">Code →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">C++ · SDL2</p>
+        <h3>EDP de Black-Scholes</h3>
+        <p>Résolution par différences finies de l'équation de Black-Scholes pour les calls et les puts.</p>
+        <ul>
+          <li>θ-schéma : explicite, implicite ou Crank–Nicolson, systèmes tridiagonaux.</li>
+          <li>Forme complète et forme réduite de l'équation comparées.</li>
+          <li>Solutions et écarts tracés dans une fenêtre graphique.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/Black-Scholes-PDE-solving">Code →</a></div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<section id="data">
+  <div class="page">
+    <p class="surtitre">Data science et IA</p>
+    <h2>Apprentissage automatique, séries temporelles, sécurité des LLM</h2>
+    <p class="intro">Projets d'apprentissage et de recherche : modèles profonds, statistiques appliquées et attaques sur
+      les systèmes à base de modèles de langage.</p>
+    <div class="grille">
+
+      <article class="carte">
+        <p class="langue">Python · TensorFlow / Keras</p>
+        <h3>Apprentissage profond</h3>
+        <p>Trois architectures sur trois problèmes réels.</p>
+        <ul>
+          <li>MLP : résistance du béton (régression, comparaison de modèles).</li>
+          <li>LSTM et CNN 1D : consommation électrique d'un foyer, série minute par minute.</li>
+          <li>GAN convolutionnel : génération d'images Fashion-MNIST.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/DEEP_LEARNING">Code →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">Python · statistiques</p>
+        <h3>Ruptures dans les séries temporelles</h3>
+        <p>Régularité mensuelle des TER, région par région.</p>
+        <ul>
+          <li>Détection des points de rupture.</li>
+          <li>Estimation des paramètres de lois normales asymétriques.</li>
+          <li>Trains programmés et annulés, avec rapport.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/Time-Series-Analysis-">Code →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">Python · Mistral API · RAG</p>
+        <h3>ComPromptMized : ver par injection de prompt</h3>
+        <p>Reproduction de l'attaque Morris II sur un assistant e-mail à base de RAG.</p>
+        <ul>
+          <li>Un prompt auto-réplicant, retrouvé par la recherche vectorielle, détourne le modèle.</li>
+          <li>Montre pourquoi un contexte non filtré rend un système RAG vulnérable.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/ComPromptMized">Code →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">Python · scikit-learn</p>
+        <h3>Spaceship Titanic (Kaggle)</h3>
+        <p>Classification : quels passagers ont été transportés ?</p>
+        <ul>
+          <li>Ingénierie de variables (cabine, groupe, âge) et tests du χ².</li>
+          <li>Ridge, arbres, forêts aléatoires, gradient boosting, SVM comparés.</li>
+        </ul>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/Spceship-Titanic-Kaggle">Code →</a></div>
+      </article>
+
+      <article class="carte">
+        <p class="langue">R</p>
+        <h3>Rythmes circadiens et toxicité</h3>
+        <p>Classification de la toxicité de molécules à partir de leurs effets sur les rythmes circadiens des cellules,
+          en binôme.</p>
+        <div class="liens"><a href="https://github.com/yassinebarnicha/MRR-Project">Code →</a></div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<section id="methodes">
+  <div class="page">
+    <p class="surtitre">En un coup d'œil</p>
+    <h2>Méthodes et outils</h2>
+    <p class="intro">Ce que les projets ci-dessus mettent en œuvre, et où le voir.</p>
+    <div class="methodes">
+      <div><h3>Pricing</h3><ul>
+        <li>Fourier : COS, PROJ <span class="ou">· calibration BTC</span></li>
+        <li>Monte-Carlo, pont brownien, BGK <span class="ou">· lookback</span></li>
+        <li>Longstaff-Schwartz <span class="ou">· LSMC, HJM, BTC</span></li>
+        <li>Différences finies, θ-schéma <span class="ou">· EDP, HJM</span></li>
+        <li>Deep optimal stopping <span class="ou">· bermudéennes</span></li>
+      </ul></div>
+      <div><h3>Modèles</h3><ul>
+        <li>Black-Scholes, Black-76, Bachelier</li>
+        <li>Heston, double Heston, Bates</li>
+        <li>Sauts : Merton, Kou, CGMY, VG, NIG</li>
+        <li>HJM à un facteur</li>
+      </ul></div>
+      <div><h3>Calibration</h3><ul>
+        <li>Nelder–Mead classique et adaptatif</li>
+        <li>Évolution différentielle</li>
+        <li>Bootstrap sur swaptions coterminales</li>
+        <li>Surrogate neuronal</li>
+      </ul></div>
+      <div><h3>Langages et outils</h3><ul>
+        <li>Python, NumPy, SciPy, PyTorch, Keras</li>
+        <li>C++ (DLL, CMake, Excel)</li>
+        <li>JavaScript, HTML, CSS</li>
+        <li>R, Git, GitHub Actions</li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="page">
+    <span>© 2026 Mohammed-Yassine Barnicha · code sous licence MIT</span>
+    <span><a href="https://github.com/yassinebarnicha">github.com/yassinebarnicha</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
