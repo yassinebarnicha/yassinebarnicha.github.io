@@ -62,7 +62,7 @@ h1{font-weight:400;font-size:clamp(32px,5vw,52px);line-height:1.1;letter-spacing
 .btn.creux:hover{background:var(--tag)}
 .chiffres{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:40px}
 .chiffres div{background:var(--panel);padding:16px 18px}
-.chiffres b{display:block;font:500 26px/1.2 var(--mono);letter-spacing:-.02em}
+.chiffres b{display:block;font:600 16px/1.3 var(--sans);margin-bottom:4px}
 .chiffres span{font-size:12.5px;color:var(--ink2)}
 
 /* sections */
@@ -190,12 +190,12 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
   <div class="page">
     <p class="surtitre">Mathématiques appliquées · finance quantitative · machine learning</p>
     <h1>Mohammed-Yassine Barnicha</h1>
-    <p class="chapeau">Élève ingénieur à l'<b>ENSIIE</b> en mathématiques appliquées et informatique, formé à la finance quantitative au
-      <b>M2QF de Paris-Saclay</b> et aujourd'hui en <b>Master Mathématiques de la finance et des données (ex-DEA Lamberton)</b> à
-      l'Université Gustave Eiffel. Je recherche un <b>stage en recherche quantitative, développement quantitatif, ingénierie
-      financière ou machine learning</b>.</p>
-    <p class="chapeau" style="margin-top:-12px">Ci-dessous, mes projets de pricing et de calibration de dérivés : Fourier, Monte-Carlo, EDP et
-      réseaux de neurones, du modèle mathématique jusqu'à l'application utilisable en ligne, avec le code et sa validation.</p>
+    <p class="chapeau">Élève ingénieur à l'ENSIIE en mathématiques appliquées et informatique, j'ai suivi le M2QF de Paris-Saclay et je
+      poursuis le Master Mathématiques de la finance et des données (ex-DEA Lamberton) à l'Université Gustave Eiffel.
+      Je cherche un <b>CDI ou un stage</b> en recherche quantitative, développement quantitatif, ingénierie financière ou
+      machine learning.</p>
+    <p class="chapeau" style="margin-top:-12px">Cette page rassemble mes projets de pricing et de calibration de dérivés, avec leur code&nbsp;;
+      certains peuvent être utilisés directement en ligne.</p>
     <div class="boutons">
       <a class="btn plein" href="calibration-btc-svjd/">▶ Calibration d'options BTC</a>
       <a class="btn plein" href="swaptions-hjm/">▶ Swaptions bermudéennes HJM</a>
@@ -205,10 +205,10 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
       <a class="btn creux" href="https://github.com/yassinebarnicha">GitHub</a>
     </div>
     <div class="chiffres">
-      <div><b>26,7 bp</b><span>RMSE en volatilité implicite : calibration quotidienne de Bates sur les options BTC</span></div>
-      <div><b>≈ 21×</b><span>calibration plus rapide grâce à un surrogate neuronal du pricer de Bates</span></div>
-      <div><b>97,1 %</b><span>de précision pour un détecteur d'injection de prompt sur un LLM</span></div>
-      <div><b>20/20</b><span>en calcul stochastique à l'ENSIIE</span></div>
+      <div><b>Pricing</b><span>Fourier (COS, PROJ), Monte-Carlo, EDP, exercice anticipé</span></div>
+      <div><b>Calibration</b><span>modèles à sauts et volatilité stochastique, modèles de taux</span></div>
+      <div><b>Machine learning</b><span>surrogates de pricers, deep learning, sécurité des LLM</span></div>
+      <div><b>Code</b><span>Python, C++, JavaScript, Excel/VBA</span></div>
     </div>
   </div>
 </header>
@@ -232,7 +232,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
         <div class="etape"><span class="quand">2022–2026</span><h4>ENSIIE</h4>
           <p class="ou">Diplôme d'ingénieur en mathématiques appliquées et informatique, Évry</p>
           <p>Probabilités, statistique et séries temporelles, optimisation, machine learning, calcul scientifique (C++/Python).
-            <b>Calcul stochastique : 20/20 ; modèles de finance en temps discret : 19,5/20.</b></p></div>
+            Calcul stochastique : 20/20 ; modèles de finance en temps discret : 19,5/20.</p></div>
         <div class="etape"><span class="quand">2020–2022</span><h4>Classes préparatoires MPSI–MP</h4>
           <p class="ou">Maroc</p>
           <p>Deux ans de mathématiques et de physique intensives ; admis aux concours Centrale–SupOptique, Mines-Télécom et CCINP.</p></div>
@@ -243,16 +243,16 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
           <p class="ou">Stagiaire en recherche quantitative : pricing et calibration d'options vanilles BTC, Paris</p>
           <ul>
             <li>Calibration quotidienne d'un modèle de Bates à 8 paramètres (volatilité stochastique et sauts) sur 6 maturités Deribit,
-              options hors de la monnaie à plus de 10 jours : <b>26,7 bp de RMSE et 21,1 bp de MAE</b> en volatilité implicite.</li>
-            <li>Surrogate neuronal du pricer de Bates : calibration de toute la surface ramenée d'environ 10 min à <b>28 s (≈ 21×)</b>
+              options hors de la monnaie à plus de 10 jours : 26,7 bp de RMSE et 21,1 bp de MAE en volatilité implicite.</li>
+            <li>Surrogate neuronal du pricer de Bates : calibration de toute la surface ramenée d'environ 10 min à 28 s
               face au COS vectorisé et parallélisé ; PIDE de Bates validée par IMEX-ADI, PROJ et un solveur neuronal à contraintes dures.</li>
           </ul></div>
         <div class="etape"><span class="quand">mai – septembre 2025</span><h4>Thales CortAIx Labs</h4>
           <p class="ou">Stagiaire en recherche, deep learning (LLM), Palaiseau</p>
           <ul>
             <li>Détecteur d'injection de prompt indirecte sur Phi-3.5, à partir des scores d'attention et du flux résiduel : classifieurs
-              MLP et forêts aléatoires sur les 32 couches, tests croisés entre jeux de données ; <b>97,1 % de précision, ROC-AUC 99,94 %,
-              F1 ≈ 97 %</b>.</li>
+              MLP et forêts aléatoires sur les 32 couches, tests croisés entre jeux de données ; 97,1 % de précision, ROC-AUC 99,94 %,
+              F1 ≈ 97 %.</li>
           </ul></div>
         <div class="etape"><span class="quand">juin – août 2023</span><h4>Conservatoire national des arts et métiers (CNAM)</h4>
           <p class="ou">Stagiaire en recherche, modélisation statistique, Paris</p>
@@ -274,7 +274,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
 <section id="applications">
   <div class="page">
     <p class="surtitre">Applications en ligne</p>
-    <h2>Trois projets à utiliser directement</h2>
+    <h2>Trois projets utilisables en ligne</h2>
     <p class="intro">Chaque application tourne entièrement dans le navigateur, sans installation ; toutes les entrées sont modifiables
       et le code d'origine du projet est consultable dans l'onglet « Code source ».</p>
     <div class="apps">
@@ -301,7 +301,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
 
 <section id="calibration">
   <div class="page">
-    <p class="surtitre">Projet phare · application en ligne</p>
+    <p class="surtitre">Projet principal · application en ligne</p>
     <h2>Calibration d'options Bitcoin dans le navigateur</h2>
     <p class="intro">Pricer, calibrer et analyser les options BTC de Deribit avec des modèles à sauts et à volatilité
       stochastique, sans serveur de calcul ni installation : tout tourne dans le navigateur du visiteur, sur ordinateur
