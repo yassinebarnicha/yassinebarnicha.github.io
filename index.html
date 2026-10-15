@@ -291,25 +291,25 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
       <article class="carte">
         <p class="langue">Python</p>
         <h3>Swaptions bermudéennes sous HJM</h3>
-        <p>Modèle HJM à un facteur avec retour à la moyenne et volatilité constante par morceaux.</p>
+        <p>Modèle HJM à un facteur avec retour à la moyenne et volatilité constante par morceaux, utilisable en ligne.</p>
         <ul>
-          <li>Calibration par bootstrap sur des swaptions coterminales (volatilités normales de Bachelier).</li>
-          <li>Swaption bermudéenne pricée par EDP, contrôlée par Monte-Carlo de Longstaff-Schwartz.</li>
-          <li>Sensibilités au strike, au niveau de volatilité et au retour à la moyenne.</li>
+          <li>Calibration en direct par bootstrap sur des swaptions coterminales (volatilités normales de Bachelier).</li>
+          <li>Bermudéenne pricée par EDP (implicite ou Crank–Nicolson), contrôlée par Longstaff-Schwartz.</li>
+          <li>Revue du modèle : erreur de signe trouvée et corrigée dans la formule des zéro-coupons, contrôle de martingale.</li>
         </ul>
-        <div class="liens"><a href="https://github.com/yassinebarnicha/Bermudian-Swaptions-pricer-under-HJM-">Code →</a></div>
+        <div class="liens"><a href="swaptions-hjm/">▶ Ouvrir l'application</a><a href="swaptions-hjm/#code">Code →</a></div>
       </article>
 
       <article class="carte">
         <p class="langue">C++ · DLL · Excel</p>
         <h3>Options lookback à strike flottant</h3>
-        <p>Bibliothèque C++ unifiée, réalisée en binôme, pour les lookbacks européens sous Black-Scholes.</p>
+        <p>Bibliothèque C++ unifiée, réalisée en binôme, pour les lookbacks européens sous Black-Scholes, utilisable en ligne.</p>
         <ul>
           <li>Moteur exact en un pas : l'extremum est tiré du pont brownien, sans biais de discrétisation.</li>
-          <li>Moteur à pas de temps avec correction BGK.</li>
-          <li>Grecques par bump-and-revalue à nombres aléatoires communs, appelables depuis Excel.</li>
+          <li>Moteur à pas de temps avec correction BGK, ou pont exact par pas (ajouté, sans biais).</li>
+          <li>Grecques à nombres aléatoires communs ; dividende et option en cours de vie ajoutés.</li>
         </ul>
-        <div class="liens"><a href="https://github.com/yassinebarnicha/Lookback_Options_Pricer">Code →</a></div>
+        <div class="liens"><a href="options-lookback/">▶ Ouvrir l'application</a><a href="options-lookback/#code">Code →</a></div>
       </article>
 
       <article class="carte">

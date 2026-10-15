@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Options lookback — Mohammed-Yassine Barnicha</title>
+<meta name="description" content="Pricer d'options lookback à strike flottant : les deux moteurs Monte-Carlo C++ du projet (pont brownien exact, schéma en temps avec BGK) et la formule fermée, portés en JavaScript, avec dividende, extremum observé et tous les réglages.">
+<meta name="theme-color" content="#161616">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23161616'/%3E%3Cpath d='M5 24 Q11 6 16 16 T27 8' stroke='%230f62fe' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<style>
+/*__STYLE__*/
+.tab-res td small{color:var(--ink2);display:block;font-size:11px}
+.tab-res td.vide{color:var(--ink2)}
+.revue li{margin-bottom:8px}
+</style>
+</head>
+<body>
+<!--GABARIT--><p style="margin:0;padding:12px 16px;background:#fff1c7;color:#684e00;font:600 14px system-ui,sans-serif">Ceci est le gabarit, sans styles ni calculs : ouvrez <code>index.html</code> (construit par <code>python construire.py</code> à la racine du dépôt).</p><!--/GABARIT-->
+<div class="barre"><div class="page">
+  <a class="mono-nom" href="../" title="Page d'accueil">MYB</a>
+  <span class="titre">Options lookback à strike flottant</span>
+  <nav><a href="../">← Projets</a><a href="#code">Code source</a></nav>
+</div></div>
+
+<main class="page">
+  <header class="entete">
+    <p class="surtitre">C++ · Monte-Carlo · pont brownien · correction BGK · formule fermée</p>
+    <h1>Pricer d'options lookback</h1>
+    <p class="chapeau">Les deux moteurs C++ du projet, le <b>pont brownien exact</b> et le <b>schéma en temps avec correction BGK</b>,
+      sont portés ici en JavaScript ligne à ligne, avec le même générateur aléatoire que le C++ : réglages par défaut,
+      la page donne les nombres de la DLL. Au-delà, tout est réglable : dividende, <b>option en cours de vie</b>, correction de la
+      surveillance discrète, tailles des bumps des grecques.</p>
+  </header>
+
+  <div class="onglets" role="tablist">
+    <button type="button" data-vue="pricer">Pricer</button>
+    <button type="button" data-vue="courbes">Courbes</button>
+    <button type="button" data-vue="convergence">Convergence et biais</button>
+    <button type="button" data-vue="methode">Méthode et revue</button>
+    <button type="button" data-vue="code">Code source</button>
+  </div>
+
+  <!-- ============================== PRICER ============================== -->
+  <section class="vue" id="pricer">
+    <div class="espace">
+      <aside class="panneau reglages" aria-label="Entrées">
+        <h3>Contrat</h3>
+        <div class="champ"><label for="type">Type</label><select id="type"><option value="0">Call : S<sub>T</sub> − min S</option><option value="1" selected>Put : max S − S<sub>T</sub></option></select></div>
+        <div class="champ"><label for="t0">Date d'évaluation T<sub>0</sub></label><input type="date" id="t0" value="2026-01-01"></div>
+        <div class="champ"><label for="t1">Échéance T</label><input type="date" id="t1" value="2027-01-01"></div>
+        <div class="champ"><label for="ttm">Maturité restante (ans)</label><input type="number" id="ttm" step="0.05" value="1"></div>
+        <p class="aide">Maturité = (T − T<sub>0</sub>) / 365, comme dans l'Excel ; on peut aussi la saisir directement.</p>
+        <label class="case"><input type="checkbox" id="vie"> Option en cours de vie</label>
+        <div class="champ" id="ch-ext" hidden><label for="ext" id="lb-ext">Minimum déjà observé</label><input type="number" id="ext" value="90" step="1"></div>
+        <p class="aide" id="aide-ext" hidden>L'extremum atteint depuis l'émission ; à l'émission il vaut le spot. Le Γ n'est nul qu'à l'émission.</p>
+
+        <h3>Marché (Black-Scholes)</h3>
+        <div class="champ"><label for="spot"><b>S</b> spot</label><input type="number" id="spot" value="100" step="1"></div>
+        <div class="champ"><label for="rate"><b>r</b> taux continu</label><input type="number" id="rate" value="0.05" step="0.005"></div>
+        <div class="champ"><label for="q"><b>q</b> dividende continu</label><input type="number" id="q" value="0" step="0.005"></div>
+        <div class="champ"><label for="vol"><b>σ</b> volatilité</label><input type="number" id="vol" value="0.2" step="0.01"></div>
+
+        <h3>Pont brownien exact (Barnicha)</h3>
+        <div class="champ"><label for="pc">Chemins</label><input type="number" id="pc" value="10000" step="1000"></div>
+        <div class="champ"><label for="seed">Graine</label><input type="number" id="seed" value="42"></div>
+        <label class="case"><input type="checkbox" id="anti" checked> Variable antithétique (z ↔ −z)</label>
+        <label class="case"><input type="checkbox" id="thc"> Θ par différence centrée (le C++ : d'un seul côté)</label>
+        <details><summary class="aide" style="cursor:pointer">Tailles des bumps</summary>
+          <div class="champ"><label for="bS">spot (relatif)</label><input type="number" id="bS" value="0.0001" step="0.0001"></div>
+          <div class="champ"><label for="br">r (absolu)</label><input type="number" id="br" value="0.0001" step="0.0001"></div>
+          <div class="champ"><label for="bv">σ (absolu)</label><input type="number" id="bv" value="0.0001" step="0.0001"></div>
+          <div class="champ"><label for="bT">T (absolu, ans)</label><input type="number" id="bT" value="0.0001" step="0.0001"></div>
+        </details>
+
+        <h3>Schéma en temps (Chivet)</h3>
+        <div class="champ"><label for="pb">Chemins</label><input type="number" id="pb" value="10000" step="1000"></div>
+        <div class="champ"><label for="steps">Pas de temps</label><input type="number" id="steps" value="100" step="10"></div>
+        <div class="champ"><label for="seedb">Graine</label><input type="number" id="seedb" value="42"></div>
+        <div class="champ"><label for="corr">Surveillance discrète</label><select id="corr"><option value="aucune">sans correction</option><option value="bgk">correction BGK</option><option value="pont">pont exact par pas</option></select></div>
+        <div class="champ"><label for="beta">β de BGK</label><input type="number" id="beta" value="0.5826" step="0.0001"></div>
+        <label class="case"><input type="checkbox" id="stderr" checked> Erreurs standard des grecques</label>
+        <details><summary class="aide" style="cursor:pointer">Tailles des bumps (toutes relatives)</summary>
+          <div class="champ"><label for="cS">spot</label><input type="number" id="cS" value="0.001" step="0.0001"></div>
+          <div class="champ"><label for="cv">σ</label><input type="number" id="cv" value="0.001" step="0.0001"></div>
+          <div class="champ"><label for="cr">r</label><input type="number" id="cr" value="0.0001" step="0.0001"></div>
+          <div class="champ"><label for="cT">T</label><input type="number" id="cT" value="0.00273972602739726" step="0.0001"></div>
+        </details>
+        <div class="btns"><button type="button" class="btn" id="go">Calculer</button><button type="button" class="btn creux" id="defaut">Valeurs de l'Excel</button></div>
+      </aside>
+      <div class="resultats">
+        <div class="etat" id="etat" role="status"></div>
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">Formule fermée</div><div class="val" id="k-f">—</div><div class="sous" id="k-f-s"></div></div>
+          <div class="kpi"><div class="lbl">Pont brownien exact (MC)</div><div class="val" id="k-c">—</div><div class="sous" id="k-c-s"></div></div>
+          <div class="kpi"><div class="lbl">Schéma en temps (MC)</div><div class="val" id="k-b">—</div><div class="sous" id="k-b-s"></div></div>
+        </div>
+        <div class="carte-res">
+          <h2>Prix et grecques</h2>
+          <p class="aide">Les 48 valeurs de <code>price_lookback</code> : estimation et, pour le Monte-Carlo, ± 1,96 erreur standard.
+            Chaque moteur garde ses conventions : Θ<sub>Barnicha</sub> = −∂V/∂T, Θ<sub>Chivet</sub> = +∂V/∂T.</p>
+          <div class="defile"><table class="tab-res" id="t-res"><thead><tr><th>grandeur</th><th>pont exact (MC)</th><th>formule — conv. Barnicha</th><th>schéma en temps (MC)</th><th>formule — conv. Chivet</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="grille-res">
+          <div class="carte-res"><h2>Distribution des gains actualisés</h2>
+            <p class="aide">Pont exact, un gain par chemin (sans antithétique). Le prix est la moyenne de cette distribution.</p>
+            <div class="graphe" id="g-hist"></div></div>
+          <div class="carte-res"><h2>Chaque chemin : S<sub>T</sub> et son extremum</h2>
+            <p class="aide">En log-rendement. Le gain est l'écart vertical à la diagonale : l'extremum est toujours au-delà de 0 et de log(S<sub>T</sub>/S).</p>
+            <div class="graphe" id="g-nuage"></div></div>
+          <div class="carte-res"><h2>Loi de l'extremum : simulation contre théorie</h2>
+            <p class="aide">Histogramme des extrema tirés par le pont brownien et densité exacte de l'extremum d'un mouvement brownien
+              avec dérive : la superposition valide l'échantillonneur.</p>
+            <div class="graphe" id="g-ext"></div></div>
+          <div class="carte-res"><h2>Ce qui fait le prix</h2>
+            <p class="aide">Décomposition de l'espérance actualisée : E[extremum] et E[S<sub>T</sub>], simulées et exactes.</p>
+            <div class="defile"><table id="t-dec"><thead><tr><th>terme</th><th>simulé</th><th>exact</th></tr></thead><tbody></tbody></table></div></div>
+        </div>
+        <div class="carte-res">
+          <h2>Trajectoires et extrema courants</h2>
+          <p class="aide">Quelques chemins avec leur minimum (call) ou maximum (put) courant : le gain du lookback est l'écart final
+            entre la trajectoire et son extremum. Illustration.</p>
+          <div class="graphe haut" id="g-traj"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== COURBES ============================== -->
+  <section class="vue" id="courbes" hidden>
+    <div class="espace">
+      <aside class="panneau reglages">
+        <p class="aide" style="margin-top:0">Comme la feuille « CurveData » de l'Excel : une grandeur en fonction d'une entrée, les
+          autres restant celles de l'onglet Pricer.</p>
+        <div class="champ"><label for="cx">Variable en abscisse</label><select id="cx"><option value="spot">Spot S</option><option value="vol">Volatilité σ</option><option value="rate">Taux r</option><option value="q">Dividende q</option><option value="ttm">Maturité T</option></select></div>
+        <div class="champ"><label for="cmin">Minimum</label><input type="number" id="cmin" value="80"></div>
+        <div class="champ"><label for="cmax">Maximum</label><input type="number" id="cmax" value="120"></div>
+        <div class="champ"><label for="cn">Nombre de points</label><input type="number" id="cn" value="20"></div>
+        <div class="champ"><label for="cm1">Graphe 1</label><select id="cm1"></select></div>
+        <div class="champ"><label for="cm2">Graphe 2</label><select id="cm2"></select></div>
+        <label class="case"><input type="checkbox" id="c-cond" checked> Pont brownien exact</label>
+        <label class="case"><input type="checkbox" id="c-bgk" checked> Schéma en temps</label>
+        <label class="case"><input type="checkbox" id="c-an" checked> Formule fermée</label>
+        <p class="aide">Option en cours de vie et spot en abscisse : l'extremum observé reste fixe, le spot varie.</p>
+        <div class="btns"><button type="button" class="btn" id="c-go">Tracer</button></div>
+        <progress id="c-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="c-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="carte-res"><h2 id="c-t1">Prix</h2><div class="graphe haut" id="g-c1"></div></div>
+        <div class="carte-res"><h2 id="c-t2">Delta</h2><div class="graphe haut" id="g-c2"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== CONVERGENCE ============================== -->
+  <section class="vue" id="convergence" hidden>
+    <div class="espace">
+      <aside class="panneau reglages">
+        <h3>Convergence en nombre de chemins</h3>
+        <div class="champ"><label for="v-ch">Chemins</label><input type="text" id="v-ch" value="1000 2000 5000 10000 20000 50000 100000"></div>
+        <h3>Biais de discrétisation</h3>
+        <div class="champ"><label for="v-pas">Pas de temps</label><input type="text" id="v-pas" value="5 10 25 50 100 250"></div>
+        <div class="champ"><label for="v-pch">Chemins par point</label><input type="number" id="v-pch" value="20000"></div>
+        <p class="aide">Un extremum relevé à dates discrètes manque le vrai extremum entre deux dates. BGK le décale de
+          e<sup>±β σ √Δt</sup> (approximation) ; le pont par pas tire l'extremum exact entre deux dates (sans biais).</p>
+        <div class="btns"><button type="button" class="btn" id="v-go">Lancer</button></div>
+        <progress id="v-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="v-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="carte-res"><h2>Prix contre nombre de chemins</h2><p class="aide">Bandes : intervalles de confiance à 95 %.</p><div class="graphe haut" id="g-v1"></div></div>
+        <div class="carte-res"><h2>Biais de discrétisation selon la correction</h2><div class="graphe haut" id="g-v2"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== MÉTHODE ============================== -->
+  <section class="vue texte" id="methode" hidden>
+    <h2>Le contrat</h2>
+    <p>Lookback européen à strike flottant sous Black-Scholes avec dividende continu q :</p>
+    <div class="formule">call : S_T − min(m, min_{t≤s≤T} S_s)        put : max(M, max_{t≤s≤T} S_s) − S_T</div>
+    <p>où m (ou M) est l'extremum déjà atteint ; à l'émission, m = M = S.</p>
+
+    <h2>Moteur A — pont brownien exact en un pas (Barnicha)</h2>
+    <p>On tire X<sub>T</sub> = log S<sub>T</sub> exactement, puis l'extremum du pont brownien entre X<sub>t</sub> et X<sub>T</sub> :</p>
+    <div class="formule">P( max X ≤ y | X_t, X_T ) = 1 − exp( −2 (y − X_t)(y − X_T) / (σ² τ) )</div>
+    <p>dont l'inversion est une équation du second degré : un seul pas, <b>aucun biais de discrétisation</b>.</p>
+
+    <h2>Moteur B — schéma en temps (Chivet)</h2>
+    <p>Trajectoires sur N pas, extremum relevé aux dates de la grille, donc biaisé. Trois choix ici :</p>
+    <ul>
+      <li><b>sans correction</b> : la surveillance discrète, telle quelle ;</li>
+      <li><b>BGK</b> (le C++) : extremum décalé de e<sup>β σ √Δt</sup>, β = −ζ(½)/√(2π) ≈ 0,5826, une approximation asymptotique ;</li>
+      <li><b>pont exact par pas</b> (ajouté) : sur chaque pas, l'extremum du pont brownien est tiré avec la loi ci-dessus.
+        Le schéma devient exact pour la surveillance continue, quel que soit le nombre de pas.</li>
+    </ul>
+
+    <h2>Formule fermée</h2>
+    <p>Goldman-Sosin-Gatto, avec portage b = r − q et extremum observé (forme générale de Haug). À l'émission et sans dividende,
+      la page utilise la formule du code de chaque moteur ; la forme générale la retrouve à 10<sup>−10</sup> près, y compris
+      pour r = 0.</p>
+    <p>Propriété utile : le prix est homogène de degré 1 en (S, m). À l'émission, V = S · f(r, q, σ, T), donc
+      <b>Δ = V/S et Γ = 0</b> exactement : le Γ Monte-Carlo n'y est que du bruit. En cours de vie, Γ ≠ 0.</p>
+
+    <h2>Revue du code : défauts relevés</h2>
+    <ul class="revue">
+      <li><b>Le programme Barnicha ne compile pas</b> : <code>Barnicha/app/main.cpp</code> fait <code>using namespace lookback;</code>
+        alors que le namespace s'appelle <code>Barnicha</code>. C'est l'exécutable que les macros de l'Excel appellent.</li>
+      <li><b>Chivet ignore la graine</b> : <code>getRandomSeed()</code> renvoie l'horloge, deux calculs identiques diffèrent. Ici, la
+        graine saisie est utilisée.</li>
+      <li><b>Chivet : tirages communs imparfaits</b>. <code>setRandomSeed</code> réamorce le générateur, mais la loi normale garde
+        la valeur mise en réserve par la méthode polaire : les prix décalés ne partent pas des mêmes nombres, ce qui ajoute du
+        bruit aux grecques. Ici, la loi repart de zéro à chaque prix.</li>
+      <li><b>Chivet : erreur standard du ρ fausse</b>. L'estimation divise par 2·bump·r, l'erreur standard seulement par 2·bump.
+        Corrigé ici.</li>
+      <li><b>Chivet : Γ fermé quatre fois trop petit</b>. Divisé par (S·0,0002)² au lieu de (S·0,0001)² ; invisible à l'émission,
+        où Γ = 0. Corrigé ici.</li>
+      <li><b>Chivet : r = 0 interdit</b>. Le bump relatif sur r et la formule fermée (division par 2r) ne sont pas définis :
+        la page affiche « non défini ». Le moteur Barnicha traite la limite r → 0.</li>
+      <li><b>Conventions de Θ opposées</b> : Barnicha calcule (V(T−h) − V(T))/h, d'un seul côté ; Chivet calcule +∂V/∂T, centré.
+        Option ici : Θ centré pour Barnicha.</li>
+      <li><b>Barnicha tire u<sub>max</sub> et u<sub>min</sub> indépendamment</b> : juste pour ces contrats, qui n'utilisent qu'un
+        des deux extrema. Pour un payoff qui utilise les deux (max − min), il faudrait leur loi jointe.</li>
+      <li><b><code>out_size</code> jamais renseigné</b> par les deux fonctions exportées : l'appelant doit connaître la taille (48).</li>
+    </ul>
+
+    <h2>Validation du portage</h2>
+    <p>Le générateur <code>std::mt19937</code> et les lois de libstdc++ sont reproduits bit à bit. Avec la même graine, le moteur
+      Barnicha donne les prix du programme C++ compilé avec g++ à 10<sup>−15</sup> près. Le moteur Chivet donne de même les prix
+      du simulateur C++ (sans BGK et avec BGK) à 10<sup>−12</sup> près. Les grecques de la formule fermée sont celles de
+      l'Excel à 10<sup>−10</sup> près. Avec dividende ou en cours de vie, le Monte-Carlo retrouve la formule générale dans son
+      intervalle de confiance. Le pont par pas n'a aucun biais visible, même avec 5 pas.</p>
+  </section>
+
+  <section class="vue" id="code" hidden></section>
+</main>
+
+<footer><div class="page">
+  <span>© 2026 Mohammed-Yassine Barnicha et coauteur · licence MIT · calcul dans le navigateur</span>
+  <span><a href="https://github.com/yassinebarnicha/Lookback_Options_Pricer">Dépôt d'origine</a></span>
+</div></footer>
+
+<script>
+/*__GRAPHE__*/
+</script>
+<script>
+/*__UI__*/
+</script>
+<script type="text/plain" id="src-lb">
+/*__LB__*/
+</script>
+<script type="text/plain" id="src-travail">
+// ---- fil de calcul : appelle LB.priceLookback (portage de la DLL) ----
+function appel(method, p, s) {
+  const q = Object.assign({}, p, s || {});
+  return LB.priceLookback(method, q.ttm, q.type, q.spot, q.rate, q.vol, method === 1 ? q.pc : q.pb, q.steps, method === 1 ? q.seed : q.seedb,
+    q.stderr, q.corr === "bgk", {q: q.q, extremum: q.vie ? q.ext : null, antithetique: q.anti, thetaCentre: q.thc, correction: q.corr, beta: q.beta,
+      bumpsBarnicha: q.bB, bumpsChivet: q.bC});
+}
+// graphes descriptifs : détail du pont exact chemin par chemin
+function descriptif(p) {
+  const n = Math.min(p.pc, 50000), t = LB.tiragesPont(n, p.seed >>> 0), put = p.type === 1;
+  const m = {put, S: p.spot, r: p.rate, q: p.q, sig: p.vol, T: p.ttm, ext: p.vie ? p.ext : null};
+  const d = LB.detailPont(t, m), mu = p.rate - p.q - 0.5 * p.vol * p.vol;
+  const quantile = (a, u) => { const s = Float64Array.from(a).sort(); return s[Math.min(s.length - 1, Math.max(0, Math.floor(u * (s.length - 1))))]; };
+  // gains
+  const gmax = quantile(d.gain, 0.995) || 1, nb = 40, w = gmax / nb, hg = new Array(nb).fill(0);
+  let sg = 0; for (const v of d.gain) { sg += v; const j = Math.floor(v / w); if (j >= 0 && j < nb) hg[j]++; }
+  // extremum (log) : histogramme et densité exacte par bin
+  const lo = put ? 0 : quantile(d.le, 0.003), hi = put ? quantile(d.le, 0.997) : 0, ne = 50, we = (hi - lo) / ne, he = new Array(ne).fill(0);
+  for (const v of d.le) { const j = Math.floor((v - lo) / we); if (j >= 0 && j < ne) he[j]++; }
+  const F = y => LB.repartitionExtremum(put, y, mu, p.vol, p.ttm);
+  const theo = he.map((_, j) => { const a = lo + j * we, b = a + we; return (put ? F(b) - F(a) : F(a) - F(b)) / we; });
+  // décomposition : E[e^{-rT} ext], E[e^{-rT} S_T]
+  const disc = Math.exp(-p.rate * p.ttm); let se = 0, ss = 0;
+  for (let i = 0; i < n; i++) { let ext = p.spot * Math.exp(d.le[i]); if (m.ext != null) ext = put ? Math.max(ext, m.ext) : Math.min(ext, m.ext); se += disc * ext; ss += disc * p.spot * Math.exp(d.lx[i]); }
+  const k = Math.min(n, 1500);
+  return {n, w, hg: hg.map(c => c / (n * w)), centres: hg.map((_, j) => (j + 0.5) * w), moy: sg / n,
+    we, ce: he.map((_, j) => lo + (j + 0.5) * we), he: he.map(c => c / (n * we)), theo,
+    nuage: {x: Array.from(d.lx.slice(0, k)), y: Array.from(d.le.slice(0, k))}, eExt: se / n, eST: ss / n,
+    eSTexact: p.spot * Math.exp(-p.q * p.ttm)};
+}
+self.onmessage = ev => {
+  const {id, type, p, e} = ev.data;
+  try {
+    const prog = f => self.postMessage({id, progres: f});
+    let res;
+    if (type === "calcul") {
+      const t0 = performance.now(), cond = appel(1, p), t1 = performance.now(), bgk = appel(0, p), t2 = performance.now();
+      res = {cond, bgk, tc: t1 - t0, tb: t2 - t1, desc: descriptif(p)};
+    } else if (type === "courbe") {
+      res = [];
+      e.xs.forEach((x, i) => { const s = {[e.var]: x}; res.push({x, cond: e.cond ? appel(1, p, s) : null, bgk: e.bgk ? appel(0, p, s) : null}); prog((i + 1) / e.xs.length); });
+    } else if (type === "convergence") {
+      const tot = e.chemins.length * 2 + e.pas.length * 3; let k = 0;
+      const ch = e.chemins.map(n => { const a = appel(1, p, {pc: n}), b = appel(0, p, {pb: n}); prog((k += 2) / tot); return {n, cond: a, bgk: b}; });
+      const pas = e.pas.map(n => {
+        const o = {pb: e.pch, steps: n, stderr: false}, a = appel(0, p, Object.assign({corr: "aucune"}, o)), b = appel(0, p, Object.assign({corr: "bgk"}, o)), c = appel(0, p, Object.assign({corr: "pont"}, o));
+        prog((k += 3) / tot); return {n, brut: a, bgk: b, pont: c}; });
+      res = {ch, pas, ref: appel(1, p, {pc: 100})};
+    }
+    self.postMessage({id, ok: true, res});
+  } catch (err) { self.postMessage({id, ok: false, msg: String(err && err.message || err)}); }
+};
+</script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const {lireNombre, listeNombres, differe} = UI;
+const GRANDEURS = ["Prix", "Delta", "Gamma", "Theta", "Rho", "Vega"];
+["cm1", "cm2"].forEach((s, k) => { $(s).innerHTML = GRANDEURS.map((g, i) => `<option value="${i}">${g}</option>`).join(""); $(s).value = k; });
+const DEFAUT = {type: "1", t0: "2026-01-01", t1: "2027-01-01", ttm: 1, spot: 100, rate: 0.05, q: 0, vol: 0.2, pc: 10000, seed: 42, pb: 10000, steps: 100, seedb: 42,
+  corr: "aucune", beta: 0.5826, bS: 0.0001, br: 0.0001, bv: 0.0001, bT: 0.0001, cS: 0.001, cv: 0.001, cr: 0.0001, cT: 1 / 365, ext: 90,
+  vie: false, anti: true, thc: false, stderr: true};
+
+// ---------- fil de calcul ----------
+const travail = UI.travailleur("src-lb", "src-travail");
+let num = 0; const attente = {};
+travail.onmessage = ev => { const m = ev.data, f = attente[m.id]; if (!f) return; if (m.progres != null) { f.p && f.p(m.progres); return; } delete attente[m.id]; f.r(m); };
+const demander = (type, p, e, prog) => new Promise(r => { const id = ++num; attente[id] = {r, p: prog}; travail.postMessage({id, type, p, e}); });
+
+// ---------- entrées ----------
+const jours = (a, b) => (Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000;
+function majTtm() { const d = jours($("t0").value, $("t1").value); if (isFinite(d)) $("ttm").value = +(d / 365).toFixed(6); }
+$("t0").addEventListener("change", majTtm); $("t1").addEventListener("change", majTtm);
+function majVie() {
+  const v = $("vie").checked, put = $("type").value === "1";
+  $("ch-ext").hidden = !v; $("aide-ext").hidden = !v;
+  $("lb-ext").textContent = put ? "Maximum déjà observé" : "Minimum déjà observé";
+}
+$("vie").addEventListener("change", majVie); $("type").addEventListener("change", () => {
+  const S = lireNombre($("spot"), 100); if ($("vie").checked) $("ext").value = $("type").value === "1" ? Math.round(S * 1.1) : Math.round(S * 0.9); majVie(); });
+function appliquer(d) {
+  for (const k of ["type", "t0", "t1", "ttm", "spot", "rate", "q", "vol", "pc", "seed", "pb", "steps", "seedb", "corr", "beta", "bS", "br", "bv", "bT", "cS", "cv", "cr", "cT", "ext"]) $(k).value = d[k];
+  for (const k of ["vie", "anti", "thc", "stderr"]) $(k).checked = d[k];
+  majVie();
+}
+function lire() {
+  const N = (id, d) => lireNombre($(id), d);
+  const p = {type: +$("type").value, ttm: N("ttm", NaN), spot: N("spot", NaN), rate: N("rate", NaN), q: N("q", 0), vol: N("vol", NaN),
+    pc: Math.round(N("pc", 0)), seed: Math.round(N("seed", 42)), pb: Math.round(N("pb", 0)), steps: Math.round(N("steps", 0)), seedb: Math.round(N("seedb", 42)),
+    corr: $("corr").value, beta: N("beta", 0.5826), stderr: $("stderr").checked, anti: $("anti").checked, thc: $("thc").checked,
+    vie: $("vie").checked, ext: N("ext", NaN),
+    bB: {S: N("bS", 1e-4), r: N("br", 1e-4), sig: N("bv", 1e-4), T: N("bT", 1e-4)}, bC: {S: N("cS", 1e-3), sig: N("cv", 1e-3), r: N("cr", 1e-4), T: N("cT", 1 / 365)}};
+  if (!(p.ttm > 0)) throw new Error("la maturité doit être positive (T après T0)");
+  if (!(p.spot > 0)) throw new Error("le spot doit être positif");
+  if (!(p.vol > 0)) throw new Error("la volatilité doit être positive");
+  if (!isFinite(p.rate) || !isFinite(p.q)) throw new Error("taux ou dividende invalide");
+  if (p.vie && !(p.ext > 0)) throw new Error("extremum observé invalide");
+  if (p.vie && (p.type === 1 ? p.ext < p.spot : p.ext > p.spot)) throw new Error(p.type === 1 ? "le maximum déjà observé doit être ≥ au spot" : "le minimum déjà observé doit être ≤ au spot");
+  if (!(p.pc >= 10 && p.pc <= 2e6)) throw new Error("chemins du pont exact : entre 10 et 2 000 000");
+  if (!(p.pb >= 10 && p.pb <= 1e6)) throw new Error("chemins du schéma en temps : entre 10 et 1 000 000");
+  if (!(p.steps >= 1 && p.steps <= 10000)) throw new Error("pas de temps : entre 1 et 10 000");
+  if (p.pb * p.steps > 5e7) throw new Error("schéma en temps : chemins × pas limité à 50 millions (temps de calcul)");
+  for (const v of [...Object.values(p.bB), ...Object.values(p.bC)]) if (!(v > 0 && v < 0.5)) throw new Error("tailles de bump : entre 0 et 0,5");
+  return p;
+}
+
+// ---------- pricer ----------
+const f = (v, d = 6) => !isFinite(v) ? "—" : (Math.abs(v) !== 0 && (Math.abs(v) < 1e-4 || Math.abs(v) >= 1e7) ? v.toExponential(3) : v.toFixed(d));
+const cellule = (a, i, mc) => { const est = a[i * 4], se = a[i * 4 + 1];
+  if (!isFinite(est)) return `<td class="vide">— <small>non défini</small></td>`;
+  return `<td>${f(est)}${mc ? `<small>± ${f(1.96 * se, 6)}</small>` : ""}</td>`; };
+let numCalcul = 0;
+async function calculer() {
+  let p; try { p = lire(); } catch (err) { etat(err.message, "err"); return; }
+  const moi = ++numCalcul;
+  etat("Calcul…");
+  const m = await demander("calcul", p);
+  if (moi !== numCalcul) return;
+  if (!m.ok) { etat(m.msg, "err"); return; }
+  const {cond, bgk} = m.res;
+  $("t-res").tBodies[0].innerHTML = GRANDEURS.map((g, i) => `<tr><td>${g}</td>${cellule(cond, i, true)}${cellule(cond, 6 + i, false)}${cellule(bgk, i, p.stderr || i === 0)}${cellule(bgk, 6 + i, false)}</tr>`).join("");
+  const ref = cond[24];
+  $("k-f").textContent = f(ref); $("k-f-s").textContent = p.vie || p.q ? "Goldman-Sosin-Gatto général" : "Goldman-Sosin-Gatto";
+  $("k-c").textContent = f(cond[0]); $("k-c-s").textContent = `± ${f(1.96 * cond[1], 4)} · écart ${f(cond[0] - ref, 4)} · ${m.res.tc.toFixed(0)} ms`;
+  const nomCorr = {aucune: "", bgk: " · BGK", pont: " · pont par pas"}[p.corr];
+  $("k-b").textContent = f(bgk[0]); $("k-b-s").textContent = `± ${f(1.96 * bgk[1], 4)} · écart ${f(bgk[0] - ref, 4)}${nomCorr} · ${m.res.tb.toFixed(0)} ms`;
+  etat(`Pont exact ${p.pc} chemins · schéma ${p.pb} × ${p.steps} pas${nomCorr}`, "ok");
+  descriptifs(p, m.res.desc, ref);
+  trajectoires(p);
+}
+function descriptifs(p, d, ref) {
+  const put = p.type === 1, nomExt = put ? "maximum" : "minimum";
+  Graphe.tracer($("g-hist"), {series: [{nom: "densité des gains", x: d.centres, y: d.hg, type: "barres", couleur: "c2"},
+    {nom: `moyenne ${d.moy.toFixed(3)}`, x: [d.moy, d.moy], y: [0, Math.max(...d.hg)], couleur: "c5", epaisseur: 2},
+    {nom: `prix fermé ${ref.toFixed(3)}`, x: [ref, ref], y: [0, Math.max(...d.hg)], couleur: "c3", tirets: true}],
+    xlab: "gain actualisé", ylab: "densité", yfmt: v => v.toPrecision(2)});
+  const xs = d.nuage.x, lim = [Math.min(...xs, 0), Math.max(...xs, 0)];
+  Graphe.tracer($("g-nuage"), {series: [{nom: "chemins", x: xs, y: d.nuage.y, type: "points", rayon: 1.6, couleur: "c1", sansLegende: true},
+    {nom: "extremum = S_T", x: lim, y: lim, couleur: "c5", tirets: true}],
+    xlab: "log(S_T / S)", ylab: `log(${nomExt} / S)`, xfmt: v => v.toFixed(2), yfmt: v => v.toFixed(2)});
+  Graphe.tracer($("g-ext"), {series: [{nom: "simulé (pont exact)", x: d.ce, y: d.he, type: "barres", couleur: "c2"},
+    {nom: "densité exacte", x: d.ce, y: d.theo, couleur: "c5", epaisseur: 2}],
+    xlab: `log(${nomExt} / S)`, ylab: "densité", xfmt: v => v.toFixed(2), yfmt: v => v.toPrecision(2)});
+  const sgn = put ? "E[e<sup>−rT</sup> max] − E[e<sup>−rT</sup> S<sub>T</sub>]" : "E[e<sup>−rT</sup> S<sub>T</sub>] − E[e<sup>−rT</sup> min]";
+  $("t-dec").tBodies[0].innerHTML = `<tr><td>E[e<sup>−rT</sup> ${nomExt}]</td><td>${d.eExt.toFixed(4)}</td><td>${(put ? ref + d.eSTexact : d.eSTexact - ref).toFixed(4)}</td></tr>
+    <tr><td>E[e<sup>−rT</sup> S<sub>T</sub>] = S e<sup>−qT</sup></td><td>${d.eST.toFixed(4)}</td><td>${d.eSTexact.toFixed(4)}</td></tr>
+    <tr><td>prix = ${sgn}</td><td>${(put ? d.eExt - d.eST : d.eST - d.eExt).toFixed(4)}</td><td>${ref.toFixed(4)}</td></tr>
+    <tr><td>chemins (sans antithétique)</td><td>${d.n}</td><td></td></tr>`;
+}
+function etat(msg, cls) { $("etat").textContent = msg; $("etat").className = "etat" + (cls ? " " + cls : ""); }
+function trajectoires(p) {
+  let s = (p.seed >>> 0) || 1;
+  const u = () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return (s + 0.5) / 4294967296; };
+  const gauss = () => Math.sqrt(-2 * Math.log(u())) * Math.cos(2 * Math.PI * u());
+  const nPas = 250, dt = p.ttm / nPas, xs = Array.from({length: nPas + 1}, (_, k) => k * dt), series = [];
+  for (let c = 0; c < 6; c++) {
+    const e0 = p.vie ? p.ext : p.spot, S = [p.spot], E = [p.type === 0 ? Math.min(e0, p.spot) : Math.max(e0, p.spot)];
+    for (let k = 0; k < nPas; k++) { const v = S[k] * Math.exp((p.rate - p.q - 0.5 * p.vol * p.vol) * dt + p.vol * Math.sqrt(dt) * gauss()); S.push(v); E.push(p.type === 0 ? Math.min(E[k], v) : Math.max(E[k], v)); }
+    const coul = "c" + (1 + c);
+    series.push({nom: `chemin ${c + 1}`, x: xs, y: S, couleur: coul, epaisseur: 1.5, sansLegende: true}, {nom: `${p.type === 0 ? "minimum" : "maximum"} courant ${c + 1}`, x: xs, y: E, couleur: coul, tirets: true, epaisseur: 1.2, sansLegende: true});
+  }
+  Graphe.tracer($("g-traj"), {series, xlab: "temps (ans)", ylab: "S", yfmt: v => v.toFixed(0)});
+}
+$("go").onclick = calculer;
+$("defaut").onclick = () => { appliquer(DEFAUT); calculer(); };
+const auto = differe(calculer, 350);
+document.querySelector("#pricer .reglages").addEventListener("change", auto);
+
+// ---------- courbes ----------
+const BORNES = {spot: [80, 120], vol: [0.1, 0.5], rate: [0, 0.1], q: [0, 0.08], ttm: [0.25, 3]};
+$("cx").onchange = () => { const b = BORNES[$("cx").value]; $("cmin").value = b[0]; $("cmax").value = b[1]; };
+const erreurIci = (id, msg) => { $(id).textContent = msg; $(id).className = "etat err"; };
+$("c-go").onclick = async () => {
+  let p; try { p = lire(); } catch (err) { erreurIci("c-etat", err.message); return; }
+  const a = lireNombre($("cmin"), NaN), b = lireNombre($("cmax"), NaN), n = Math.round(lireNombre($("cn"), 20)), v = $("cx").value;
+  if (!(b > a) || !(n >= 2 && n <= 200)) { erreurIci("c-etat", "bornes ou nombre de points invalides (2 à 200)"); return; }
+  if ((v === "spot" || v === "vol" || v === "ttm") && !(a > 0)) { erreurIci("c-etat", "le minimum doit être positif pour cette variable"); return; }
+  if (v === "spot" && p.vie && (p.type === 1 ? b > p.ext : a < p.ext)) { erreurIci("c-etat", "en cours de vie, le spot doit rester du bon côté de l'extremum observé"); return; }
+  const xs = Array.from({length: n}, (_, i) => a + (b - a) * i / (n - 1));
+  const e = {var: v, xs, cond: $("c-cond").checked || $("c-an").checked, bgk: $("c-bgk").checked};
+  $("c-go").disabled = true; $("c-prog").hidden = false; $("c-etat").textContent = "Calcul…"; $("c-etat").className = "etat";
+  const t0 = Date.now();
+  const m = await demander("courbe", p, e, fr => { $("c-prog").value = fr; });
+  $("c-go").disabled = false; $("c-prog").hidden = true;
+  if (!m.ok) { erreurIci("c-etat", m.msg); return; }
+  $("c-etat").textContent = `${n} points en ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("c-etat").className = "etat ok";
+  const nomX = $("cx").selectedOptions[0].textContent;
+  [["cm1", "g-c1", "c-t1"], ["cm2", "g-c2", "c-t2"]].forEach(([sel, g, t]) => {
+    const i = +$(sel).value, series = [], xs2 = m.res.map(o => o.x);
+    $(t).textContent = GRANDEURS[i] + " en fonction de " + nomX.toLowerCase();
+    if ($("c-cond").checked) series.push({nom: "pont exact (MC)", x: xs2, y: m.res.map(o => o.cond[i * 4]), couleur: "c1", marqueurs: true,
+      bande: [m.res.map(o => o.cond[i * 4 + 2]), m.res.map(o => o.cond[i * 4 + 3])]});
+    if ($("c-bgk").checked) series.push({nom: "schéma en temps (MC)", x: xs2, y: m.res.map(o => o.bgk[i * 4]), couleur: "c4", marqueurs: true});
+    if ($("c-an").checked) series.push({nom: "formule fermée (conv. Barnicha)", x: xs2, y: m.res.map(o => o.cond[24 + i * 4]), couleur: "c3", tirets: true});
+    Graphe.tracer($(g), {series, xlab: nomX, ylab: GRANDEURS[i]});
+  });
+};
+
+// ---------- convergence ----------
+$("v-go").onclick = async () => {
+  let p; try { p = lire(); } catch (err) { erreurIci("v-etat", err.message); return; }
+  const e = {chemins: listeNombres($("v-ch").value).map(Math.round).filter(x => x >= 10 && x <= 1e6), pas: listeNombres($("v-pas").value).map(Math.round).filter(x => x >= 1 && x <= 5000), pch: Math.round(lireNombre($("v-pch"), 20000))};
+  if (!e.chemins.length || !e.pas.length || !(e.pch >= 100)) { erreurIci("v-etat", "listes vides ou chemins par point < 100"); return; }
+  if (Math.max(...e.pas) * e.pch > 2e7 || Math.max(...e.chemins) * p.steps > 5e7) { erreurIci("v-etat", "trop de chemins × pas (limite : 20 millions par point de biais, 50 millions par point de convergence)"); return; }
+  $("v-go").disabled = true; $("v-prog").hidden = false; $("v-etat").textContent = "Calcul…"; $("v-etat").className = "etat";
+  const t0 = Date.now();
+  const m = await demander("convergence", p, e, fr => { $("v-prog").value = fr; });
+  $("v-go").disabled = false; $("v-prog").hidden = true;
+  if (!m.ok) { erreurIci("v-etat", m.msg); return; }
+  $("v-etat").textContent = `Terminé en ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("v-etat").className = "etat ok";
+  const r = m.res, ref = r.ref[24], bande = (a, k) => [a.map(o => o[k][2]), a.map(o => o[k][3])];
+  Graphe.tracer($("g-v1"), {series: [
+    {nom: "pont exact (MC)", x: r.ch.map(o => o.n), y: r.ch.map(o => o.cond[0]), couleur: "c1", marqueurs: true, bande: bande(r.ch, "cond")},
+    {nom: `schéma en temps, ${p.steps} pas`, x: r.ch.map(o => o.n), y: r.ch.map(o => o.bgk[0]), couleur: "c4", marqueurs: true, bande: bande(r.ch, "bgk")},
+    {nom: "formule fermée", x: r.ch.map(o => o.n), y: r.ch.map(() => ref), couleur: "c3", tirets: true}], xlab: "chemins", ylab: "prix", xfmt: v => v >= 1000 ? (v / 1000) + "k" : v.toFixed(0)});
+  Graphe.tracer($("g-v2"), {series: [
+    {nom: "sans correction", x: r.pas.map(o => o.n), y: r.pas.map(o => o.brut[0]), couleur: "c5", marqueurs: true, bande: bande(r.pas, "brut")},
+    {nom: "BGK", x: r.pas.map(o => o.n), y: r.pas.map(o => o.bgk[0]), couleur: "c1", marqueurs: true, bande: bande(r.pas, "bgk")},
+    {nom: "pont exact par pas", x: r.pas.map(o => o.n), y: r.pas.map(o => o.pont[0]), couleur: "c6", marqueurs: true, bande: bande(r.pas, "pont")},
+    {nom: "formule fermée (continu)", x: r.pas.map(o => o.n), y: r.pas.map(() => ref), couleur: "c3", tirets: true}], xlab: "pas de temps", ylab: "prix"});
+};
+
+// ---------- code source ----------
+const CODE = /*__CODE__*/;
+let codePret = false;
+document.addEventListener("vue", ev => { if (ev.detail === "code" && !codePret) { codePret = true; UI.lecteurCode($("code"), CODE, "__DEPOT__"); } });
+
+appliquer(DEFAUT);
+calculer();
+</script>
+</body>
+</html>

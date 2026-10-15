@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Swaptions bermudéennes sous HJM — Mohammed-Yassine Barnicha</title>
+<meta name="description" content="Pricer en ligne de swaptions bermudéennes coterminales sous HJM à un facteur : calibration par bootstrap sur les volatilités normales, EDP et Monte-Carlo de Longstaff-Schwartz, revue et correction du modèle, dans le navigateur.">
+<meta name="theme-color" content="#161616">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23161616'/%3E%3Cpath d='M5 24 Q11 6 16 16 T27 8' stroke='%230f62fe' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<style>
+/*__STYLE__*/
+.revue li{margin-bottom:8px}
+.alerte{background:var(--warn-bg);color:var(--warn);padding:10px 14px;font-size:13px;border-left:3px solid var(--warn)}
+</style>
+</head>
+<body>
+<!--GABARIT--><p style="margin:0;padding:12px 16px;background:#fff1c7;color:#684e00;font:600 14px system-ui,sans-serif">Ceci est le gabarit, sans styles ni calculs : ouvrez <code>index.html</code> (construit par <code>python construire.py</code> à la racine du dépôt).</p><!--/GABARIT-->
+<div class="barre"><div class="page">
+  <a class="mono-nom" href="../" title="Page d'accueil">MYB</a>
+  <span class="titre">Swaptions bermudéennes sous HJM</span>
+  <nav><a href="../">← Projets</a><a href="#code">Code source</a></nav>
+</div></div>
+
+<main class="page">
+  <header class="entete">
+    <p class="surtitre">Taux d'intérêt · HJM à un facteur · EDP · Longstaff-Schwartz</p>
+    <h1>Pricer de swaptions bermudéennes coterminales</h1>
+    <p class="chapeau">Le modèle <b>HJM à un facteur</b> (retour à la moyenne λ, volatilité σ(t) constante par morceaux) est
+      <b>calibré en direct</b> sur des swaptions européennes coterminales cotées en volatilité normale, puis la bermudéenne est
+      pricée par <b>EDP</b> et contrôlée par <b>Monte-Carlo de Longstaff-Schwartz</b>. Toutes les entrées et tous les choix
+      numériques sont modifiables. La relecture du code a mis au jour une <b>erreur de signe</b> dans la formule des
+      zéro-coupons : la page utilise la formule corrigée et garde celle du code en option (onglet Méthode).</p>
+  </header>
+
+  <div class="onglets" role="tablist">
+    <button type="button" data-vue="pricer">Pricer et calibration</button>
+    <button type="button" data-vue="etudes">Études de sensibilité</button>
+    <button type="button" data-vue="methode">Méthode et revue</button>
+    <button type="button" data-vue="code">Code source</button>
+  </div>
+
+  <!-- ============================== PRICER ============================== -->
+  <section class="vue" id="pricer">
+    <div class="espace">
+      <aside class="panneau reglages" aria-label="Entrées">
+        <h3>Courbe zéro-coupon P(0,t)</h3>
+        <table class="tab-edit" id="t-courbe"><thead><tr><th>t (ans)</th><th>P(0,t)</th><th>taux zéro</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="btns"><button type="button" class="btn creux" id="courbe-plus">+ pilier</button>
+          <button type="button" class="btn creux" id="courbe-plat">Courbe à taux plat…</button></div>
+        <p class="aide">Interpolation linéaire des log-facteurs (comme <code>curve.py</code>), extrapolation plate ; P(0,0) = 1 ajouté si absent.</p>
+
+        <h3>Modèle</h3>
+        <div class="champ"><label for="lam"><b>λ</b> retour à la moyenne</label><input type="number" id="lam" step="0.01" value="0.03"></div>
+        <div class="champ"><label for="conv">Formule des zéro-coupons</label><select id="conv"><option value="corrigee">corrigée (sans arbitrage)</option><option value="code">celle du code</option></select></div>
+        <div class="champ"><label for="mode">Volatilité σ(t)</label><select id="mode"><option value="calibree">calibrée (bootstrap)</option><option value="imposee">imposée</option></select></div>
+
+        <h3>Produit</h3>
+        <div class="champ"><label for="sens">Sens</label><select id="sens"><option value="1">Payeuse</option><option value="0">Receveuse</option></select></div>
+        <div class="champ"><label for="strike"><b>K</b> taux fixe (%)</label><input type="number" id="strike" step="0.05" value="3"></div>
+        <div class="champ"><label for="terminal"><b>T<sub>N</sub></b> maturité finale</label><input type="number" id="terminal" step="0.5" value="7"></div>
+        <div class="champ"><label for="paie">Dates de paiement fixes</label><input type="text" id="paie" value="2 3 4 5 6 7"></div>
+        <div class="champ"><label for="accr">Fractions d'année</label><input type="text" id="accr" value="1 1 1 1 1 1"></div>
+        <div class="btns"><label class="aide" style="margin:0;align-self:center">Pas</label><input type="number" id="pas" value="1" step="0.25" style="width:80px">
+          <button type="button" class="btn creux" id="gen-paie">Générer l'échéancier</button></div>
+
+        <h3>Dates d'exercice, cotations et σ</h3>
+        <table class="tab-edit" id="t-ex"><thead><tr><th>exercice T<sub>k</sub></th><th>vol N (bp)</th><th>σ imposée (bp)</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="btns"><button type="button" class="btn creux" id="ex-plus">+ date d'exercice</button></div>
+        <p class="aide">Une swaption européenne coterminale par date (échéance T<sub>k</sub>, swap jusqu'à T<sub>N</sub>) et un segment de σ(t)
+          par date : calé par bootstrap, ou imposé (la colonne de droite sert alors, et la table montre l'écart au marché).</p>
+
+        <h3>Bootstrap (Brent)</h3>
+        <div class="champ"><label for="bas">σ minimale</label><input type="number" id="bas" value="0.000001" step="0.000001"></div>
+        <div class="champ"><label for="haut">σ maximale</label><input type="number" id="haut" value="0.2" step="0.01"></div>
+
+        <h3>EDP</h3>
+        <div class="champ"><label for="schema">Schéma en temps</label><select id="schema"><option value="1">implicite (le code)</option><option value="0.5">Crank–Nicolson</option></select></div>
+        <div class="champ"><label for="ran">Pas implicites de Rannacher</label><input type="number" id="ran" value="2" step="1"></div>
+        <div class="champ"><label for="nstd">Domaine ± n écarts-types</label><input type="number" id="nstd" value="5" step="0.5"></div>
+        <div class="champ"><label for="nx">Points d'espace n<sub>x</sub></label><input type="number" id="nx" value="501" step="50"></div>
+        <div class="champ"><label for="nt">Pas de temps n<sub>t</sub></label><input type="number" id="nt" value="1000" step="100"></div>
+
+        <h3>Monte-Carlo de Longstaff-Schwartz</h3>
+        <label class="case"><input type="checkbox" id="mc-on" checked> Calculer le prix LSMC</label>
+        <div class="champ"><label for="nmc">Trajectoires</label><input type="number" id="nmc" value="20000" step="1000"></div>
+        <div class="champ"><label for="graine">Graine</label><input type="number" id="graine" value="1234"></div>
+        <div class="champ"><label for="actu">Actualisation</label><select id="actu"><option value="exacte">exacte : e^(−∫r) simulé</option><option value="code">celle du code (taux figé)</option></select></div>
+        <div class="champ"><label for="spa">Sous-pas par an (∫r)</label><input type="number" id="spa" value="52" step="4"></div>
+        <div class="champ"><label for="deg">Degré de la régression</label><input type="number" id="deg" value="2" step="1" min="1" max="6"></div>
+        <label class="case"><input type="checkbox" id="indep"> Régression sur des chemins indépendants</label>
+        <div class="btns"><button type="button" class="btn creux" id="defaut">Réglages recommandés</button><button type="button" class="btn creux" id="notebook">Valeurs du notebook</button></div>
+      </aside>
+
+      <div class="resultats">
+        <div class="etat" id="etat" role="status">Calcul…</div>
+        <div class="alerte" id="alerte" hidden></div>
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">Bermudéenne — EDP</div><div class="val" id="k-edp">—</div><div class="sous" id="k-edp-s"></div></div>
+          <div class="kpi"><div class="lbl">Bermudéenne — LSMC</div><div class="val" id="k-mc">—</div><div class="sous" id="k-mc-s"></div></div>
+          <div class="kpi"><div class="lbl">Plus chère des européennes</div><div class="val" id="k-eur">—</div><div class="sous" id="k-eur-s"></div></div>
+          <div class="kpi"><div class="lbl">Prime d'exercice anticipé</div><div class="val" id="k-eep">—</div><div class="sous" id="k-eep-s"></div></div>
+        </div>
+
+        <div class="carte-res">
+          <h2>Calibration : swaptions européennes coterminales</h2>
+          <p class="aide">Prix de marché = Bachelier sur la vol normale cotée ; prix modèle = Jamshidian (somme d'options sur zéro-coupons),
+            reconverti en vol normale implicite.</p>
+          <div class="defile"><table id="t-cal"><thead><tr><th>échéance</th><th>swap fwd</th><th>annuité</th><th>vol N marché</th><th>vol N modèle</th><th>prix marché</th><th>prix modèle</th><th>écart</th><th>σ</th></tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <div class="grille-res">
+          <div class="carte-res"><h2>Volatilité σ(t)</h2><p class="aide">Constante par morceaux, un segment par date d'exercice.</p><div class="graphe" id="g-sigma"></div></div>
+          <div class="carte-res"><h2>Courbe des taux</h2><p class="aide">Taux zéro et forward instantané f(0,t) tirés de P(0,t).</p><div class="graphe" id="g-courbe"></div><p class="aide" id="courbe-note" style="margin:6px 0 0"></p></div>
+          <div class="carte-res"><h2>Éventail du taux court</h2><p class="aide">Quantiles de r<sub>t</sub> = A(t) + e<sup>−λt</sup> X<sub>t</sub>, X<sub>t</sub> gaussien de variance α(t) : 1 %, 5 %, 25 %, 50 %, 75 %, 95 %, 99 %.</p><div class="graphe" id="g-event"></div></div>
+          <div class="carte-res"><h2>Loi du facteur aux dates d'exercice</h2><p class="aide">Densité de X<sub>T<sub>k</sub></sub> ~ N(0, α(T<sub>k</sub>)) ; les traits verticaux marquent la frontière d'exercice trouvée par l'EDP.</p><div class="graphe" id="g-densite"></div></div>
+        </div>
+
+        <div class="carte-res">
+          <h2>Frontière d'exercice (EDP)</h2>
+          <p class="aide">À chaque date, l'option est exercée là où la valeur d'exercice dépasse la valeur de continuation.</p>
+          <div class="champ" style="max-width:360px"><label for="tranche">Date d'exercice</label><select id="tranche"></select></div>
+          <div class="graphe haut" id="g-front"></div>
+          <p class="aide" id="front-note"></p>
+        </div>
+
+        <div class="grille-res" id="c-mc">
+          <div class="carte-res">
+            <h2>Régression de Longstaff-Schwartz</h2>
+            <p class="aide">Chemins dans la monnaie : valeur future actualisée (points), continuation estimée par le polynôme (trait) et
+              valeur d'exercice (tirets). On exerce où les tirets passent au-dessus du trait.</p>
+            <div class="champ" style="max-width:360px"><label for="reg-date">Date</label><select id="reg-date"></select></div>
+            <div class="graphe haut" id="g-reg"></div>
+          </div>
+          <div class="carte-res">
+            <h2>Où le Monte-Carlo exerce</h2><p class="aide">Trajectoires exercées à chaque date.</p>
+            <div class="graphe" id="g-mc"></div>
+            <h2 style="margin-top:14px">Contrôle de martingale</h2>
+            <p class="aide">Prix Monte-Carlo des zéro-coupons avec l'actualisation choisie, contre la courbe : ils doivent coïncider.</p>
+            <div class="defile"><table id="t-mart"><thead><tr><th>T</th><th>P(0,T) courbe</th><th>Monte-Carlo</th><th>écart</th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== ÉTUDES ============================== -->
+  <section class="vue" id="etudes" hidden>
+    <div class="espace">
+      <aside class="panneau reglages" aria-label="Études">
+        <p class="aide" style="margin-top:0">Les études de <code>Main.ipynb</code>, sur les entrées et les choix de l'onglet Pricer. Les listes sont modifiables.</p>
+        <h3>Convergence de la grille EDP</h3>
+        <div class="champ"><label for="e-grilles">n<sub>x</sub>/n<sub>t</sub></label><input type="text" id="e-grilles" value="101/200 201/400 301/700 501/1000 1001/2000"></div>
+        <h3>Troncature du domaine</h3>
+        <div class="champ"><label for="e-nstd">n écarts-types</label><input type="text" id="e-nstd" value="3 4 5 6 7"></div>
+        <h3>Convergence LSMC</h3>
+        <div class="champ"><label for="e-mc">Trajectoires</label><input type="text" id="e-mc" value="2000 5000 10000 20000 50000"></div>
+        <h3>λ recalibré</h3>
+        <div class="champ"><label for="e-lam">Valeurs de λ</label><input type="text" id="e-lam" value="0 0.01 0.03 0.05 0.1 0.2 0.3"></div>
+        <h3>Strike (recalibré)</h3>
+        <div class="champ"><label for="e-k">K (%)</label><input type="text" id="e-k" value="2 2.5 3 3.5 4"></div>
+        <h3>Niveau des vols de marché</h3>
+        <div class="champ"><label for="e-vol">Facteurs</label><input type="text" id="e-vol" value="0.8 0.9 1 1.1 1.2"></div>
+        <label class="case"><input type="checkbox" id="e-deux" checked> Comparer les deux formules des zéro-coupons</label>
+        <div class="btns"><button type="button" class="btn" id="e-go">Lancer les études</button></div>
+        <progress id="e-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="e-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="grille-res">
+          <div class="carte-res"><h2>Convergence de la grille</h2><div class="graphe" id="g-e-grille"></div></div>
+          <div class="carte-res"><h2>Troncature du domaine</h2><div class="graphe" id="g-e-nstd"></div></div>
+          <div class="carte-res"><h2>LSMC contre EDP</h2><p class="aide">Bande : ± 1,96 erreur standard.</p><div class="graphe" id="g-e-mc"></div></div>
+          <div class="carte-res"><h2>Retour à la moyenne λ (recalibré)</h2><div class="graphe" id="g-e-lam"></div></div>
+          <div class="carte-res"><h2>σ calibrées en fonction de λ</h2><div class="graphe" id="g-e-lam-s"></div></div>
+          <div class="carte-res"><h2>Sensibilité au strike</h2><div class="graphe" id="g-e-k"></div></div>
+          <div class="carte-res"><h2>Niveau des volatilités</h2><div class="graphe" id="g-e-vol"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== MÉTHODE ============================== -->
+  <section class="vue texte" id="methode" hidden>
+    <h2>Le modèle</h2>
+    <p>Dans le cadre HJM, le forward instantané f(t,T) a pour volatilité <b>σ(t)·e<sup>−λ(T−t)</sup></b>. Ce choix séparable rend
+      le modèle markovien en un seul facteur, la variable d'état sans dérive</p>
+    <div class="formule">X_t = ∫₀ᵗ σ(u) e^{λu} dW_u ,   dX_t = η(t) dW_t ,   η(t) = σ(t) e^{λt}</div>
+    <p>Les zéro-coupons sont des exponentielles affines de X<sub>t</sub> :</p>
+    <div class="formule">P(t,T) = P(0,T)/P(0,t) · exp( −D(t,T) · ( c(t,T) + X_t ) )
+D(t,T) = B(T) − B(t),   B(t) = (1 − e^{−λt}) / λ
+c(t,T) = ½ (B(T) + B(t)) α(t) − γ(t)
+α(t) = ∫₀ᵗ σ² e^{2λu} du = Var[X_t],   γ(t) = ∫₀ᵗ σ² e^{2λu} B(u) du</div>
+    <p>et le taux court vaut r<sub>t</sub> = f(0,t) + e<sup>−λt</sup> (B(t) α(t) − γ(t)) + e<sup>−λt</sup> X<sub>t</sub>.</p>
+
+    <h2>Revue du code : l'erreur de signe</h2>
+    <p><code>hjm_1f.py</code> écrit <code>P(t,T) = P(0,T)/P(0,t) · exp(D · (c − X))</code> : le terme de convexité c(t,T) a le
+      <b>mauvais signe</b>, et le taux court <code>short_rate</code>, qui en est la dérivée, en hérite. On le vérifie en intégrant
+      la dérive HJM : −∫ₜᵀ ∫₀ᵗ σ<sub>f</sub>(s,u) ∫ₛᵘ σ<sub>f</sub>(s,v) dv ds du = −D(t,T) c(t,T).</p>
+    <p>Conséquences mesurées (σ = 150 bp, λ = 3 %) :</p>
+    <ul>
+      <li>le zéro-coupon actualisé n'est plus une martingale : E[e<sup>−∫r</sup> P(3,7)] dépasse P(0,7) de 1,5 % (plus de 200 erreurs
+        standard ; avec la formule corrigée, l'écart est au niveau du bruit) ;</li>
+      <li>le modèle se contredit : une swaption <b>européenne</b> vaut 0,02534 par Jamshidian mais 0,02103 par l'EDP et le
+        Monte-Carlo du même modèle ; corrigé, les trois donnent 0,02534 ;</li>
+      <li>sur le cas du notebook, la bermudéenne passe de 0,014929 à <b>0,016737</b> (+12 %). Les σ calibrées ne bougent presque
+        pas : Jamshidian n'utilise que P(0,·) et la variance des zéro-coupons.</li>
+    </ul>
+    <p>La page utilise la formule corrigée ; « Valeurs du notebook » remet celle du code et retrouve exactement les chiffres de
+      <code>Main.ipynb</code>.</p>
+
+    <h2>Autres points relevés et améliorations</h2>
+    <ul class="revue">
+      <li><b>Actualisation du Monte-Carlo</b>. <code>mc_1f.py</code> fige le taux court entre deux dates d'exercice, puis
+        actualise tout au taux court initial r(0) jusqu'à aujourd'hui, en ignorant la courbe : les facteurs d'actualisation sont
+        faux de 0,25 % à 2 ans et 0,54 % à 3 ans (tableau « Contrôle de martingale »). Ajouté : X tiré sur une grille fine et
+        e<sup>−∫r</sup> simulé chemin par chemin. Le LSMC rejoint alors l'EDP.</li>
+      <li><b>Biais de la régression</b>. Régresser et pricer sur les mêmes chemins biaise vers le haut. Ajouté : régression sur des
+        chemins indépendants (une borne basse) et degré du polynôme au choix.</li>
+      <li><b>Schéma en temps de l'EDP</b>. Euler implicite est d'ordre 1. Ajouté : Crank–Nicolson (ordre 2) avec des pas implicites de
+        Rannacher après chaque date d'exercice, pour amortir les oscillations nées de la non-régularité du gain.</li>
+      <li><b>Swaption receveuse</b>. Le Python renvoie la formule payeuse ; ici, Jamshidian avec des calls sur zéro-coupons. La
+        parité payeuse − receveuse = swap forward est vérifiée à 10<sup>−8</sup> près.</li>
+      <li><b>Liberté</b>. σ(t) imposée sans calibration, volatilités normales implicites du modèle affichées, toutes les grilles
+        et tous les choix numériques réglables.</li>
+    </ul>
+
+    <h2>La calibration</h2>
+    <p>Chaque date d'exercice porte une swaption européenne coterminale, cotée en volatilité normale : prix de marché par
+      <b>Bachelier</b>, prix modèle par la <b>décomposition de Jamshidian</b> (racine X* du swap à l'échéance, puis somme de puts
+      sur zéro-coupons). Le <b>bootstrap</b> résout par Brent, dans l'ordre des échéances, la σ de chaque segment.</p>
+
+    <h2>Le pricing de la bermudéenne</h2>
+    <p><b>EDP</b> : ∂V/∂t + ½ η(t)² ∂²V/∂x² − r(t,x) V = 0, à rebours, système tridiagonal (Thomas) sur ± n écarts-types de
+      X<sub>T</sub>, dates d'exercice exactement sur la grille (V = max(V, exercice)). <b>Longstaff-Schwartz</b> : à rebours, la
+      continuation est régressée sur un polynôme en X parmi les chemins dans la monnaie.</p>
+
+    <h2>Validation</h2>
+    <p>Avec les réglages du notebook, le moteur JavaScript retrouve à la 8<sup>e</sup> décimale tous les prix EDP de
+      <code>Main.ipynb</code> (grilles, domaines, λ de 0 à 0,3, strikes de 2 % à 4 %) et les σ calibrées à 10<sup>−17</sup> près.
+      Formule corrigée : Jamshidian, EDP et Monte-Carlo concordent sur l'européenne ; les zéro-coupons simulés retrouvent la
+      courbe dans leur intervalle de confiance.</p>
+  </section>
+
+  <section class="vue" id="code" hidden></section>
+</main>
+
+<footer><div class="page">
+  <span>© 2026 Mohammed-Yassine Barnicha · licence MIT · calcul 100 % dans le navigateur</span>
+  <span><a href="code/HJM_Bermudan_Swaptions_Pricer_Report.pdf">Rapport (PDF)</a> ·
+    <a href="https://github.com/yassinebarnicha/Bermudian-Swaptions-pricer-under-HJM-">Dépôt d'origine</a></span>
+</div></footer>
+
+<script>
+/*__GRAPHE__*/
+</script>
+<script>
+/*__UI__*/
+</script>
+<script id="src-hjm">
+/*__HJM__*/
+</script>
+<script type="text/plain" id="src-travail">
+// ---- fil de calcul : reçoit les entrées, renvoie les résultats ----
+function construire(p) {
+  const courbe = HJM.Courbe(p.courbeT, p.courbeP);
+  const inst = p.ex.map((e, i) => ({swaption: HJM.Swaption(e, p.terminal, p.K, p.paie, p.accr, p.payer), volN: p.vols[i]}));
+  const berm = HJM.Bermudeenne(p.ex, p.terminal, p.K, p.paie, p.accr, p.payer);
+  return {courbe, inst, berm};
+}
+function caler(p, b) {
+  if (p.mode === "imposee") {
+    const modele = HJM.Modele(b.courbe, p.lam, p.ex, p.sigImp, p.conv);
+    return {sigmas: p.sigImp.slice(), modele, marche: b.inst.map(it => HJM.prixBachelier(b.courbe, it.swaption, it.volN)), modeles: b.inst.map(it => modele.jamshidian(it.swaption))};
+  }
+  return HJM.bootstrap(b.courbe, p.lam, p.ex, b.inst, p.bas, p.haut, p.conv);
+}
+const optEDP = p => ({theta: p.theta, rannacher: p.ran});
+const optMC = (p, detail) => ({actualisation: p.actu, sousPasParAn: p.spa, degre: p.deg, independants: p.indep, detail});
+function calculer(p) {
+  const b = construire(p), cal = caler(p, b);
+  const details = b.inst.map((it, i) => ({fwd: HJM.tauxSwapForward(b.courbe, it.swaption), ann: HJM.annuite(b.courbe, it.swaption.rest, it.swaption.acc),
+    volModele: HJM.volNImplicite(b.courbe, it.swaption, cal.modeles[i])}));
+  const tMax = p.ex[p.ex.length - 1], g = HJM.grilleEcartsTypes(cal.modele, tMax, p.nstd, p.nx, p.nt);
+  const t0 = Date.now(), edp = HJM.prixEDP(cal.modele, b.berm, g, true, optEDP(p)), tEdp = Date.now() - t0;
+  let mc = null, tMc = 0;
+  if (p.mc) { const t1 = Date.now(); mc = HJM.prixLSMC(cal.modele, b.berm, p.nmc, p.graine, optMC(p, true)); tMc = Date.now() - t1; }
+  const zs = [-2.326, -1.645, -0.674, 0, 0.674, 1.645, 2.326];
+  const ev = HJM.eventailTaux(cal.modele, Math.max(p.terminal, tMax), zs);
+  const fwd = ev.ts.map(t => b.courbe.instFwd(Math.max(t, 1e-6)));
+  return {sigmas: cal.sigmas, marche: cal.marche, modeles: cal.modeles, details,
+    edp: {prix: edp.prix, xs: Array.from(edp.xs), nPas: edp.nPasTemps, tranches: edp.tranches.map(tr => ({t: tr.t, c: Array.from(tr.continuation), e: Array.from(tr.exercice)}))},
+    alphas: p.ex.map(t => cal.modele.alpha(t)), grille: g, mc, tEdp, tMc, sdX: Math.sqrt(cal.modele.alpha(tMax)), eventail: {ts: ev.ts, q: ev.q, fwd}};
+}
+function etudes(p, e, progres) {
+  const out = {};
+  const convs = e.deux ? ["corrigee", "code"] : [p.conv];
+  const total = e.grilles.length + e.nstd.length + e.mc.length + convs.length * (e.lam.length + e.k.length + e.vol.length);
+  let fait = 0; const pas = () => progres(++fait / total);
+  const base = construire(p), cal = caler(p, base), tMax = p.ex[p.ex.length - 1];
+  const edp = (modele, berm, q) => HJM.prixEDP(modele, berm, HJM.grilleEcartsTypes(modele, tMax, q.nstd, q.nx, q.nt), false, optEDP(q));
+  out.grilles = e.grilles.map(([nx, nt]) => { const r = edp(cal.modele, base.berm, Object.assign({}, p, {nx, nt})); pas(); return {nx, nt, prix: r}; });
+  out.nstd = e.nstd.map(n => { const r = edp(cal.modele, base.berm, Object.assign({}, p, {nstd: n})); pas(); return {n, prix: r}; });
+  out.edp = edp(cal.modele, base.berm, p);
+  out.mc = e.mc.map(n => { const r = HJM.prixLSMC(cal.modele, base.berm, n, p.graine, optMC(p, false)); pas(); return {n, prix: r.prix, err: r.erreur}; });
+  const recal = q => { const b = construire(q), c = caler(q, b); return {sig: c.sigmas, prix: edp(c.modele, b.berm, q), eur: Math.max(...c.modeles)}; };
+  const essai = (q, f) => { try { const r = recal(q); pas(); return f(r); } catch (err) { pas(); return {erreur: err.message}; } };
+  out.convs = convs;
+  out.parConv = convs.map(conv => {
+    const pc = Object.assign({}, p, {conv});
+    return {conv,
+      lam: e.lam.map(l => essai(Object.assign({}, pc, {lam: l}), r => ({l, prix: r.prix, sig: r.sig}))),
+      k: e.k.map(k => essai(Object.assign({}, pc, {K: k}), r => ({k, prix: r.prix, eur: r.eur}))),
+      vol: e.vol.map(f => essai(Object.assign({}, pc, {vols: p.vols.map(v => v * f), sigImp: p.sigImp.map(v => v * f)}), r => ({f, prix: r.prix, eur: r.eur})))};
+  });
+  return out;
+}
+self.onmessage = ev => {
+  const {id, type, p, e} = ev.data;
+  try {
+    const res = type === "etudes" ? etudes(p, e, f => self.postMessage({id, progres: f})) : calculer(p);
+    self.postMessage({id, ok: true, res});
+  } catch (err) { self.postMessage({id, ok: false, msg: err.message}); }
+};
+</script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const {fmt, pct, bp, lireNombre, listeNombres, differe} = UI;
+const COMMUN = {courbe: [[0, 1], [1, 0.978], [2, 0.954], [3, 0.930], [5, 0.885], [7, 0.842], [10, 0.780]],
+  ex: [[1, 80, 86], [2, 85, 96], [3, 90, 106]], lam: 0.03, payer: "1", K: 3, terminal: 7, paie: "2 3 4 5 6 7", accr: "1 1 1 1 1 1",
+  bas: 0.000001, haut: 0.2, nstd: 5, nx: 501, nt: 1000, mc: true, graine: 1234, mode: "calibree"};
+const RECOMMANDE = Object.assign({}, COMMUN, {conv: "corrigee", schema: "0.5", ran: 2, nmc: 20000, actu: "exacte", spa: 52, deg: 2, indep: false});
+const NOTEBOOK = Object.assign({}, COMMUN, {conv: "code", schema: "1", ran: 0, nmc: 10000, actu: "code", spa: 52, deg: 2, indep: false});
+
+// ---------- tableaux éditables ----------
+function ligneCourbe(t, p) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><input type="number" step="0.25" value="${t}"></td><td><input type="number" step="0.001" value="${p}"></td><td class="zr"></td><td><button type="button" class="retirer" title="Retirer">×</button></td>`;
+  tr.querySelector(".retirer").onclick = () => { tr.remove(); lancer(); };
+  $("t-courbe").tBodies[0].append(tr);
+}
+function ligneEx(t, v, s) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><input type="number" step="0.25" value="${t}"></td><td><input type="number" step="1" value="${v}"></td><td><input type="number" step="1" value="${s}"></td><td><button type="button" class="retirer" title="Retirer">×</button></td>`;
+  tr.querySelector(".retirer").onclick = () => { tr.remove(); lancer(); };
+  $("t-ex").tBodies[0].append(tr);
+}
+function appliquer(d) {
+  $("t-courbe").tBodies[0].innerHTML = ""; d.courbe.forEach(([t, p]) => ligneCourbe(t, p));
+  $("t-ex").tBodies[0].innerHTML = ""; d.ex.forEach(([t, v, s]) => ligneEx(t, v, s));
+  for (const k of ["lam", "terminal", "paie", "accr", "bas", "haut", "nstd", "nx", "nt", "nmc", "graine", "conv", "mode", "schema", "ran", "actu", "spa", "deg"]) $(k).value = d[k];
+  $("sens").value = d.payer; $("strike").value = d.K; $("mc-on").checked = d.mc; $("indep").checked = d.indep;
+}
+$("courbe-plus").onclick = () => { const r = [...$("t-courbe").tBodies[0].rows]; const last = r.length ? +r[r.length - 1].cells[0].querySelector("input").value : 0;
+  const pl = r.length ? +r[r.length - 1].cells[1].querySelector("input").value : 1; ligneCourbe(last + 1, (pl * 0.97).toFixed(4)); lancer(); };
+$("courbe-plat").onclick = () => {
+  const s = prompt("Taux zéro continu (en %) pour toute la courbe :", "2.5"); if (s == null) return;
+  const r = parseFloat(s.replace(",", ".")) / 100; if (!isFinite(r)) return;
+  [...$("t-courbe").tBodies[0].rows].forEach(tr => { const t = +tr.cells[0].querySelector("input").value; tr.cells[1].querySelector("input").value = Math.exp(-r * t).toFixed(6); });
+  lancer();
+};
+const lireEx = () => [...$("t-ex").tBodies[0].rows].map(tr => [0, 1, 2].map(k => +tr.cells[k].querySelector("input").value));
+$("ex-plus").onclick = () => { const r = lireEx(); const l = r.length ? r[r.length - 1] : [0, 80, 90]; ligneEx(l[0] + 1, l[1], l[2]); lancer(); };
+$("gen-paie").onclick = () => {
+  const pas = lireNombre($("pas"), 1), TN = lireNombre($("terminal"), 7), ex = lireEx().map(x => x[0]).sort((a, b) => a - b);
+  if (!(pas > 0)) return;
+  const debut = (ex.length ? ex[0] : 0) + pas, ts = [];
+  for (let t = debut; t <= TN + 1e-9; t += pas) ts.push(+t.toFixed(6));
+  if (!ts.length || Math.abs(ts[ts.length - 1] - TN) > 1e-9) ts.push(TN);
+  $("paie").value = ts.join(" "); $("accr").value = ts.map((t, i) => +(t - (i ? ts[i - 1] : t - pas)).toFixed(6)).join(" ");
+  lancer();
+};
+$("defaut").onclick = () => { appliquer(RECOMMANDE); lancer(); };
+$("notebook").onclick = () => { appliquer(NOTEBOOK); lancer(); };
+
+function lire() {
+  const courbe = [...$("t-courbe").tBodies[0].rows].map(tr => [+tr.cells[0].querySelector("input").value, +tr.cells[1].querySelector("input").value])
+    .filter(([t, p]) => isFinite(t) && isFinite(p)).sort((a, b) => a[0] - b[0]);
+  const ex = lireEx().filter(r => r.every(isFinite)).sort((a, b) => a[0] - b[0]);
+  const paie = listeNombres($("paie").value);
+  let accr = listeNombres($("accr").value);
+  if (accr.length === 1) accr = paie.map(() => accr[0]);
+  const N = (id, d) => lireNombre($(id), d);
+  const p = {courbeT: courbe.map(c => c[0]), courbeP: courbe.map(c => c[1]), lam: N("lam", 0.03), payer: $("sens").value === "1",
+    K: N("strike", 3) / 100, terminal: N("terminal", 7), paie, accr, conv: $("conv").value, mode: $("mode").value,
+    ex: ex.map(e => e[0]), vols: ex.map(e => e[1] / 1e4), sigImp: ex.map(e => e[2] / 1e4), bas: N("bas", 1e-6), haut: N("haut", 0.2),
+    theta: +$("schema").value, ran: Math.round(N("ran", 0)), nstd: N("nstd", 5), nx: Math.round(N("nx", 501)), nt: Math.round(N("nt", 1000)),
+    mc: $("mc-on").checked, nmc: Math.round(N("nmc", 10000)), graine: Math.round(N("graine", 1234)), actu: $("actu").value,
+    spa: Math.round(N("spa", 52)), deg: Math.round(N("deg", 2)), indep: $("indep").checked};
+  if (!p.ex.length) throw new Error("ajoutez au moins une date d'exercice");
+  if (paie.length !== accr.length) throw new Error(`${paie.length} dates de paiement mais ${accr.length} fractions d'année`);
+  if (p.ex.some((t, i) => i && t === p.ex[i - 1])) throw new Error("deux dates d'exercice identiques");
+  if (p.ex[0] <= 0) throw new Error("les dates d'exercice doivent être positives");
+  if (p.ex[p.ex.length - 1] >= p.terminal) throw new Error("la dernière date d'exercice doit précéder la maturité finale T_N");
+  if (p.ex.some(t => !paie.some(u => u > t))) throw new Error("chaque date d'exercice doit être suivie d'au moins un paiement fixe");
+  if (p.vols.some(v => !(v > 0))) throw new Error("les volatilités normales doivent être positives");
+  if (p.mode === "imposee" && p.sigImp.some(v => !(v >= 0))) throw new Error("σ imposées : valeurs positives attendues");
+  if (!(p.nx >= 11 && p.nx <= 5001)) throw new Error("n_x entre 11 et 5001");
+  if (!(p.nt >= 10 && p.nt <= 20000)) throw new Error("n_t entre 10 et 20000");
+  if (!(p.nstd > 0)) throw new Error("domaine de l'EDP : n écarts-types > 0");
+  if (!(p.ran >= 0 && p.ran <= 50)) throw new Error("pas de Rannacher entre 0 et 50");
+  if (p.mc && !(p.nmc >= 100 && p.nmc <= 300000)) throw new Error("trajectoires Monte-Carlo entre 100 et 300 000");
+  if (!(p.spa >= 1 && p.spa <= 2000)) throw new Error("sous-pas par an entre 1 et 2000");
+  if (!(p.deg >= 1 && p.deg <= 6)) throw new Error("degré de la régression entre 1 et 6");
+  if (!(p.bas > 0 && p.haut > p.bas)) throw new Error("bornes du bootstrap : 0 < σ min < σ max");
+  return p;
+}
+
+// ---------- fil de calcul ----------
+const travail = UI.travailleur("src-hjm", "src-travail");
+let dernierId = 0, enCours = {};
+travail.onmessage = ev => { const m = ev.data, f = enCours[m.id]; if (!f) return; if (m.progres != null) { f.progres && f.progres(m.progres); return; } delete enCours[m.id]; f.fin(m); };
+function demander(type, p, e, progres) { const id = ++dernierId; return new Promise(fin => { enCours[id] = {fin, progres}; travail.postMessage({id, type, p, e}); }); }
+
+let dernier = null, numCalcul = 0;
+const lancer = differe(async () => {
+  let p;
+  try { p = lire(); } catch (err) { etat(err.message, "err"); return; }
+  majCourbe(p);
+  etat("Calcul…");
+  const moi = ++numCalcul;
+  const m = await demander("calcul", p);
+  if (moi !== numCalcul) return;
+  if (!m.ok) { etat(m.msg, "err"); return; }
+  dernier = {p, r: m.res};
+  afficher(p, m.res);
+}, 220);
+function etat(msg, cls) { const e = $("etat"); e.textContent = msg; e.className = "etat" + (cls ? " " + cls : ""); }
+
+function majCourbe(p) {
+  let c;
+  try { c = HJM.Courbe(p.courbeT, p.courbeP); } catch (err) { etat(err.message, "err"); return; }
+  [...$("t-courbe").tBodies[0].rows].forEach(tr => { const t = +tr.cells[0].querySelector("input").value, d = +tr.cells[1].querySelector("input").value;
+    tr.querySelector(".zr").textContent = t > 0 && d > 0 ? pct(-Math.log(d) / t, 2) : "—"; });
+  // jusqu'au plus loin du dernier pilier et de T_N (au-delà du dernier pilier, l'extrapolation plate des log-facteurs donne un forward nul)
+  const tmax = Math.max(p.terminal, ...p.courbeT), xs = [], z = [], f = [];
+  for (let i = 1; i <= 240; i++) { const t = Math.min(tmax * i / 240, tmax - 1e-4); xs.push(t); z.push(-Math.log(c.discount(t)) / t * 100); f.push(c.instFwd(t) * 100); }
+  Graphe.tracer($("g-courbe"), {series: [{nom: "taux zéro", x: xs, y: z, couleur: "c2"}, {nom: "forward instantané", x: xs, y: f, couleur: "c4", type: "marches"}],
+    xlab: "t (ans)", ylab: "taux (%)", yfmt: v => v.toFixed(2)});
+  const dernierPilier = c.times[c.times.length - 1];
+  $("courbe-note").textContent = p.terminal > dernierPilier ? `Attention : T_N = ${p.terminal} dépasse le dernier pilier (${dernierPilier}) ; au-delà, l'extrapolation plate des log-facteurs donne un forward nul.` : "";
+}
+
+const dens = (x, v) => Math.exp(-0.5 * x * x / v) / Math.sqrt(2 * Math.PI * v);
+function afficher(p, r) {
+  const n = p.ex.length;
+  $("alerte").hidden = p.conv !== "code";
+  $("alerte").textContent = "Formule des zéro-coupons du code d'origine : son terme de convexité a le mauvais signe, le modèle n'est pas sans arbitrage (onglet Méthode). Utile pour retrouver les chiffres du notebook.";
+  $("k-edp").textContent = fmt(r.edp.prix, 8);
+  $("k-edp-s").textContent = `${p.theta === 1 ? "implicite" : "Crank–Nicolson"} · ${p.nx} × ${r.edp.nPas} pas · ${r.tEdp} ms`;
+  if (r.mc) { $("k-mc").textContent = fmt(r.mc.prix, 8); $("k-mc-s").textContent = `± ${fmt(1.96 * r.mc.erreur, 6)} (95 %) · écart EDP ${bp(r.mc.prix - r.edp.prix)} · ${r.tMc} ms`; }
+  else { $("k-mc").textContent = "—"; $("k-mc-s").textContent = "désactivé"; }
+  const imax = r.modeles.indexOf(Math.max(...r.modeles));
+  $("k-eur").textContent = fmt(r.modeles[imax], 8); $("k-eur-s").textContent = `échéance ${p.ex[imax]} an${p.ex[imax] > 1 ? "s" : ""}`;
+  const eep = r.edp.prix - r.modeles[imax];
+  $("k-eep").textContent = fmt(eep, 8);
+  $("k-eep-s").textContent = `${bp(eep)} · vs dernière européenne : ${fmt(r.edp.prix - r.modeles[n - 1], 8)}`;
+  $("t-cal").tBodies[0].innerHTML = p.ex.map((t, i) => {
+    const ec = r.modeles[i] - r.marche[i], ok = Math.abs(ec) < 1e-8;
+    return `<tr><td>${t}</td><td>${pct(r.details[i].fwd, 3)}</td><td>${r.details[i].ann.toFixed(5)}</td><td>${(p.vols[i] * 1e4).toFixed(1)} bp</td>
+      <td>${isFinite(r.details[i].volModele) ? (r.details[i].volModele * 1e4).toFixed(2) + " bp" : "—"}</td>
+      <td>${fmt(r.marche[i], 8)}</td><td>${fmt(r.modeles[i], 8)}</td><td><span class="badge ${ok ? "ok" : "av"}">${ec.toExponential(1)}</span></td><td>${(r.sigmas[i] * 1e4).toFixed(2)} bp</td></tr>`;
+  }).join("");
+  // σ vaut s_k sur ]T_(k-1), T_k] : paliers explicites
+  const sx = [], sy = [];
+  p.ex.forEach((t, i) => { sx.push(i ? p.ex[i - 1] : 0, t); sy.push(r.sigmas[i] * 1e4, r.sigmas[i] * 1e4); });
+  Graphe.tracer($("g-sigma"), {series: [{nom: "σ(t)", x: sx, y: sy, couleur: "c1"}], xlab: "t (ans)", ylab: "σ (bp)", zero: true, yfmt: v => v.toFixed(1)});
+  // éventail du taux court
+  const ev = r.eventail, noms = ["1 %", "5 %", "25 %", "médiane", "75 %", "95 %", "99 %"], coul = ["c7", "c2", "c3", "c1", "c3", "c2", "c7"];
+  Graphe.tracer($("g-event"), {series: [
+    ...ev.q.map((q, i) => ({nom: "quantile " + noms[i], x: ev.ts, y: q.map(v => v * 100), couleur: coul[i], tirets: i !== 3, epaisseur: i === 3 ? 2 : 1.2, sansLegende: i > 3})),
+    {nom: "forward f(0,t)", x: ev.ts, y: ev.fwd.map(v => v * 100), couleur: "c5", epaisseur: 1.5}],
+    xlab: "t (ans)", ylab: "taux court (%)", yfmt: v => v.toFixed(2)});
+  // densités de X aux dates d'exercice + frontière EDP
+  const frontiere = r.edp.tranches.map(tr => { const xs = r.edp.xs;
+    for (let j = 1; j < xs.length; j++) { const a = tr.e[j - 1] - tr.c[j - 1], b = tr.e[j] - tr.c[j]; if (tr.e[j] > 0 && (a <= 0) !== (b <= 0)) return xs[j - 1] + (xs[j] - xs[j - 1]) * a / (a - b); }
+    return null; });
+  const sdMax = Math.sqrt(Math.max(...r.alphas)), xg = Array.from({length: 241}, (_, k) => -4 * sdMax + 8 * sdMax * k / 240), series = [];
+  p.ex.forEach((t, i) => {
+    const c = "c" + (1 + i % 8), v = r.alphas[i], dmax = dens(0, v);
+    series.push({nom: `X à T = ${t}`, x: xg, y: xg.map(x => dens(x, v)), couleur: c});
+    if (frontiere[i] != null) series.push({nom: `frontière T = ${t}`, x: [frontiere[i], frontiere[i]], y: [0, dmax], couleur: c, tirets: true, sansLegende: true});
+  });
+  Graphe.tracer($("g-densite"), {series, xlab: "facteur X", ylab: "densité", xfmt: v => v.toFixed(3), yfmt: v => v.toFixed(0)});
+  // frontière d'exercice
+  const sel = $("tranche"), avant = sel.value;
+  sel.innerHTML = r.edp.tranches.map((tr, i) => `<option value="${i}">T = ${tr.t}${i === r.edp.tranches.length - 1 ? " (dernière)" : ""}</option>`).join("");
+  if (avant && +avant < r.edp.tranches.length) sel.value = avant;
+  dessinerFrontiere(frontiere);
+  // Monte-Carlo
+  $("c-mc").hidden = !r.mc;
+  if (r.mc) {
+    Graphe.tracer($("g-mc"), {series: [{nom: "trajectoires exercées", x: p.ex, y: r.mc.nbExerces, type: "barres", couleur: "c3"}], xlab: "date d'exercice", ylab: "trajectoires", yfmt: v => v.toFixed(0)});
+    const rs = $("reg-date"), av = rs.value, dispo = r.mc.details.map((d, j) => d ? j : -1).filter(j => j >= 0);
+    rs.innerHTML = dispo.map(j => `<option value="${j}">T = ${p.ex[j]}</option>`).join("") || `<option value="">(aucune régression)</option>`;
+    if (av && dispo.includes(+av)) rs.value = av;
+    dessinerRegression();
+    $("t-mart").tBodies[0].innerHTML = r.mc.martingale.map(m => { const e = m.mc - m.courbe, z = m.se > 0 ? Math.abs(e) / m.se : (Math.abs(e) > 1e-12 ? Infinity : 0);
+      return `<tr><td>${m.t}</td><td>${m.courbe.toFixed(6)}</td><td>${m.mc.toFixed(6)}${m.se > 0 ? ` <small>± ${(1.96 * m.se).toFixed(6)}</small>` : ""}</td>
+        <td><span class="badge ${z < 3 ? "ok" : "ko"}">${e >= 0 ? "+" : ""}${e.toExponential(1)}</span></td></tr>`; }).join("");
+  }
+  etat(`${p.mode === "imposee" ? "σ imposées" : "Calibré"} et pricé · σ(X_T) = ${fmt(r.sdX, 5)} · domaine EDP [${fmt(r.grille.xMin, 4)}, ${fmt(r.grille.xMax, 4)}]`, "ok");
+}
+function dessinerFrontiere(frontiere) {
+  if (!dernier) return;
+  const r = dernier.r, i = +$("tranche").value || 0, tr = r.edp.tranches[i];
+  if (!tr) return;
+  Graphe.tracer($("g-front"), {series: [
+    {nom: "valeur de continuation", x: r.edp.xs, y: tr.c, couleur: "c2"},
+    {nom: "valeur d'exercice", x: r.edp.xs, y: tr.e, couleur: "c4", tirets: true}],
+    xlab: "facteur X", ylab: "valeur", xfmt: v => v.toFixed(3)});
+  const f = (frontiere || dernier.frontiere || [])[i];
+  if (frontiere) dernier.frontiere = frontiere;
+  const sd = Math.sqrt(r.alphas[i] || 0);
+  $("front-note").textContent = f == null ? "" : `Exercice dès que X dépasse ${f.toFixed(4)} (${(f / sd).toFixed(2)} écart-type) : probabilité ${(100 * 0.5 * (1 - HJM.erf(f / sd / Math.SQRT2))).toFixed(1)} % sous la loi de X à cette date.`;
+}
+function dessinerRegression() {
+  if (!dernier || !dernier.r.mc) return;
+  const j = +$("reg-date").value, d = dernier.r.mc.details[j];
+  if (!d) { Graphe.tracer($("g-reg"), {series: []}); return; }
+  const xmin = Math.min(...d.x), xmax = Math.max(...d.x), xs = Array.from({length: 120}, (_, k) => xmin + (xmax - xmin) * k / 119);
+  const cont = xs.map(x => d.beta.reduce((s, b, k) => s + b * Math.pow(x / d.sd, k), 0));
+  const ordre = d.x.map((x, k) => k).sort((a, b) => d.x[a] - d.x[b]);
+  Graphe.tracer($("g-reg"), {series: [
+    {nom: "valeur future actualisée (chemins)", x: d.x, y: d.y, type: "points", rayon: 1.6, couleur: "c2"},
+    {nom: `continuation (degré ${d.beta.length - 1})`, x: xs, y: cont, couleur: "c1", epaisseur: 2.5},
+    {nom: "valeur d'exercice", x: ordre.map(k => d.x[k]), y: ordre.map(k => d.v[k]), couleur: "c4", tirets: true, epaisseur: 2}],
+    xlab: "facteur X", ylab: "valeur", xfmt: v => v.toFixed(3)});
+}
+$("tranche").onchange = () => dessinerFrontiere();
+$("reg-date").onchange = dessinerRegression;
+document.querySelector("#pricer .reglages").addEventListener("input", lancer);
+document.querySelector("#pricer .reglages").addEventListener("change", lancer);
+
+// ---------- études ----------
+$("e-go").onclick = async () => {
+  let p; try { p = lire(); } catch (err) { $("e-etat").textContent = err.message; $("e-etat").className = "etat err"; return; }
+  const e = {grilles: $("e-grilles").value.trim().split(/\s+/).map(s => s.split("/").map(Number)).filter(g => g.length === 2 && g.every(v => v > 3)),
+    nstd: listeNombres($("e-nstd").value).filter(v => v > 0), mc: listeNombres($("e-mc").value).filter(v => v >= 100 && v <= 300000).map(Math.round),
+    lam: listeNombres($("e-lam").value), k: listeNombres($("e-k").value).map(v => v / 100), vol: listeNombres($("e-vol").value).filter(v => v > 0), deux: $("e-deux").checked};
+  $("e-go").disabled = true; $("e-prog").hidden = false; $("e-prog").value = 0; $("e-etat").className = "etat"; $("e-etat").textContent = "Calcul des études…";
+  const t0 = Date.now();
+  const m = await demander("etudes", p, e, f => { $("e-prog").value = f; });
+  $("e-go").disabled = false; $("e-prog").hidden = true;
+  if (!m.ok) { $("e-etat").textContent = m.msg; $("e-etat").className = "etat err"; return; }
+  const r = m.res;
+  $("e-etat").textContent = `Terminé en ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("e-etat").className = "etat ok";
+  const f8 = v => v.toFixed(6);
+  Graphe.tracer($("g-e-grille"), {series: [{nom: "prix EDP", x: r.grilles.map((g, i) => i), y: r.grilles.map(g => g.prix), couleur: "c1", marqueurs: true,
+    etiquettes: r.grilles.map(g => `n_x/n_t = ${g.nx}/${g.nt}`)}], xlab: "grille", ylab: "prix", yfmt: f8,
+    xfmt: v => (r.grilles[Math.round(v)] && Math.abs(v - Math.round(v)) < 1e-9) ? r.grilles[Math.round(v)].nx + "/" + r.grilles[Math.round(v)].nt : ""});
+  Graphe.tracer($("g-e-nstd"), {series: [{nom: "prix EDP", x: r.nstd.map(o => o.n), y: r.nstd.map(o => o.prix), couleur: "c1", marqueurs: true}], xlab: "n écarts-types", ylab: "prix", yfmt: f8});
+  Graphe.tracer($("g-e-mc"), {series: [
+    {nom: "LSMC", x: r.mc.map(o => o.n), y: r.mc.map(o => o.prix), couleur: "c3", marqueurs: true, bande: [r.mc.map(o => o.prix - 1.96 * o.err), r.mc.map(o => o.prix + 1.96 * o.err)]},
+    {nom: "EDP", x: r.mc.map(o => o.n), y: r.mc.map(() => r.edp), couleur: "c1", tirets: true}], xlab: "trajectoires", ylab: "prix", yfmt: f8});
+  const ok = a => a.filter(o => !o.erreur), nomC = c => c === "code" ? "formule du code" : "formule corrigée", coulC = c => c === "code" ? "c5" : "c1";
+  const lamS = [], kS = [], volS = [];
+  r.parConv.forEach(pc => {
+    const lam = ok(pc.lam), k = ok(pc.k), vol = ok(pc.vol), tir = pc.conv === "code";
+    lamS.push({nom: nomC(pc.conv), x: lam.map(o => o.l), y: lam.map(o => o.prix), couleur: coulC(pc.conv), marqueurs: true, tirets: tir});
+    kS.push({nom: "bermudéenne, " + nomC(pc.conv), x: k.map(o => o.k * 100), y: k.map(o => o.prix), couleur: coulC(pc.conv), marqueurs: true, tirets: tir});
+    volS.push({nom: "bermudéenne, " + nomC(pc.conv), x: vol.map(o => o.f), y: vol.map(o => o.prix), couleur: coulC(pc.conv), marqueurs: true, tirets: tir});
+    if (pc === r.parConv[0]) {
+      kS.push({nom: "plus chère des européennes", x: k.map(o => o.k * 100), y: k.map(o => o.eur), couleur: "c3", tirets: true, marqueurs: true});
+      volS.push({nom: "plus chère des européennes", x: vol.map(o => o.f), y: vol.map(o => o.eur), couleur: "c3", tirets: true, marqueurs: true});
+      Graphe.tracer($("g-e-lam-s"), {series: p.ex.map((t, j) => ({nom: `segment jusqu'à t = ${t}`, x: lam.map(o => o.l), y: lam.map(o => o.sig[j] * 1e4), couleur: "c" + (1 + j % 8), marqueurs: true})),
+        xlab: "λ", ylab: "σ (bp)", yfmt: v => v.toFixed(1)});
+    }
+  });
+  Graphe.tracer($("g-e-lam"), {series: lamS, xlab: "λ", ylab: "prix", yfmt: f8});
+  Graphe.tracer($("g-e-k"), {series: kS, xlab: "K (%)", ylab: "prix", yfmt: f8});
+  Graphe.tracer($("g-e-vol"), {series: volS, xlab: "facteur sur les vols", ylab: "prix", yfmt: f8});
+  const echecs = r.parConv.flatMap(pc => [...pc.lam, ...pc.k, ...pc.vol]).filter(o => o.erreur);
+  if (echecs.length) { $("e-etat").textContent += ` · ${echecs.length} point(s) sans calibration possible : ${echecs[0].erreur}`; $("e-etat").className = "etat err"; }
+};
+
+// ---------- code source ----------
+const CODE = /*__CODE__*/;
+let codePret = false;
+document.addEventListener("vue", ev => { if (ev.detail === "code" && !codePret) { codePret = true; UI.lecteurCode($("code"), CODE, "__DEPOT__"); } });
+
+appliquer(RECOMMANDE);
+lancer();
+</script>
+</body>
+</html>
