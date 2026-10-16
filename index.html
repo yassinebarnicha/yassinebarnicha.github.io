@@ -8,8 +8,8 @@
 <meta property="og:title" content="Mohammed-Yassine Barnicha — Finance quantitative">
 <meta property="og:description" content="Pricing, calibration et méthodes numériques : applications et code source.">
 <meta property="og:image" content="https://yassinebarnicha.github.io/img/calibration.webp">
-<meta name="theme-color" content="#161616">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23161616'/%3E%3Cpath d='M5 24 Q11 6 16 16 T27 8' stroke='%230f62fe' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#080b12">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23080b12'/%3E%3Cpath d='M7 22 13 10l5 12 7-13' stroke='%2391b9ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 <style>
 /* Même langage visuel que l'application de calibration : fond neutre, angles droits, chiffres en chasse fixe.
    Aucune police ni bibliothèque externe : la page reste autonome. */
@@ -166,6 +166,209 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
   .btn{flex:1 1 auto;justify-content:center}
 }
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* Editorial portfolio theme */
+:root{
+  --ground:#f4f0e8;--panel:#fbf9f4;--sunk:#ede7dc;--ink:#20231f;--ink2:#64665f;--line:#d8d1c5;
+  --accent:#315c4e;--accent-hover:#24483d;--accent-ink:#fbf9f4;--tag:#e7eee8;--tag-ink:#315c4e;
+  --display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#1e211e;--panel:#272b27;--sunk:#30362f;--ink:#f1eee6;--ink2:#bbbcb3;--line:#444a42;
+    --accent:#a8c4ae;--accent-hover:#c3d8c5;--accent-ink:#20231f;--tag:#303d33;--tag-ink:#c7ddca;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#1e211e;--panel:#272b27;--sunk:#30362f;--ink:#f1eee6;--ink2:#bbbcb3;--line:#444a42;
+  --accent:#a8c4ae;--accent-hover:#c3d8c5;--accent-ink:#20231f;--tag:#303d33;--tag-ink:#c7ddca;
+}
+body{font-size:15px;line-height:1.68;letter-spacing:.005em}
+.page{max-width:1240px;padding-inline:clamp(20px,5vw,72px)}
+.barre{background:var(--ground);color:var(--ink);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+.barre .page{min-height:64px}
+.mono-nom{color:var(--accent);border-color:var(--line);letter-spacing:.08em}
+.barre .nom{font-weight:550;letter-spacing:.01em}
+.barre nav a{color:var(--ink2);padding:8px 11px;transition:color .18s ease,background .18s ease}
+.barre nav a:hover{color:var(--ink);background:var(--sunk)}
+.entete{padding:clamp(58px,9vw,112px) 0 clamp(42px,6vw,72px);background:var(--panel);border-bottom:1px solid var(--line)}
+.surtitre{font-size:11px;letter-spacing:.12em;color:var(--accent)}
+.entete .surtitre{display:flex;align-items:center;gap:10px}
+.entete .surtitre::before{content:"";width:24px;height:1px;background:var(--accent)}
+h1,h2{font-family:var(--display);font-weight:400;letter-spacing:-.035em}
+h1{font-size:clamp(46px,7vw,76px);line-height:.98;max-width:none;margin:0 0 24px}
+.chapeau{max-width:70ch;font-size:clamp(16px,1.45vw,19px);line-height:1.75}
+.chapeau b{font-weight:650;color:var(--accent)}
+.boutons{gap:9px}
+.btn{min-height:46px;padding:0 18px;border-radius:2px;transition:transform .18s ease,background .18s ease,border-color .18s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn.plein{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.plein:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.creux{color:var(--ink);border-color:var(--line)}
+.btn.creux:hover{background:var(--sunk);border-color:var(--line)}
+.chiffres{gap:0;background:transparent;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-top:48px}
+.chiffres div{background:transparent;padding:18px 16px}
+.chiffres b{font-family:var(--display);font-size:20px;font-weight:500;letter-spacing:-.02em}
+section{padding:clamp(52px,7vw,84px) 0;border-color:var(--line)}
+h2{font-size:clamp(30px,4vw,44px);line-height:1.1;margin-bottom:10px}
+.intro{font-size:15px;line-height:1.75;margin-bottom:32px}
+h3{font-size:17px;line-height:1.35}
+.apps{gap:18px}
+.app,.carte,.cadre{background:var(--panel);border-color:var(--line);border-radius:3px}
+.app{overflow:hidden;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.app:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 12px 28px rgb(32 35 31 / 8%)}
+.app img{border-color:var(--line);transition:transform .35s ease}
+.app:hover img{transform:scale(1.025)}
+.app .corps{padding:19px 20px 21px;gap:10px}
+.app .ouvrir{background:transparent;color:var(--accent);padding:8px 0 0;font-size:13px}
+.app:hover .ouvrir{background:transparent;color:var(--accent-hover)}
+.vedette{gap:clamp(24px,4vw,54px);align-items:center}
+.cadre{padding:7px}
+.cadre figcaption{padding:10px 6px 4px;line-height:1.5}
+.galerie{gap:14px}
+.galerie .cadre{height:100%}
+.galerie img{aspect-ratio:1.5;object-fit:cover}
+.etiquettes li{border-radius:2px}
+.etape{border-color:var(--line)}
+.etape::before{border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--ground)}
+.competences{background:var(--line);gap:1px}
+.competences div{background:var(--panel);line-height:1.65}
+.grille{gap:16px}
+.carte{padding:22px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+.carte:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 10px 22px rgb(32 35 31 / 6%)}
+.carte .langue{font-size:11px;letter-spacing:.04em;color:var(--accent)}
+.carte .liens a{text-underline-offset:3px}
+.methodes{background:var(--line)}
+.methodes div{background:var(--panel)}
+.methodes h3{color:var(--accent)}
+footer{border-top:1px solid var(--line)}
+:focus-visible{outline-color:var(--accent)}
+@media(max-width:600px){
+  .page{padding-inline:18px}
+  .entete{padding:52px 0 38px}
+  h1{font-size:clamp(42px,13vw,64px)}
+  .barre .page{gap:10px}
+  .barre nav a{padding-inline:8px}
+  .chiffres div{padding:14px 12px}
+  .galerie{gap:10px}
+}
+@keyframes settle-in{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.entete .surtitre{animation:settle-in .55s cubic-bezier(.2,.7,.2,1) both}
+.entete h1{animation:settle-in .65s .06s cubic-bezier(.2,.7,.2,1) both}
+.entete .chapeau{animation:settle-in .65s .12s cubic-bezier(.2,.7,.2,1) both}
+.entete .boutons{animation:settle-in .65s .18s cubic-bezier(.2,.7,.2,1) both}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-delay:0ms!important}
+}
+
+/* Midnight glass motion system */
+:root{
+  color-scheme:dark;
+  --ground:#080b12;--panel:#111827;--sunk:#182235;--ink:#eef3ff;--ink2:#a8b4ca;--line:#29354a;
+  --accent:#91b9ff;--accent-hover:#c0d4ff;--accent-ink:#10182a;--tag:#1a2942;--tag-ink:#c4d8ff;
+  --sans:Arial,"Helvetica Neue",sans-serif;--display:var(--sans);
+}
+body{background:var(--ground);color:var(--ink);font-size:15px;line-height:1.7;letter-spacing:.005em}
+.page{max-width:1320px;padding-inline:clamp(20px,5vw,76px)}
+.barre{background:rgb(8 11 18 / 76%);color:var(--ink);border-bottom:1px solid rgb(255 255 255 / 8%);backdrop-filter:blur(22px) saturate(150%)}
+.barre .page{min-height:68px}
+.mono-nom{color:var(--accent);border-color:rgb(255 255 255 / 13%)}
+.barre .nom{font-weight:550;letter-spacing:.01em}
+.barre nav a{color:var(--ink2);border-radius:999px;padding:8px 13px;transition:color .24s ease,background .24s ease,transform .3s cubic-bezier(.2,.8,.2,1)}
+.barre nav a:hover{color:var(--ink);background:rgb(255 255 255 / 8%);transform:translateY(-1px)}
+.entete{position:relative;isolation:isolate;overflow:hidden;padding:clamp(62px,10vw,128px) 0 clamp(50px,7vw,88px);background:linear-gradient(135deg,#0b1020 0%,#10192b 52%,#101522 100%);border:1px solid rgb(255 255 255 / 8%);border-radius:0 0 34px 34px}
+.entete::before{content:"";position:absolute;z-index:-1;top:-54%;right:-12%;width:min(75vw,880px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 42% 42%,rgb(73 127 255 / 35%),transparent 50%),radial-gradient(circle at 65% 58%,rgb(163 124 255 / 24%),transparent 48%);filter:blur(30px);pointer-events:none;animation:ambient-float 16s ease-in-out infinite alternate}
+.entete .page{position:relative;z-index:1}
+.entete .surtitre{display:inline-flex;align-items:center;gap:10px;padding:8px 13px;border:1px solid rgb(255 255 255 / 13%);border-radius:999px;background:rgb(255 255 255 / 5%);color:#bfd3ff;font-size:11px;letter-spacing:.11em;backdrop-filter:blur(12px)}
+.entete .surtitre::before{content:"";width:7px;height:7px;border-radius:50%;background:#a5f0ce;box-shadow:0 0 14px rgb(165 240 206 / 75%)}
+h1,h2{font-family:var(--sans);font-weight:620;letter-spacing:-.065em}
+h1{max-width:17ch;margin:22px 0 24px;font-size:clamp(48px,7.8vw,96px);line-height:.96}
+.chapeau{max-width:68ch;font-size:clamp(16px,1.45vw,19px);line-height:1.75;color:#b5c0d2}
+.chapeau b{font-weight:650;color:#c4d8ff}
+.boutons{gap:10px}
+.btn{min-height:48px;padding:0 21px;border-radius:999px;transition:transform .36s cubic-bezier(.2,.8,.2,1.25),background .24s ease,border-color .24s ease,box-shadow .3s ease}
+.btn:active{transform:scale(.96)}
+.btn.plein{border-color:transparent;background:linear-gradient(125deg,#93baff,#b2a4ff);color:#10182a;box-shadow:0 8px 24px rgb(106 144 255 / 20%)}
+.btn.plein:hover{background:linear-gradient(125deg,#b8d0ff,#d0c3ff);box-shadow:0 12px 32px rgb(106 144 255 / 32%)}
+.btn.creux{border-color:rgb(255 255 255 / 15%);background:rgb(255 255 255 / 5%);color:var(--ink);backdrop-filter:blur(14px)}
+.btn.creux:hover{border-color:rgb(255 255 255 / 28%);background:rgb(255 255 255 / 10%)}
+.chiffres{gap:10px;background:transparent;border:0;margin-top:44px}
+.chiffres div{border:1px solid rgb(255 255 255 / 9%);border-radius:18px;background:linear-gradient(145deg,rgb(255 255 255 / 8%),rgb(255 255 255 / 3%));padding:17px 19px}
+.chiffres b{font-size:17px;font-weight:600;letter-spacing:-.025em}
+.chiffres span{color:var(--ink2)}
+section{padding:clamp(54px,7vw,88px) 0;border-color:rgb(255 255 255 / 9%)}
+h2{font-size:clamp(30px,4.2vw,48px);line-height:1.08;letter-spacing:-.055em}
+.intro{max-width:72ch;font-size:15px;line-height:1.75;color:var(--ink2)}
+.apps{gap:18px}
+.app,.carte,.cadre{border:1px solid rgb(255 255 255 / 10%);border-radius:22px;background:linear-gradient(145deg,rgb(255 255 255 / 7%),rgb(255 255 255 / 2%));box-shadow:inset 0 1px rgb(255 255 255 / 5%)}
+.app{overflow:hidden;transition:transform .42s cubic-bezier(.2,.8,.2,1),border-color .3s ease,box-shadow .35s ease}
+.app img{border-color:rgb(255 255 255 / 10%);transition:transform .65s cubic-bezier(.2,.7,.2,1)}
+.app .corps{padding:20px 21px 22px;gap:10px}
+.app h3,.carte h3{letter-spacing:-.025em}
+.app p,.carte p,.carte li{color:var(--ink2)}
+.app .ouvrir{margin-top:auto;align-self:flex-start;border-radius:999px;background:rgb(145 185 255 / 12%);color:#c4d8ff;font-size:13px;padding:8px 14px;transition:background .24s ease,color .24s ease,transform .3s ease}
+.app:hover .ouvrir{background:rgb(145 185 255 / 22%);color:#e2ecff;transform:translateX(3px)}
+.vedette{gap:clamp(24px,4vw,54px);align-items:center}
+.cadre{padding:8px;overflow:hidden}
+.cadre figcaption{padding:11px 8px 5px;color:var(--ink2)}
+.galerie{gap:14px}
+.galerie .cadre{height:100%}
+.galerie img{aspect-ratio:1.5;object-fit:cover;border-radius:15px}
+.etiquettes li{padding:5px 10px;border-radius:999px;background:var(--tag);color:var(--tag-ink)}
+.etape{border-color:var(--line)}
+.etape::before{border-radius:50%;background:var(--accent);box-shadow:0 0 0 5px var(--ground),0 0 18px rgb(145 185 255 / 35%)}
+.etape .ou,.etape p,.etape li{color:var(--ink2)}
+.competences{gap:10px;background:transparent;border:0}
+.competences div{border:1px solid rgb(255 255 255 / 9%);border-radius:18px;background:linear-gradient(145deg,rgb(255 255 255 / 6%),rgb(255 255 255 / 2%));color:var(--ink2)}
+.competences b{color:var(--accent)}
+.grille{gap:16px}
+.carte{padding:22px;transition:transform .38s cubic-bezier(.2,.8,.2,1),border-color .3s ease,box-shadow .35s ease}
+.carte .langue{color:#b6cbf4;letter-spacing:.05em}
+.carte .liens a{color:#bcd2ff;text-underline-offset:4px;transition:color .2s ease}
+.carte .liens a:hover{color:#fff}
+.methodes{gap:10px;background:transparent;border:0}
+.methodes div{border:1px solid rgb(255 255 255 / 9%);border-radius:18px;background:linear-gradient(145deg,rgb(255 255 255 / 6%),rgb(255 255 255 / 2%))}
+.methodes h3{color:#c1d5ff}
+.methodes li{border-color:rgb(255 255 255 / 8%)}
+.methodes .ou{color:var(--ink2)}
+.onglets-app{gap:8px;background:transparent;border:0}
+.onglets-app li{border:1px solid rgb(255 255 255 / 8%);border-radius:12px;background:rgb(255 255 255 / 4%);color:var(--ink2)}
+.onglets-app b{color:var(--ink)}
+footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
+:focus-visible{outline-color:#a4c4ff;outline-offset:3px}
+.entete .surtitre,.entete h1,.entete .chapeau,.entete .boutons{animation:none}
+.btn{position:relative;overflow:hidden}
+.btn.plein::before{content:"";position:absolute;inset:-40% auto -40% -45%;width:35%;transform:translateX(-180%) skewX(-20deg);background:linear-gradient(90deg,transparent,rgb(255 255 255 / 42%),transparent);pointer-events:none}
+.app{position:relative;isolation:isolate}
+.app::after{content:"";position:absolute;z-index:2;inset:-70% -40%;transform:translateX(-70%) rotate(12deg);background:linear-gradient(105deg,transparent 42%,rgb(255 255 255 / 8%) 50%,transparent 58%);opacity:0;pointer-events:none}
+@media(hover:hover){
+  .btn:hover{transform:translateY(-2px) scale(1.015)}
+  .btn.plein:hover::before{animation:button-glint .72s cubic-bezier(.2,.7,.2,1) both}
+  .app:hover,.carte:hover{transform:translateY(-5px) scale(1.008);border-color:rgb(145 185 255 / 48%);box-shadow:0 24px 54px rgb(0 0 0 / 24%),inset 0 1px rgb(255 255 255 / 10%)}
+  .app:hover img{transform:scale(1.035)}
+  .app:hover::after{animation:card-sheen .9s ease both}
+}
+@keyframes button-glint{0%{transform:translateX(-180%) skewX(-20deg);opacity:0}20%{opacity:.8}100%{transform:translateX(550%) skewX(-20deg);opacity:0}}
+@keyframes card-sheen{0%{transform:translateX(-70%) rotate(12deg);opacity:0}18%{opacity:1}100%{transform:translateX(70%) rotate(12deg);opacity:0}}
+@keyframes ambient-float{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-5%,5%,0) scale(1.08)}}
+@media(max-width:600px){
+  .page{padding-inline:18px}
+  .barre .page{gap:10px;min-height:60px}
+  .barre nav a{padding:7px 10px}
+  .entete{padding:58px 0 42px;border-radius:0 0 24px 24px}
+  .entete::before{top:-15%;right:-48%;width:125vw;opacity:.75}
+  h1{font-size:clamp(46px,13vw,64px);max-width:15ch;line-height:.98}
+  .chiffres{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .chiffres div{padding:14px;border-radius:15px}
+  .app,.carte,.cadre{border-radius:18px}
+  .galerie{gap:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
 </style>
 </head>
 <body>
@@ -197,9 +400,9 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
     <p class="chapeau" style="margin-top:-12px">Cette page rassemble mes projets de pricing et de calibration de dérivés, avec leur code&nbsp;;
       certains peuvent être utilisés directement en ligne.</p>
     <div class="boutons">
-      <a class="btn plein" href="calibration-btc-svjd/">▶ Calibration d'options BTC</a>
-      <a class="btn plein" href="swaptions-hjm/">▶ Swaptions bermudéennes HJM</a>
-      <a class="btn plein" href="options-lookback/">▶ Options lookback</a>
+      <a class="btn plein" href="calibration-btc-svjd/">Calibration d'options BTC</a>
+      <a class="btn plein" href="swaptions-hjm/">Swaptions bermudéennes HJM</a>
+      <a class="btn plein" href="options-lookback/">Options lookback</a>
       <a class="btn creux" href="#parcours">Parcours</a>
       <a class="btn creux" href="https://www.linkedin.com/in/mohammed-yassine-barnicha-855587280/">LinkedIn</a>
       <a class="btn creux" href="https://github.com/yassinebarnicha">GitHub</a>
@@ -276,19 +479,19 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
         <img src="img/calibration.webp" width="900" height="570" loading="lazy" alt="Calibration du modèle de Bates sur les smiles Deribit">
         <div class="corps"><h3>Calibration d'options Bitcoin</h3>
           <p>28 modèles à sauts et volatilité stochastique calibrés en direct sur Deribit : grecques, surface de volatilité 3D, GEX, exotiques.</p>
-          <span class="ouvrir">▶ Ouvrir</span></div></a>
+          <span class="ouvrir">Ouvrir</span></div></a>
       <a class="app" href="swaptions-hjm/">
         <img src="img/hjm.webp" width="900" height="579" loading="lazy" alt="Pricer de swaptions bermudéennes sous HJM">
         <div class="corps"><h3>Swaptions bermudéennes sous HJM</h3>
           <p>Calibration par bootstrap, EDP et Longstaff-Schwartz ; effet du retour à la moyenne après recalibration ; erreur de signe
             trouvée et corrigée dans le modèle.</p>
-          <span class="ouvrir">▶ Ouvrir</span></div></a>
+          <span class="ouvrir">Ouvrir</span></div></a>
       <a class="app" href="options-lookback/">
         <img src="img/lookback.webp" width="900" height="579" loading="lazy" alt="Pricer d'options lookback">
         <div class="corps"><h3>Options lookback</h3>
           <p>Les deux moteurs C++ (pont brownien exact, schéma en temps avec BGK) en JavaScript ; Δ constant à l'émission ; option en
             cours de vie.</p>
-          <span class="ouvrir">▶ Ouvrir</span></div></a>
+          <span class="ouvrir">Ouvrir</span></div></a>
     </div>
   </div>
 </section>
@@ -319,7 +522,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
             barrières, lookbacks, américaines par Longstaff-Schwartz, payoff en formule libre).</li>
         </ul>
         <div class="boutons">
-          <a class="btn plein" href="https://yassinebarnicha.github.io/calibration-btc-svjd/">▶ Démo</a>
+          <a class="btn plein" href="https://yassinebarnicha.github.io/calibration-btc-svjd/">Démo</a>
           <a class="btn creux" href="https://github.com/yassinebarnicha/calibration-btc-svjd">Code</a>
           <a class="btn creux" href="https://github.com/yassinebarnicha/calibration-btc-svjd/blob/main/docs/GUIDE.md">Guide</a>
         </div>
@@ -415,7 +618,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
           <li>Bermudéenne pricée par EDP (implicite ou Crank–Nicolson), contrôlée par Longstaff-Schwartz.</li>
           <li>Revue du modèle : erreur de signe trouvée et corrigée dans la formule des zéro-coupons, contrôle de martingale.</li>
         </ul>
-        <div class="liens"><a href="swaptions-hjm/">▶ Ouvrir l'application</a><a href="swaptions-hjm/#code">Code →</a></div>
+        <div class="liens"><a href="swaptions-hjm/">Ouvrir l'application</a><a href="swaptions-hjm/#code">Code →</a></div>
       </article>
 
       <article class="carte">
@@ -427,7 +630,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
           <li>Moteur à pas de temps avec correction BGK, ou pont exact par pas (ajouté, sans biais).</li>
           <li>Grecques à nombres aléatoires communs ; dividende et option en cours de vie ajoutés.</li>
         </ul>
-        <div class="liens"><a href="options-lookback/">▶ Ouvrir l'application</a><a href="options-lookback/#code">Code →</a></div>
+        <div class="liens"><a href="options-lookback/">Ouvrir l'application</a><a href="options-lookback/#code">Code →</a></div>
       </article>
 
       <article class="carte">
