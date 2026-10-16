@@ -1,20 +1,22 @@
-/* hjm.js — portage JavaScript fidèle du paquet Python hjm1f/ (même modèle, mêmes formules, mêmes schémas).
-   Utilisable dans le navigateur (window.HJM) et sous Node (module.exports) pour les tests.
+/* hjm.js — faithful JavaScript port of the Python package hjm1f/ (same model, same formulas, same schemes).
+   Runs in the browser (window.HJM) and under Node (module.exports) for the tests.
 
-   Seuls écarts assumés avec le Python :
-   - la loi normale est calculée par erf/erfc en série et fraction continue (précision ~1e-15) ;
-   - le Monte-Carlo a son propre générateur (xoshiro128** + Box-Muller), donc pas les mêmes tirages que NumPy ;
-   - la swaption receveuse européenne est pricée par des calls sur zéro-coupon (le Python renvoie la formule
-     payeuse dans ce cas : le code indique lui-même que le receveur n'y est pas spécialisé). */
+   The only deliberate differences with the Python:
+   - the normal law is computed with erf/erfc by series and continued fraction (accuracy ~1e-15);
+   - the Monte Carlo has its own generator (xoshiro128** + Box-Muller), so not the same draws as NumPy;
+   - the European receiver swaption is priced with calls on zero-coupon bonds (the Python returns the payer formula
+     in that case: the code itself says the receiver is not specialised there).
+   Options added after the model review: corrected convexity sign, exact Monte Carlo discounting, Crank–Nicolson with
+   Rannacher steps, regression degree and independent regression paths (see the Theory tab and the report). */
 (function (racine) {
   "use strict";
 
-  // ------------------------------------------------------------------ loi normale
+  // ------------------------------------------------------------------ normal law
   const SQRTPI = Math.sqrt(Math.PI);
   function erfc(x) {
     if (x < 0) return 2 - erfc(-x);
     if (x < 3) return 1 - erfPos(x);
-    // fraction continue (Lentz) : erfc(x) = exp(-x²)/√π · 1/(x + (1/2)/(x + 1/(x + (3/2)/(x + …))))
+    // continued fraction (Lentz): erfc(x) = exp(-x²)/√π · 1/(x + (1/2)/(x + 1/(x + (3/2)/(x + …))))
     const tiny = 1e-300;
     let f = x, C = x, D = 0;
     for (let n = 1; n < 300; n++) {
@@ -26,7 +28,7 @@
     }
     return Math.exp(-x * x) / SQRTPI / f;
   }
-  // erf(x) = 2/√π e^{-x²} Σ 2^n x^{2n+1} / (1·3·…·(2n+1)) : termes tous positifs, sans annulation
+  // erf(x) = 2/√π e^{-x²} Σ 2^n x^{2n+1} / (1·3·…·(2n+1)): all terms positive, no cancellation
   function erfPos(x) {
     let terme = x, somme = x;
     for (let n = 1; n < 200; n++) {
@@ -40,16 +42,16 @@
   const phi = x => 0.5 * erfc(-x / Math.SQRT2);
   const pdf = x => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
 
-  // ------------------------------------------------------------------ solveur de Brent (solvers.py)
+  // ------------------------------------------------------------------ Brent solver (solvers.py)
   const ULP1 = Math.pow(2, -52);
-  function ulp(x) { // math.ulp(1.0) dans le Python : constante
+  function ulp(x) { // math.ulp(1.0) in the Python: a constant
     return ULP1 * (x === x ? 1 : 1);
   }
   function brent(f, a, b, tol = 1e-10, maxIter = 100) {
     let fa = f(a), fb = f(b);
     if (fa === 0) return a;
     if (fb === 0) return b;
-    if (fa * fb > 0) throw new Error("racine non encadrée : f(" + a + ") et f(" + b + ") ont le même signe");
+    if (fa * fb > 0) throw new Error("root not bracketed: f(" + a + ") and f(" + b + ") have the same sign");
     let c = a, fc = fa, d = b - a, e = d;
     for (let it = 0; it < maxIter; it++) {
       if (fb * fc > 0) { c = a; fc = fa; d = e = b - a; }
@@ -71,10 +73,10 @@
       if (Math.abs(d) > tol1) b += d; else b += xm >= 0 ? tol1 : -tol1;
       fb = f(b);
     }
-    throw new Error("Brent n'a pas convergé");
+    throw new Error("Brent did not converge");
   }
 
-  // ------------------------------------------------------------------ courbe zéro-coupon (curve.py)
+  // ------------------------------------------------------------------ zero-coupon curve (curve.py)
   function interpLin(x, xs, ys) {
     if (x <= xs[0]) return ys[0];
     if (x >= xs[xs.length - 1]) return ys[ys.length - 1];
@@ -85,12 +87,12 @@
   }
   function Courbe(times, discounts) {
     times = times.slice(); discounts = discounts.slice();
-    if (times.length !== discounts.length) throw new Error("maturités et facteurs d'actualisation de longueurs différentes");
-    if (times.length < 1) throw new Error("courbe vide");
-    for (let i = 1; i < times.length; i++) if (!(times[i] > times[i - 1])) throw new Error("les maturités de la courbe doivent être strictement croissantes");
+    if (times.length !== discounts.length) throw new Error("maturities and discount factors have different lengths");
+    if (times.length < 1) throw new Error("empty curve");
+    for (let i = 1; i < times.length; i++) if (!(times[i] > times[i - 1])) throw new Error("the curve maturities must be strictly increasing");
     if (times[0] > 0) { times.unshift(0); discounts.unshift(1); }
-    if (discounts[0] !== 1) throw new Error("le facteur d'actualisation en 0 doit valoir 1");
-    for (const d of discounts) if (!(d > 0)) throw new Error("facteurs d'actualisation strictement positifs attendus");
+    if (discounts[0] !== 1) throw new Error("the discount factor at 0 must be 1");
+    for (const d of discounts) if (!(d > 0)) throw new Error("discount factors must be strictly positive");
     const logs = discounts.map(d => Math.log(Math.max(d, 1e-16)));
     const discount = t => t <= 0 ? 1 : Math.exp(interpLin(t, times, logs));
     const instFwd = (t, h = 1e-5) => { const t0 = Math.max(0, t - h), t1 = t + h; return -(Math.log(discount(t1)) - Math.log(discount(t0))) / (t1 - t0); };
@@ -108,11 +110,11 @@
       sousJacente: t => Swaption(t, terminal, strike, payTimes, accruals, payer)};
   }
 
-  // ------------------------------------------------------------------ cotations de marché (market_quotes.py)
+  // ------------------------------------------------------------------ market quotes (market_quotes.py)
   const annuite = (courbe, times, acc) => times.reduce((s, t, i) => s + acc[i] * courbe.discount(t), 0);
   function tauxSwapForward(courbe, sw) {
     const ann = annuite(courbe, sw.rest, sw.acc);
-    if (!(ann > 0)) throw new Error("annuité nulle : aucun coupon après l'échéance " + sw.expiry);
+    if (!(ann > 0)) throw new Error("zero annuity: no coupon after the expiry " + sw.expiry);
     return (courbe.discount(sw.expiry) - courbe.discount(sw.terminal)) / ann;
   }
   function prixBachelier(courbe, sw, volN) {
@@ -123,14 +125,14 @@
     return sw.payer ? ann * ((fwd - k) * phi(d) + s * pdf(d)) : ann * ((k - fwd) * phi(-d) + s * pdf(d));
   }
 
-  // ------------------------------------------------------------------ modèle HJM à un facteur (hjm_1f.py)
-  // convexite : "code" reproduit hjm_1f.py ; "corrigee" inverse le signe du terme de convexité c(t,T) dans
-  // P(t,T) = P(0,T)/P(0,t) · exp(−D(t,T) (c(t,T) + X_t)) et donc dans le taux court. Seule la version corrigée fait des
-  // zéro-coupons actualisés des martingales (absence d'arbitrage) : voir l'onglet Méthode.
+  // ------------------------------------------------------------------ one-factor HJM model (hjm_1f.py)
+  // convexite: "code" reproduces hjm_1f.py; "corrigee" (corrected) flips the sign of the convexity term c(t,T) in
+  // P(t,T) = P(0,T)/P(0,t) · exp(−D(t,T) (c(t,T) + X_t)) and therefore in the short rate. Only the corrected version makes
+  // discounted zero-coupon bonds martingales (no arbitrage): see the Theory tab.
   function Modele(courbe, lam, bucketEnds, sigmas, convexite = "code") {
     const sg = convexite === "corrigee" ? -1 : 1;
-    if (bucketEnds.length !== sigmas.length) throw new Error("une volatilité par segment attendue");
-    for (let i = 1; i < bucketEnds.length; i++) if (!(bucketEnds[i] > bucketEnds[i - 1])) throw new Error("fins de segments strictement croissantes attendues");
+    if (bucketEnds.length !== sigmas.length) throw new Error("one volatility per segment expected");
+    for (let i = 1; i < bucketEnds.length; i++) if (!(bucketEnds[i] > bucketEnds[i - 1])) throw new Error("segment ends must be strictly increasing");
     const petit = Math.abs(lam) < 1e-14;
     const sigma = t => {
       if (t <= 0) return sigmas[0];
@@ -170,7 +172,7 @@
       const d = D(t, T), c = 0.5 * (Bbar(T) + Bbar(t)) * alpha(t) - gamma(t);
       return courbe.discount(T) / courbe.discount(t) * Math.exp(d * (sg * c - x));
     }
-    // r_t = f(0,t) - b(t)(B(t) α(t) - γ(t) - X_t) ; « partieFixe » regroupe ce qui ne dépend pas de X
+    // r_t = f(0,t) - b(t)(B(t) α(t) - γ(t) - X_t)  (original sign); "partieFixe" gathers what does not depend on X
     const partieFixe = t => courbe.instFwd(t) - sg * b(t) * (Bbar(t) * alpha(t) - gamma(t));
     const tauxCourt = (t, x) => sg === 1 ? courbe.instFwd(t) - b(t) * (Bbar(t) * alpha(t) - gamma(t) - x) : partieFixe(t) + b(t) * x;
     function valeurSwap(sw, x) {
@@ -181,7 +183,7 @@
       const payeur = 1 - pn - sw.strike * ann;
       return sw.payer ? payeur : -payeur;
     }
-    // version rapide sur toute une grille de x (mêmes calculs que valeurSwap, termes déterministes factorisés)
+    // fast version on a whole grid of x (same computation as valeurSwap, deterministic terms factored out)
     function valeursSwapGrille(sw, xs) {
       const out = new Float64Array(xs.length);
       if (!sw.rest.length) return out;
@@ -226,7 +228,7 @@
       valeurSwap, valeursSwapGrille, putZC, callZC, jamshidian};
   }
 
-  // ------------------------------------------------------------------ bootstrap coterminal (calibration_1f.py)
+  // ------------------------------------------------------------------ co-terminal bootstrap (calibration_1f.py)
   function bootstrap(courbe, lam, bucketEnds, instruments, lower = 1e-6, upper = 0.20, convexite = "code") {
     const sig = bucketEnds.map(() => 0.01);
     const modeles = [], marche = [], parBrent = [];
@@ -234,15 +236,15 @@
       const prixMarche = prixBachelier(courbe, inst.swaption, inst.volN);
       const obj = s => { const v = sig.slice(); v[i] = s; return Modele(courbe, lam, bucketEnds, v, convexite).jamshidian(inst.swaption) - prixMarche; };
       try { sig[i] = brent(obj, lower, upper, 1e-10, 200); }
-      catch (e) { throw new Error(`instrument ${i + 1} (échéance ${inst.swaption.expiry}) : aucune volatilité dans [${lower}, ${upper}] ne reproduit le prix de marché (${e.message})`); }
+      catch (e) { throw new Error(`instrument ${i + 1} (expiry ${inst.swaption.expiry}): no volatility in [${lower}, ${upper}] reproduces the market price (${e.message})`); }
       modeles.push(Modele(courbe, lam, bucketEnds, sig, convexite).jamshidian(inst.swaption));
       marche.push(prixMarche);
     });
     return {sigmas: sig, modeles, marche, modele: Modele(courbe, lam, bucketEnds, sig, convexite)};
   }
 
-  // ------------------------------------------------------------------ EDP (pde_1f.py)
-  function arrondiBanquier(x) { // round() de Python 3
+  // ------------------------------------------------------------------ PDE (pde_1f.py)
+  function arrondiBanquier(x) { // Python 3 round()
     const f = Math.floor(x), r = x - f;
     if (r > 0.5) return f + 1;
     if (r < 0.5) return f;
@@ -283,10 +285,10 @@
     for (let i = n - 2; i >= 0; i--) x[i] = dp[i] - cp[i] * x[i + 1];
     return x;
   }
-  // θ-schéma : θ = 1 implicite (le code Python), θ = ½ Crank–Nicolson. Rannacher : après la date finale et après chaque
-  // date d'exercice (gain non lisse), quelques pas implicites amortissent les oscillations de Crank–Nicolson.
+  // θ-scheme: θ = 1 implicit (the Python code), θ = ½ Crank–Nicolson. Rannacher: after the final date and after each
+  // exercise date (non-smooth payoff), a few implicit steps damp the Crank–Nicolson oscillations.
   function prixEDP(modele, berm, grille, avecProfil = false, opts = {}) {
-    if (grille.nx < 4) throw new Error("au moins 4 points d'espace");
+    if (grille.nx < 4) throw new Error("at least 4 space points");
     const theta0 = opts.theta == null ? 1 : opts.theta, rannacher = Math.max(0, Math.round(opts.rannacher || 0));
     const xs = linspace(grille.xMin, grille.xMax, grille.nx), dx = xs[1] - xs[0];
     const ts = grilleTemps(berm, grille);
@@ -297,7 +299,7 @@
     let v = exercice(dernier);
     const tranches = [];
     const m = grille.nx - 2, lower = new Float64Array(m - 1), upper = new Float64Array(m - 1), diag = new Float64Array(m), rhs = new Float64Array(m);
-    // valeur intrinsèque aux deux bords pour chaque date d'exercice (ne dépend pas du pas de temps)
+    // intrinsic value at both edges for each exercise date (does not depend on the time step)
     const bordsEx = berm.exerciseTimes.map(ex => {
       const sw = sousJ.get(ex);
       return {ex, g: Math.max(modele.valeurSwap(sw, xs[0]), 0), d: Math.max(modele.valeurSwap(sw, xs[grille.nx - 1]), 0)};
@@ -306,17 +308,25 @@
     for (let n = ts.length - 2; n >= 0; n--) {
       const th = lisser > 0 ? 1 : theta0;
       if (lisser > 0) lisser--;
-      const t = ts[n], dt = ts[n + 1] - ts[n], eta = modele.eta(t), A = modele.partieFixe(t), bt = modele.b(t);
-      const diff = 0.5 * eta * eta / (dx * dx);
-      if (th === 1) { // expressions du code Python, à l'identique
+      const t = ts[n], dt = ts[n + 1] - ts[n], A = modele.partieFixe(t), bt = modele.b(t);
+      let diff;
+      if (theta0 === 1) { // the Python code's expressions, unchanged (η taken at the start of the step)
+        const eta = modele.eta(t);
+        diff = 0.5 * eta * eta / (dx * dx);
         for (let i = 0; i < m - 1; i++) { lower[i] = -dt * diff; upper[i] = -dt * diff; }
         for (let i = 0; i < m; i++) { diag[i] = 1 + 2 * dt * diff + dt * (A + bt * xs[i + 1]); rhs[i] = v[i + 1]; }
       } else {
-        const A1 = modele.partieFixe(ts[n + 1]), b1 = modele.b(ts[n + 1]);
+        // θ-scheme with every coefficient at its own end of the step: η(t_n) in the implicit part, η(t_{n+1}) in the
+        // explicit part (η(t) = σ(t) e^{λt} moves within a step; one value for both ends would make the scheme first
+        // order). σ is read at the middle of the step, i.e. on the segment the step belongs to.
+        const A1 = modele.partieFixe(ts[n + 1]), b1 = modele.b(ts[n + 1]), s = modele.sigma(0.5 * (t + ts[n + 1]));
+        const e0 = s * Math.exp(modele.lam * t), e1 = s * Math.exp(modele.lam * ts[n + 1]);
+        diff = 0.5 * e0 * e0 / (dx * dx);
+        const diff1 = 0.5 * e1 * e1 / (dx * dx);
         for (let i = 0; i < m - 1; i++) { lower[i] = -th * dt * diff; upper[i] = -th * dt * diff; }
         for (let i = 0; i < m; i++) {
           diag[i] = 1 + th * dt * (2 * diff + A + bt * xs[i + 1]);
-          rhs[i] = v[i + 1] - (1 - th) * dt * ((2 * diff + A1 + b1 * xs[i + 1]) * v[i + 1] - diff * (v[i] + v[i + 2]));
+          rhs[i] = v[i + 1] - (1 - th) * dt * ((2 * diff1 + A1 + b1 * xs[i + 1]) * v[i + 1] - diff1 * (v[i] + v[i + 2]));
         }
       }
       let gauche = v[0], droite = v[grille.nx - 1];
@@ -336,7 +346,7 @@
       v = vNew;
     }
     if (avecProfil) {
-      // à la dernière date, la valeur de continuation est nulle : l'option est exercée dès qu'elle est dans la monnaie
+      // at the last date the continuation value is zero: the option is exercised as soon as it is in the money
       if (!tranches.some(tr => r12(tr.t) === r12(dernier)))
         tranches.push({t: dernier, continuation: new Float64Array(grille.nx), exercice: exercice(dernier)});
       tranches.sort((a, b) => a.t - b.t);
@@ -349,8 +359,8 @@
     return avecProfil ? {prix, xs, v, nPasTemps: ts.length - 1, tranches} : prix;
   }
 
-  // ------------------------------------------------------------------ Monte-Carlo de Longstaff-Schwartz (mc_1f.py)
-  function generateur(graine) { // xoshiro128** amorcé par splitmix32, normales par Box-Muller
+  // ------------------------------------------------------------------ Longstaff-Schwartz Monte Carlo (mc_1f.py)
+  function generateur(graine) { // xoshiro128** seeded by splitmix32, normals by Box-Muller
     let s = (graine >>> 0) || 1;
     const sm = () => { s = (s + 0x9e3779b9) >>> 0; let z = s; z = Math.imul(z ^ (z >>> 16), 0x85ebca6b) >>> 0; z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35) >>> 0; return (z ^ (z >>> 16)) >>> 0; };
     let a = sm(), b = sm(), c = sm(), d = sm();
@@ -365,7 +375,7 @@
     };
     return {unif, normale};
   }
-  // moindres carrés par QR de Householder (comme np.linalg.lstsq, à plein rang)
+  // least squares by Householder QR (like np.linalg.lstsq at full rank)
   function moindresCarres(A, y, n, p) {
     const Q = Float64Array.from(A), z = Float64Array.from(y);
     for (let k = 0; k < p; k++) {
@@ -381,9 +391,9 @@
     for (let k = p - 1; k >= 0; k--) { let s = z[k]; for (let j = k + 1; j < p; j++) s -= Q[k * p + j] * beta[j]; const dkk = Q[k * p + k]; beta[k] = Math.abs(dkk) > 1e-300 ? s / dkk : 0; }
     return beta;
   }
-  // Chemins du facteur aux dates d'exercice.
-  //  « code » : X tiré exactement aux seules dates d'exercice (comme mc_1f.py) ;
-  //  « exacte » : X tiré sur une grille fine, et l'intégrale I = ∫ r ds accumulée par trapèzes (r = A(t) + b(t) X_t).
+  // Paths of the factor at the exercise dates.
+  //  "code": X drawn exactly at the exercise dates only (as in mc_1f.py);
+  //  "exacte" (exact): X drawn on a fine grid, and the integral I = ∫ r ds accumulated by trapezoids (r = A(t) + b(t) X_t).
   function simulerChemins(modele, ex, N, rng, exacte, sousPasParAn) {
     const n = ex.length, x = new Float64Array(N * n);
     if (!exacte) {
@@ -418,12 +428,12 @@
     }
     return {x, I};
   }
-  // Longstaff-Schwartz. Options :
-  //  actualisation : "code" (mc_1f.py : taux court figé entre deux dates, puis e^{−r(0) τ} jusqu'à aujourd'hui) ou
-  //                  "exacte" (e^{−∫r} simulé chemin par chemin) ;
-  //  degre : degré du polynôme de régression (le code : 2, base [1, X, X²]) ;
-  //  independants : régression sur un jeu de chemins, prix sur un autre (supprime le biais haut de l'échantillon) ;
-  //  detail : renvoie, pour chaque date, un échantillon (X, valeur de continuation actualisée) et la régression.
+  // Longstaff-Schwartz. Options:
+  //  actualisation (discounting): "code" (mc_1f.py: short rate frozen between two dates, then e^{−r(0) τ} back to today)
+  //                  or "exacte" (e^{−∫r} simulated path by path);
+  //  degre: degree of the regression polynomial (the code: 2, basis [1, X, X²]);
+  //  independants: regression on one set of paths, pricing on another (removes the in-sample high bias);
+  //  detail: returns, for each date, a sample (X, discounted continuation value) and the regression.
   function prixLSMC(modele, berm, nChemins = 20000, graine = 1234, opts = {}) {
     const ex = berm.exerciseTimes.slice(), n = ex.length, N = nChemins, rng = generateur(graine);
     const exacte = opts.actualisation === "exacte", degre = Math.max(1, Math.min(6, Math.round(opts.degre || 2))), p = degre + 1;
@@ -431,15 +441,15 @@
     const S = simulerChemins(modele, ex, N, rng, exacte, sousPas);
     const col = (X, j, M) => { const c = new Float64Array(M); for (let i = 0; i < M; i++) c[i] = X[i * n + j]; return c; };
     const ecartX = ex.map(t => Math.sqrt(Math.max(modele.alpha(t), 1e-300)));
-    const base = (xx, j, k) => Math.pow(xx / ecartX[j], k); // X normalisé : même ajustement, mieux conditionné
+    const base = (xx, j, k) => Math.pow(xx / ecartX[j], k); // normalised X: same fit, better conditioned
     const r0 = modele.tauxCourt(0, 0);
-    // actualisation de la date j à la date d'exercice k, chemin i
+    // discounting from date j to exercise date k, path i
     const actu = (Sx, i, j, k, xx) => {
       if (exacte) return Math.exp(-(Sx.I[i * n + k] - Sx.I[i * n + j]));
       return Math.exp(-(modele.partieFixe(ex[j]) + modele.b(ex[j]) * xx) * (ex[k] - ex[j]));
     };
     const actu0 = (Sx, i, k) => exacte ? Math.exp(-Sx.I[i * n + k]) : Math.exp(-r0 * ex[k]);
-    // passe rétrograde sur le jeu d'entraînement
+    // backward pass on the training set
     const flux = new Float64Array(N), kEx = new Int32Array(N).fill(n - 1);
     const valeurs = X => ex.map((t, j) => { const v = modele.valeursSwapGrille(berm.sousJacente(t), col(X, j, N)); for (let i = 0; i < N; i++) v[i] = Math.max(v[i], 0); return v; });
     const vals = valeurs(S.x);
@@ -463,7 +473,7 @@
     }
     let Sp = S, fluxP = flux, kP = kEx;
     if (opts.independants) {
-      // nouveaux chemins : la règle d'exercice apprise ci-dessus est appliquée vers l'avant
+      // new paths: the exercise rule learnt above is applied forwards
       Sp = simulerChemins(modele, ex, N, rng, exacte, sousPas);
       const valsP = valeurs(Sp.x);
       fluxP = new Float64Array(N); kP = new Int32Array(N).fill(n - 1);
@@ -481,7 +491,7 @@
     const nbExerces = new Array(n).fill(0);
     for (let i = 0; i < N; i++) { const val = fluxP[i] * actu0(Sp, i, kP[i]); s += val; s2 += val * val; if (fluxP[i] > 0) nbExerces[kP[i]]++; }
     const moy = s / N, var_ = N > 1 ? (s2 - N * moy * moy) / (N - 1) : 0;
-    // contrôle de martingale : prix Monte-Carlo des zéro-coupons P(0, T_k) avec l'actualisation choisie
+    // martingale check: Monte Carlo prices of the zero-coupon bonds P(0, T_k) with the chosen discounting
     const martingale = ex.map((t, k) => {
       let a = 0, a2 = 0;
       for (let i = 0; i < N; i++) { const d = actu0(Sp, i, k); a += d; a2 += d * d; }
@@ -490,13 +500,13 @@
     });
     return {prix: moy, erreur: Math.sqrt(Math.max(var_, 0) / N), nbExerces, details, martingale};
   }
-  // volatilité normale implicite (Bachelier) d'un prix de swaption
+  // implied normal (Bachelier) volatility of a swaption price
   function volNImplicite(courbe, sw, prix) {
     const f = v => prixBachelier(courbe, sw, v) - prix;
     if (f(1e-9) > 0) return NaN;
     try { return brent(f, 1e-9, 1, 1e-14, 200); } catch (e) { return NaN; }
   }
-  // éventail du taux court : quantiles de r_t = A(t) + b(t) X_t, X_t ~ N(0, α(t))
+  // short-rate fan: quantiles of r_t = A(t) + b(t) X_t, X_t ~ N(0, α(t))
   function eventailTaux(modele, tMax, zs, nPts = 120) {
     const ts = [], q = zs.map(() => []);
     for (let k = 0; k <= nPts; k++) {

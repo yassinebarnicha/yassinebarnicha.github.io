@@ -1,329 +1,398 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Swaptions bermudéennes sous HJM — Mohammed-Yassine Barnicha</title>
-<meta name="description" content="Pricer en ligne de swaptions bermudéennes coterminales sous HJM à un facteur : calibration par bootstrap sur les volatilités normales, EDP et Monte-Carlo de Longstaff-Schwartz, revue et correction du modèle, dans le navigateur.">
+<title>Bermudan swaptions under HJM — Mohammed-Yassine Barnicha</title>
+<meta name="description" content="Online pricer for co-terminal Bermudan swaptions under a one-factor HJM model: bootstrap calibration to normal volatilities, PDE and Longstaff-Schwartz Monte Carlo, model review and correction, all in the browser.">
 <meta name="theme-color" content="#080b12">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23161616'/%3E%3Cpath d='M5 24 Q11 6 16 16 T27 8' stroke='%230f62fe' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23080b12'/%3E%3Cpath d='M7 22 13 10l5 12 7-13' stroke='%2391b9ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 <style>
 /*__STYLE__*/
 .revue li{margin-bottom:8px}
-.alerte{background:var(--warn-bg);color:var(--warn);padding:10px 14px;font-size:13px;border-left:3px solid var(--warn)}
-.remarque{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);padding:16px 20px}
+.alerte{background:var(--warn-bg);color:var(--warn);padding:10px 14px;font-size:13px;border-left:3px solid var(--warn);border-radius:0 12px 12px 0}
+.remarque{background:var(--glass);border:1px solid var(--edge);border-left:3px solid var(--accent);border-radius:0 18px 18px 0;padding:16px 20px}
 .remarque h2{font-size:18px;font-weight:600;margin:0 0 8px}
-.remarque p,.remarque li{color:var(--ink2);font-size:14px;max-width:95ch}
+.remarque p,.remarque li{color:var(--ink2);font-size:14px;max-width:100ch}
 .remarque b{color:var(--ink)}
-.remarque .phrase{font-style:italic;color:var(--ink);border-top:1px solid var(--sunk);padding-top:10px;margin-bottom:0}
+.remarque .phrase{font-style:italic;color:var(--ink);border-top:1px solid var(--edge);padding-top:10px;margin-bottom:0}
+.tab-texte{margin:12px 0;font-size:13px}
+.tab-texte td,.tab-texte th{text-align:left}
 </style>
 </head>
 <body>
-<!--GABARIT--><p style="margin:0;padding:12px 16px;background:#fff1c7;color:#684e00;font:600 14px system-ui,sans-serif">Ceci est le gabarit, sans styles ni calculs : ouvrez <code>index.html</code> (construit par <code>python construire.py</code> à la racine du dépôt).</p><!--/GABARIT-->
+<!--GABARIT--><p style="margin:0;padding:12px 16px;background:#fff1c7;color:#684e00;font:600 14px system-ui,sans-serif">This is the template, without styles or computations: open <code>index.html</code> (built by <code>python construire.py</code> at the root of the repository).</p><!--/GABARIT-->
 <div class="barre"><div class="page">
-  <a class="mono-nom" href="../" title="Page d'accueil">MYB</a>
-  <span class="titre">Swaptions bermudéennes sous HJM</span>
-  <nav><a href="../">← Projets</a><a href="#code">Code source</a></nav>
+  <a class="mono-nom" href="../" title="Home page">MYB</a>
+  <span class="titre">Bermudan swaptions under HJM</span>
+  <nav><a href="../">← Projects</a><a href="#theorie">Theory</a><a href="rapport/report.pdf">Report (PDF)</a><a href="#code">Code</a></nav>
 </div></div>
 
 <main class="page">
   <header class="entete">
-    <p class="surtitre">Taux d'intérêt · HJM à un facteur · EDP · Longstaff-Schwartz</p>
-    <h1>Pricer de swaptions bermudéennes coterminales</h1>
-    <p class="chapeau">Le modèle <b>HJM à un facteur</b> (retour à la moyenne λ, volatilité σ(t) constante par morceaux) est
-      <b>calibré en direct</b> sur des swaptions européennes coterminales cotées en volatilité normale, puis la bermudéenne est
-      pricée par <b>EDP</b> et contrôlée par <b>Monte-Carlo de Longstaff-Schwartz</b>. Toutes les entrées et tous les choix
-      numériques sont modifiables. La relecture du code a mis au jour une <b>erreur de signe</b> dans la formule des
-      zéro-coupons : la page utilise la formule corrigée et garde celle du code en option (onglet Méthode).</p>
+    <p class="surtitre">Interest rates · one-factor HJM · PDE · Longstaff-Schwartz</p>
+    <h1>Co-terminal Bermudan swaption pricer</h1>
+    <p class="chapeau">The <b>one-factor HJM model</b> (mean reversion <m>\lambda</m>, piecewise-constant volatility <m>\sigma(t)</m>) is
+      <b>calibrated live</b> to co-terminal European swaptions quoted in normal volatility; the Bermudan is then priced by a
+      <b>PDE</b> and checked by <b>Longstaff-Schwartz Monte Carlo</b>. Every input and every numerical choice can be changed.
+      Reviewing the original code revealed a <b>sign error</b> in the zero-coupon bond formula: the page uses the corrected
+      formula and keeps the original one as an option (see the Theory tab).</p>
   </header>
 
   <div class="onglets" role="tablist">
-    <button type="button" data-vue="pricer">Pricer et calibration</button>
-    <button type="button" data-vue="lambda">Retour à la moyenne</button>
-    <button type="button" data-vue="etudes">Études de sensibilité</button>
-    <button type="button" data-vue="methode">Méthode et revue</button>
-    <button type="button" data-vue="code">Code source</button>
+    <button type="button" data-vue="pricer">Pricer and calibration</button>
+    <button type="button" data-vue="lambda">Mean reversion</button>
+    <button type="button" data-vue="etudes">Sensitivity studies</button>
+    <button type="button" data-vue="theorie">Theory and model review</button>
+    <button type="button" data-vue="code">Source code</button>
   </div>
 
   <!-- ============================== PRICER ============================== -->
   <section class="vue" id="pricer">
     <div class="espace">
-      <aside class="panneau reglages" aria-label="Entrées">
-        <h3>Courbe zéro-coupon P(0,t)</h3>
-        <table class="tab-edit" id="t-courbe"><thead><tr><th>t (ans)</th><th>P(0,t)</th><th>taux zéro</th><th></th></tr></thead><tbody></tbody></table>
-        <div class="btns"><button type="button" class="btn creux" id="courbe-plus">+ pilier</button>
-          <button type="button" class="btn creux" id="courbe-plat">Courbe à taux plat…</button></div>
-        <p class="aide">Interpolation linéaire des log-facteurs (comme <code>curve.py</code>), extrapolation plate ; P(0,0) = 1 ajouté si absent.</p>
+      <aside class="panneau reglages" aria-label="Inputs">
+        <h3>Zero-coupon curve P(0,t)</h3>
+        <table class="tab-edit" id="t-courbe"><thead><tr><th>t (years)</th><th>P(0,t)</th><th>zero rate</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="btns"><button type="button" class="btn creux" id="courbe-plus">+ pillar</button>
+          <button type="button" class="btn creux" id="courbe-plat">Flat curve…</button></div>
+        <p class="aide">Linear interpolation of the log discount factors (as in <code>curve.py</code>), flat extrapolation; <m>P(0,0)=1</m> is added if missing.</p>
 
-        <h3>Modèle</h3>
-        <div class="champ"><label for="lam"><b>λ</b> retour à la moyenne</label><input type="number" id="lam" step="0.01" value="0.03"></div>
-        <div class="champ"><label for="conv">Formule des zéro-coupons</label><select id="conv"><option value="corrigee">corrigée (sans arbitrage)</option><option value="code">celle du code</option></select></div>
-        <div class="champ"><label for="mode">Volatilité σ(t)</label><select id="mode"><option value="calibree">calibrée (bootstrap)</option><option value="imposee">imposée</option></select></div>
+        <h3>Model</h3>
+        <div class="champ"><label for="lam"><b>λ</b> mean reversion</label><input type="number" id="lam" step="0.01" value="0.03"></div>
+        <div class="champ"><label for="conv">Zero-coupon formula</label><select id="conv"><option value="corrigee">corrected (arbitrage-free)</option><option value="code">original code</option></select></div>
+        <div class="champ"><label for="mode">Volatility σ(t)</label><select id="mode"><option value="calibree">calibrated (bootstrap)</option><option value="imposee">user-set</option></select></div>
 
-        <h3>Produit</h3>
-        <div class="champ"><label for="sens">Sens</label><select id="sens"><option value="1">Payeuse</option><option value="0">Receveuse</option></select></div>
-        <div class="champ"><label for="strike"><b>K</b> taux fixe (%)</label><input type="number" id="strike" step="0.05" value="3"></div>
-        <div class="champ"><label for="terminal"><b>T<sub>N</sub></b> maturité finale</label><input type="number" id="terminal" step="0.5" value="7"></div>
-        <div class="champ"><label for="paie">Dates de paiement fixes</label><input type="text" id="paie" value="2 3 4 5 6 7"></div>
-        <div class="champ"><label for="accr">Fractions d'année</label><input type="text" id="accr" value="1 1 1 1 1 1"></div>
-        <div class="btns"><label class="aide" style="margin:0;align-self:center">Pas</label><input type="number" id="pas" value="1" step="0.25" style="width:80px">
-          <button type="button" class="btn creux" id="gen-paie">Générer l'échéancier</button></div>
+        <h3>Product</h3>
+        <div class="champ"><label for="sens">Side</label><select id="sens"><option value="1">Payer</option><option value="0">Receiver</option></select></div>
+        <div class="champ"><label for="strike"><b>K</b> fixed rate (%)</label><input type="number" id="strike" step="0.05" value="3"></div>
+        <div class="champ"><label for="terminal"><b>T<sub>N</sub></b> final maturity</label><input type="number" id="terminal" step="0.5" value="7"></div>
+        <div class="champ"><label for="paie">Fixed payment dates</label><input type="text" id="paie" value="2 3 4 5 6 7"></div>
+        <div class="champ"><label for="accr">Accrual fractions</label><input type="text" id="accr" value="1 1 1 1 1 1"></div>
+        <div class="btns"><label class="aide" style="margin:0;align-self:center">Step</label><input type="number" id="pas" value="1" step="0.25" style="width:80px">
+          <button type="button" class="btn creux" id="gen-paie">Generate the schedule</button></div>
 
-        <h3>Dates d'exercice, cotations et σ</h3>
-        <table class="tab-edit" id="t-ex"><thead><tr><th>exercice T<sub>k</sub></th><th>vol N (bp)</th><th>σ imposée (bp)</th><th></th></tr></thead><tbody></tbody></table>
-        <div class="btns"><button type="button" class="btn creux" id="ex-plus">+ date d'exercice</button></div>
-        <p class="aide">Une swaption européenne coterminale par date (échéance T<sub>k</sub>, swap jusqu'à T<sub>N</sub>) et un segment de σ(t)
-          par date : calé par bootstrap, ou imposé (la colonne de droite sert alors, et la table montre l'écart au marché).</p>
+        <h3>Exercise dates, quotes and σ</h3>
+        <table class="tab-edit" id="t-ex"><thead><tr><th>exercise T<sub>k</sub></th><th>normal vol (bp)</th><th>user σ (bp)</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="btns"><button type="button" class="btn creux" id="ex-plus">+ exercise date</button></div>
+        <p class="aide">One co-terminal European swaption per date (expiry <m>T_k</m>, swap until <m>T_N</m>) and one segment of
+          <m>\sigma(t)</m> per date: fitted by bootstrap, or set by hand (the right-hand column is then used and the table shows the
+          gap to the market).</p>
 
         <h3>Bootstrap (Brent)</h3>
-        <div class="champ"><label for="bas">σ minimale</label><input type="number" id="bas" value="0.000001" step="0.000001"></div>
-        <div class="champ"><label for="haut">σ maximale</label><input type="number" id="haut" value="0.2" step="0.01"></div>
+        <div class="champ"><label for="bas">Lowest σ</label><input type="number" id="bas" value="0.000001" step="0.000001"></div>
+        <div class="champ"><label for="haut">Highest σ</label><input type="number" id="haut" value="0.2" step="0.01"></div>
 
-        <h3>EDP</h3>
-        <div class="champ"><label for="schema">Schéma en temps</label><select id="schema"><option value="1">implicite (le code)</option><option value="0.5">Crank–Nicolson</option></select></div>
-        <div class="champ"><label for="ran">Pas implicites de Rannacher</label><input type="number" id="ran" value="2" step="1"></div>
-        <div class="champ"><label for="nstd">Domaine ± n écarts-types</label><input type="number" id="nstd" value="5" step="0.5"></div>
-        <div class="champ"><label for="nx">Points d'espace n<sub>x</sub></label><input type="number" id="nx" value="501" step="50"></div>
-        <div class="champ"><label for="nt">Pas de temps n<sub>t</sub></label><input type="number" id="nt" value="1000" step="100"></div>
+        <h3>PDE</h3>
+        <div class="champ"><label for="schema">Time scheme</label><select id="schema"><option value="1">implicit (original code)</option><option value="0.5">Crank–Nicolson</option></select></div>
+        <div class="champ"><label for="ran">Rannacher implicit steps</label><input type="number" id="ran" value="2" step="1"></div>
+        <div class="champ"><label for="nstd">Domain ± n standard deviations</label><input type="number" id="nstd" value="5" step="0.5"></div>
+        <div class="champ"><label for="nx">Space points n<sub>x</sub></label><input type="number" id="nx" value="501" step="50"></div>
+        <div class="champ"><label for="nt">Time steps n<sub>t</sub></label><input type="number" id="nt" value="1000" step="100"></div>
 
-        <h3>Monte-Carlo de Longstaff-Schwartz</h3>
-        <label class="case"><input type="checkbox" id="mc-on" checked> Calculer le prix LSMC</label>
-        <div class="champ"><label for="nmc">Trajectoires</label><input type="number" id="nmc" value="20000" step="1000"></div>
-        <div class="champ"><label for="graine">Graine</label><input type="number" id="graine" value="1234"></div>
-        <div class="champ"><label for="actu">Actualisation</label><select id="actu"><option value="exacte">exacte : e^(−∫r) simulé</option><option value="code">celle du code (taux figé)</option></select></div>
-        <div class="champ"><label for="spa">Sous-pas par an (∫r)</label><input type="number" id="spa" value="52" step="4"></div>
-        <div class="champ"><label for="deg">Degré de la régression</label><input type="number" id="deg" value="2" step="1" min="1" max="6"></div>
-        <label class="case"><input type="checkbox" id="indep"> Régression sur des chemins indépendants</label>
-        <div class="btns"><button type="button" class="btn creux" id="defaut">Réglages recommandés</button><button type="button" class="btn creux" id="notebook">Valeurs du notebook</button></div>
+        <h3>Longstaff-Schwartz Monte Carlo</h3>
+        <label class="case"><input type="checkbox" id="mc-on" checked> Compute the LSMC price</label>
+        <div class="champ"><label for="nmc">Paths</label><input type="number" id="nmc" value="20000" step="1000"></div>
+        <div class="champ"><label for="graine">Seed</label><input type="number" id="graine" value="1234"></div>
+        <div class="champ"><label for="actu">Discounting</label><select id="actu"><option value="exacte">exact: e^(−∫r) simulated</option><option value="code">original code (frozen rate)</option></select></div>
+        <div class="champ"><label for="spa">Sub-steps per year (∫r)</label><input type="number" id="spa" value="52" step="4"></div>
+        <div class="champ"><label for="deg">Regression degree</label><input type="number" id="deg" value="2" step="1" min="1" max="6"></div>
+        <label class="case"><input type="checkbox" id="indep"> Regress on independent paths</label>
+        <div class="btns"><button type="button" class="btn creux" id="defaut">Recommended settings</button><button type="button" class="btn creux" id="notebook">Notebook values</button></div>
       </aside>
 
       <div class="resultats">
-        <div class="etat" id="etat" role="status">Calcul…</div>
+        <div class="etat" id="etat" role="status">Computing…</div>
         <div class="alerte" id="alerte" hidden></div>
         <div class="kpis">
-          <div class="kpi"><div class="lbl">Bermudéenne — EDP</div><div class="val" id="k-edp">—</div><div class="sous" id="k-edp-s"></div></div>
-          <div class="kpi"><div class="lbl">Bermudéenne — LSMC</div><div class="val" id="k-mc">—</div><div class="sous" id="k-mc-s"></div></div>
-          <div class="kpi"><div class="lbl">Plus chère des européennes</div><div class="val" id="k-eur">—</div><div class="sous" id="k-eur-s"></div></div>
-          <div class="kpi"><div class="lbl">Prime d'exercice anticipé</div><div class="val" id="k-eep">—</div><div class="sous" id="k-eep-s"></div></div>
+          <div class="kpi"><div class="lbl">Bermudan — PDE</div><div class="val" id="k-edp">—</div><div class="sous" id="k-edp-s"></div></div>
+          <div class="kpi"><div class="lbl">Bermudan — LSMC</div><div class="val" id="k-mc">—</div><div class="sous" id="k-mc-s"></div></div>
+          <div class="kpi"><div class="lbl">Most expensive European</div><div class="val" id="k-eur">—</div><div class="sous" id="k-eur-s"></div></div>
+          <div class="kpi"><div class="lbl">Early-exercise premium</div><div class="val" id="k-eep">—</div><div class="sous" id="k-eep-s"></div></div>
         </div>
 
         <div class="carte-res">
-          <h2>Calibration : swaptions européennes coterminales</h2>
-          <p class="aide">Prix de marché = Bachelier sur la vol normale cotée ; prix modèle = Jamshidian (somme d'options sur zéro-coupons),
-            reconverti en vol normale implicite.</p>
-          <div class="defile"><table id="t-cal"><thead><tr><th>échéance</th><th>swap fwd</th><th>annuité</th><th>vol N marché</th><th>vol N modèle</th><th>prix marché</th><th>prix modèle</th><th>écart</th><th>σ</th></tr></thead><tbody></tbody></table></div>
+          <h2>Calibration: co-terminal European swaptions</h2>
+          <p class="aide">Market price = Bachelier at the quoted normal vol; model price = Jamshidian (sum of options on zero-coupon bonds),
+            converted back into an implied normal vol.</p>
+          <div class="defile"><table id="t-cal"><thead><tr><th>expiry</th><th>fwd swap</th><th>annuity</th><th>market vol</th><th>model vol</th><th>market price</th><th>model price</th><th>gap</th><th>σ</th></tr></thead><tbody></tbody></table></div>
         </div>
 
         <div class="grille-res">
-          <div class="carte-res"><h2>Volatilité σ(t)</h2><p class="aide">Constante par morceaux, un segment par date d'exercice.</p><div class="graphe" id="g-sigma"></div></div>
-          <div class="carte-res"><h2>Courbe des taux</h2><p class="aide">Taux zéro et forward instantané f(0,t) tirés de P(0,t).</p><div class="graphe" id="g-courbe"></div><p class="aide" id="courbe-note" style="margin:6px 0 0"></p></div>
-          <div class="carte-res"><h2>Éventail du taux court</h2><p class="aide">Quantiles de r<sub>t</sub> = A(t) + e<sup>−λt</sup> X<sub>t</sub>, X<sub>t</sub> gaussien de variance α(t) : 1 %, 5 %, 25 %, 50 %, 75 %, 95 %, 99 %.</p><div class="graphe" id="g-event"></div></div>
-          <div class="carte-res"><h2>Loi du facteur aux dates d'exercice</h2><p class="aide">Densité de X<sub>T<sub>k</sub></sub> ~ N(0, α(T<sub>k</sub>)) ; les traits verticaux marquent la frontière d'exercice trouvée par l'EDP.</p><div class="graphe" id="g-densite"></div></div>
+          <div class="carte-res"><h2>Volatility σ(t)</h2><p class="aide">Piecewise constant, one segment per exercise date.</p><div class="graphe" id="g-sigma"></div></div>
+          <div class="carte-res"><h2>Yield curve</h2><p class="aide">Zero rate and instantaneous forward <m>f(0,t)=-\partial_t\ln P(0,t)</m>.</p><div class="graphe" id="g-courbe"></div><p class="aide" id="courbe-note" style="margin:6px 0 0"></p></div>
+          <div class="carte-res"><h2>Short-rate fan</h2><p class="aide">Quantiles of <m>r_t=A(t)+e^{-\lambda t}X_t</m> with <m>X_t\sim\mathcal N(0,\alpha(t))</m>: 1, 5, 25, 50, 75, 95 and 99 %.</p><div class="graphe" id="g-event"></div></div>
+          <div class="carte-res"><h2>Law of the factor at the exercise dates</h2><p class="aide">Density of <m>X_{T_k}\sim\mathcal N(0,\alpha(T_k))</m>; the vertical lines mark the exercise boundary found by the PDE.</p><div class="graphe" id="g-densite"></div></div>
         </div>
 
         <div class="carte-res">
-          <h2>Frontière d'exercice (EDP)</h2>
-          <p class="aide">À chaque date, l'option est exercée là où la valeur d'exercice dépasse la valeur de continuation.</p>
-          <div class="champ" style="max-width:360px"><label for="tranche">Date d'exercice</label><select id="tranche"></select></div>
+          <h2>Exercise boundary (PDE)</h2>
+          <p class="aide">At each date the option is exercised where the exercise value exceeds the continuation value.</p>
+          <div class="champ" style="max-width:360px"><label for="tranche">Exercise date</label><select id="tranche"></select></div>
           <div class="graphe haut" id="g-front"></div>
           <p class="aide" id="front-note"></p>
         </div>
 
         <div class="grille-res" id="c-mc">
           <div class="carte-res">
-            <h2>Régression de Longstaff-Schwartz</h2>
-            <p class="aide">Chemins dans la monnaie : valeur future actualisée (points), continuation estimée par le polynôme (trait) et
-              valeur d'exercice (tirets). On exerce où les tirets passent au-dessus du trait.</p>
+            <h2>Longstaff-Schwartz regression</h2>
+            <p class="aide">In-the-money paths: discounted future cash flow (dots), continuation estimated by the polynomial (line) and
+              exercise value (dashes). Exercise happens where the dashes rise above the line.</p>
             <div class="champ" style="max-width:360px"><label for="reg-date">Date</label><select id="reg-date"></select></div>
             <div class="graphe haut" id="g-reg"></div>
           </div>
           <div class="carte-res">
-            <h2>Où le Monte-Carlo exerce</h2><p class="aide">Trajectoires exercées à chaque date.</p>
+            <h2>Where the Monte Carlo exercises</h2><p class="aide">Paths exercised at each date.</p>
             <div class="graphe" id="g-mc"></div>
-            <h2 style="margin-top:14px">Contrôle de martingale</h2>
-            <p class="aide">Prix Monte-Carlo des zéro-coupons avec l'actualisation choisie, contre la courbe : ils doivent coïncider.</p>
-            <div class="defile"><table id="t-mart"><thead><tr><th>T</th><th>P(0,T) courbe</th><th>Monte-Carlo</th><th>écart</th></tr></thead><tbody></tbody></table></div>
+            <h2 style="margin-top:14px">Martingale check</h2>
+            <p class="aide">Monte Carlo prices of the zero-coupon bonds with the chosen discounting, against the curve: they must agree.</p>
+            <div class="defile"><table id="t-mart"><thead><tr><th>T</th><th>P(0,T) curve</th><th>Monte Carlo</th><th>gap</th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============================== RETOUR À LA MOYENNE ============================== -->
+  <!-- ============================== MEAN REVERSION ============================== -->
   <section class="vue" id="lambda" hidden>
     <div class="remarque">
-      <h2>Remarque : retour à la moyenne, recalibration et valeur de la bermudéenne</h2>
-      <p>Pour une swaption bermudéenne, augmenter le retour à la moyenne λ <b>après recalibration sur les swaptions européennes</b>
-        tend généralement à <b>augmenter son prix</b>. Pourquoi ?</p>
+      <h2>Remark: mean reversion, recalibration and the value of the Bermudan</h2>
+      <p>For a Bermudan swaption, increasing the mean reversion <m>\lambda</m> <b>and recalibrating to the European swaptions</b>
+        generally <b>increases its price</b>. Why?</p>
       <ul>
-        <li><b>La recalibration maintient les prix des européennes</b> : la hausse de λ est compensée par une hausse de σ.</li>
-        <li><b>Un retour à la moyenne plus rapide réduit la persistance des taux</b> et diminue leur corrélation entre les dates
-          d'exercice.</li>
-        <li><b>Le choix entre plusieurs dates devient plus précieux</b> : si l'exercice n'est pas intéressant aujourd'hui, les
-          conditions peuvent être différentes à une date suivante.</li>
+        <li><b>Recalibration keeps the European prices fixed</b>: the rise in <m>\lambda</m> is offset by a rise in <m>\sigma</m>. Each
+          European only sees the total variance of its own exercise date, so its price does not move.</li>
+        <li><b>Faster mean reversion makes rates less persistent</b> and lowers their correlation across exercise dates:
+          <m>\operatorname{corr}(X_{T_i},X_{T_j})=\sqrt{\alpha(T_i)/\alpha(T_j)}</m>, and for a constant <m>\sigma</m>,
+          <m>\alpha(T_i)/\alpha(T_j)=(e^{2\lambda T_i}-1)/(e^{2\lambda T_j}-1)</m> decreases in <m>\lambda</m>.</li>
+        <li><b>Choosing among several dates becomes more valuable</b>: if exercising is not worth it today, conditions may be very
+          different at a later date. The Bermudan is worth at least the most expensive European, and the gap (the switch option)
+          grows when the dates decorrelate.</li>
       </ul>
-      <p>La bermudéenne profite donc davantage de sa flexibilité d'exercice, alors que les européennes de calibration gardent
-        leurs prix. C'est une tendance, pas une règle universelle : le résultat dépend du modèle, des instruments de calibration
-        et de la structure de la bermudéenne.</p>
-      <p class="phrase">En une phrase : « Après recalibration aux européennes, une hausse du retour à la moyenne tend à augmenter la
-        valeur de la bermudéenne, car elle réduit la dépendance entre les opportunités d'exercice et valorise le choix de la date. »</p>
+      <p>The Bermudan therefore gains more from its exercise flexibility, while the calibration Europeans keep their prices. It is a
+        tendency, not a universal rule: the result depends on the model, the calibration instruments and the structure of the
+        Bermudan. Without recalibration the effect reverses: a higher <m>\lambda</m> with frozen <m>\sigma</m> just damps the
+        volatility, and every price falls.</p>
+      <p class="phrase">In one sentence: "After recalibration to the Europeans, higher mean reversion tends to increase the value of the
+        Bermudan, because it reduces the dependence between exercise opportunities and makes the choice of the date more valuable."</p>
     </div>
 
     <div class="espace" style="margin-top:20px">
-      <aside class="panneau reglages" aria-label="Retour à la moyenne">
-        <p class="aide" style="margin-top:0">Les graphes reprennent les entrées de l'onglet Pricer (courbe, produit, cotations, formule,
-          EDP) ; ils se calculent à l'ouverture de l'onglet.</p>
-        <h3>Valeurs de λ</h3>
+      <aside class="panneau reglages" aria-label="Mean reversion">
+        <p class="aide" style="margin-top:0">The charts use the inputs of the Pricer tab (curve, product, quotes, formula, PDE); they are
+          computed when the tab is opened.</p>
+        <h3>Values of λ</h3>
         <div class="champ"><label for="l-vals">λ</label><input type="text" id="l-vals" value="0 0.01 0.03 0.05 0.1 0.15 0.2 0.3"></div>
-        <label class="case"><input type="checkbox" id="l-sans" checked> Comparer sans recalibration (σ figées)</label>
-        <h3>Impact de chaque paramètre</h3>
-        <div class="champ"><label for="i-lam">Choc sur λ</label><input type="number" id="i-lam" value="0.02" step="0.01"></div>
-        <div class="champ"><label for="i-vol">Choc sur les vols (%)</label><input type="number" id="i-vol" value="10" step="1"></div>
-        <div class="champ"><label for="i-k">Choc sur K (bp)</label><input type="number" id="i-k" value="25" step="5"></div>
-        <div class="champ"><label for="i-c">Choc sur la courbe (bp)</label><input type="number" id="i-c" value="25" step="5"></div>
-        <div class="btns"><button type="button" class="btn" id="l-go">Recalculer</button></div>
+        <label class="case"><input type="checkbox" id="l-sans" checked> Compare without recalibration (frozen σ)</label>
+        <h3>Impact of each parameter</h3>
+        <div class="champ"><label for="i-lam">Shock on λ</label><input type="number" id="i-lam" value="0.02" step="0.01"></div>
+        <div class="champ"><label for="i-vol">Shock on the vols (%)</label><input type="number" id="i-vol" value="10" step="1"></div>
+        <div class="champ"><label for="i-k">Shock on K (bp)</label><input type="number" id="i-k" value="25" step="5"></div>
+        <div class="champ"><label for="i-c">Shock on the curve (bp)</label><input type="number" id="i-c" value="25" step="5"></div>
+        <div class="btns"><button type="button" class="btn" id="l-go">Recompute</button></div>
         <progress id="l-prog" max="1" value="0" hidden></progress>
         <div class="etat" id="l-etat"></div>
       </aside>
       <div class="resultats">
         <div class="grille-res">
-          <div class="carte-res"><h2>1. Les européennes restent fixes, la bermudéenne monte</h2>
-            <p class="aide">Après recalibration, chaque européenne coterminale garde son prix de marché ; la bermudéenne (EDP) monte avec λ.
-              En tirets : sans recalibration (σ figées à la calibration de λ de l'onglet Pricer), tout baisse.</p>
+          <div class="carte-res"><h2>1. The Europeans stay fixed, the Bermudan rises</h2>
+            <p class="aide">After recalibration every co-terminal European keeps its market price; the Bermudan (PDE) rises with <m>\lambda</m>.
+              Dashed: without recalibration (<m>\sigma</m> frozen at the calibration of the Pricer tab's <m>\lambda</m>), everything falls.</p>
             <div class="graphe haut" id="g-l-prix"></div></div>
-          <div class="carte-res"><h2>2. La recalibration compense λ par σ</h2>
-            <p class="aide">Les σ calibrées, segment par segment : plus le retour à la moyenne amortit les chocs, plus la volatilité
-              instantanée doit monter pour reproduire les mêmes européennes.</p>
+          <div class="carte-res"><h2>2. Recalibration offsets λ with σ</h2>
+            <p class="aide">Calibrated <m>\sigma</m>, segment by segment: the more mean reversion damps the shocks, the higher the
+              instantaneous volatility must be to reproduce the same Europeans.</p>
             <div class="graphe haut" id="g-l-sig"></div></div>
-          <div class="carte-res"><h2>3. La corrélation entre dates d'exercice diminue</h2>
-            <p class="aide">corr(X<sub>T<sub>i</sub></sub>, X<sub>T<sub>j</sub></sub>) = √(α(T<sub>i</sub>) / α(T<sub>j</sub>)), avec
-              α(t) = ∫₀ᵗ σ² e<sup>2λu</sup> du. Le taux court étant affine en X, c'est aussi sa corrélation entre les deux dates.</p>
+          <div class="carte-res"><h2>3. The correlation between exercise dates falls</h2>
+            <p class="aide"><m>\operatorname{corr}(X_{T_i},X_{T_j})=\sqrt{\alpha(T_i)/\alpha(T_j)}</m> with
+              <m>\alpha(t)=\int_0^t\sigma(u)^2e^{2\lambda u}\,du</m>. The short rate being affine in <m>X</m>, this is also its
+              correlation between the two dates.</p>
             <div class="graphe haut" id="g-l-corr"></div></div>
-          <div class="carte-res"><h2>4. La prime d'exercice anticipé grandit</h2>
-            <p class="aide">Bermudéenne − plus chère des européennes : la valeur du choix de la date, tracée contre la corrélation entre
-              la première et la dernière date d'exercice.</p>
+          <div class="carte-res"><h2>4. The early-exercise premium grows</h2>
+            <p class="aide">Bermudan − most expensive European: the value of choosing the date, plotted against the correlation between the
+              first and the last exercise date.</p>
             <div class="graphe haut" id="g-l-eep"></div></div>
         </div>
         <div class="carte-res">
-          <h2>Les chiffres</h2>
-          <div class="defile"><table id="t-l"><thead><tr><th>λ</th><th>σ calibrées (bp)</th><th>corr(T<sub>1</sub>, T<sub>n</sub>)</th><th>plus chère des européennes</th><th>bermudéenne</th><th>prime d'exercice</th><th>bermudéenne sans recalibration</th></tr></thead><tbody></tbody></table></div>
+          <h2>The figures</h2>
+          <div class="defile"><table id="t-l"><thead><tr><th>λ</th><th>calibrated σ (bp)</th><th>corr(T<sub>1</sub>, T<sub>n</sub>)</th><th>most expensive European</th><th>Bermudan</th><th>exercise premium</th><th>Bermudan, no recalibration</th></tr></thead><tbody></tbody></table></div>
         </div>
         <div class="carte-res">
-          <h2>Impact de chaque paramètre (avec recalibration)</h2>
-          <p class="aide">Variation du prix de la bermudéenne, en points de base de nominal, pour un choc à la baisse et à la hausse de chaque
-            entrée, le modèle étant recalibré à chaque fois. La dernière ligne montre λ sans recalibration : l'effet s'inverse.</p>
+          <h2>Impact of each parameter (with recalibration)</h2>
+          <p class="aide">Change in the Bermudan price, in basis points of notional, for a down and an up shock of each input, the model
+            being recalibrated every time. The last row shows <m>\lambda</m> without recalibration: the effect reverses.</p>
           <div class="graphe haut" id="g-impact"></div>
-          <div class="defile"><table id="t-impact"><thead><tr><th>paramètre</th><th>choc</th><th>Δ bermudéenne (bas)</th><th>Δ bermudéenne (haut)</th><th>Δ européenne max (bas)</th><th>Δ européenne max (haut)</th></tr></thead><tbody></tbody></table></div>
+          <div class="defile"><table id="t-impact"><thead><tr><th>parameter</th><th>shock</th><th>Δ Bermudan (down)</th><th>Δ Bermudan (up)</th><th>Δ max European (down)</th><th>Δ max European (up)</th></tr></thead><tbody></tbody></table></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============================== ÉTUDES ============================== -->
+  <!-- ============================== STUDIES ============================== -->
   <section class="vue" id="etudes" hidden>
     <div class="espace">
-      <aside class="panneau reglages" aria-label="Études">
-        <p class="aide" style="margin-top:0">Les études de <code>Main.ipynb</code>, sur les entrées et les choix de l'onglet Pricer. Les listes sont modifiables.</p>
-        <h3>Convergence de la grille EDP</h3>
+      <aside class="panneau reglages" aria-label="Studies">
+        <p class="aide" style="margin-top:0">The studies of <code>Main.ipynb</code>, on the inputs and choices of the Pricer tab. The lists can be edited.</p>
+        <h3>PDE grid convergence</h3>
         <div class="champ"><label for="e-grilles">n<sub>x</sub>/n<sub>t</sub></label><input type="text" id="e-grilles" value="101/200 201/400 301/700 501/1000 1001/2000"></div>
-        <h3>Troncature du domaine</h3>
-        <div class="champ"><label for="e-nstd">n écarts-types</label><input type="text" id="e-nstd" value="3 4 5 6 7"></div>
-        <h3>Convergence LSMC</h3>
-        <div class="champ"><label for="e-mc">Trajectoires</label><input type="text" id="e-mc" value="2000 5000 10000 20000 50000"></div>
-        <h3>λ recalibré</h3>
-        <div class="champ"><label for="e-lam">Valeurs de λ</label><input type="text" id="e-lam" value="0 0.01 0.03 0.05 0.1 0.2 0.3"></div>
-        <h3>Strike (recalibré)</h3>
+        <h3>Domain truncation</h3>
+        <div class="champ"><label for="e-nstd">n standard deviations</label><input type="text" id="e-nstd" value="3 4 5 6 7"></div>
+        <h3>LSMC convergence</h3>
+        <div class="champ"><label for="e-mc">Paths</label><input type="text" id="e-mc" value="2000 5000 10000 20000 50000"></div>
+        <h3>Recalibrated λ</h3>
+        <div class="champ"><label for="e-lam">Values of λ</label><input type="text" id="e-lam" value="0 0.01 0.03 0.05 0.1 0.2 0.3"></div>
+        <h3>Strike (recalibrated)</h3>
         <div class="champ"><label for="e-k">K (%)</label><input type="text" id="e-k" value="2 2.5 3 3.5 4"></div>
-        <h3>Niveau des vols de marché</h3>
-        <div class="champ"><label for="e-vol">Facteurs</label><input type="text" id="e-vol" value="0.8 0.9 1 1.1 1.2"></div>
-        <label class="case"><input type="checkbox" id="e-deux" checked> Comparer les deux formules des zéro-coupons</label>
-        <div class="btns"><button type="button" class="btn" id="e-go">Lancer les études</button></div>
+        <h3>Level of the market vols</h3>
+        <div class="champ"><label for="e-vol">Factors</label><input type="text" id="e-vol" value="0.8 0.9 1 1.1 1.2"></div>
+        <label class="case"><input type="checkbox" id="e-deux" checked> Compare both zero-coupon formulas</label>
+        <div class="btns"><button type="button" class="btn" id="e-go">Run the studies</button></div>
         <progress id="e-prog" max="1" value="0" hidden></progress>
         <div class="etat" id="e-etat"></div>
       </aside>
       <div class="resultats">
         <div class="grille-res">
-          <div class="carte-res"><h2>Convergence de la grille</h2><div class="graphe" id="g-e-grille"></div></div>
-          <div class="carte-res"><h2>Troncature du domaine</h2><div class="graphe" id="g-e-nstd"></div></div>
-          <div class="carte-res"><h2>LSMC contre EDP</h2><p class="aide">Bande : ± 1,96 erreur standard.</p><div class="graphe" id="g-e-mc"></div></div>
-          <div class="carte-res"><h2>Retour à la moyenne λ (recalibré)</h2><div class="graphe" id="g-e-lam"></div></div>
-          <div class="carte-res"><h2>σ calibrées en fonction de λ</h2><div class="graphe" id="g-e-lam-s"></div></div>
-          <div class="carte-res"><h2>Sensibilité au strike</h2><div class="graphe" id="g-e-k"></div></div>
-          <div class="carte-res"><h2>Niveau des volatilités</h2><div class="graphe" id="g-e-vol"></div></div>
+          <div class="carte-res"><h2>Grid convergence</h2><div class="graphe" id="g-e-grille"></div></div>
+          <div class="carte-res"><h2>Domain truncation</h2><div class="graphe" id="g-e-nstd"></div></div>
+          <div class="carte-res"><h2>LSMC against PDE</h2><p class="aide">Band: ± 1.96 standard errors.</p><div class="graphe" id="g-e-mc"></div></div>
+          <div class="carte-res"><h2>Mean reversion λ (recalibrated)</h2><div class="graphe" id="g-e-lam"></div></div>
+          <div class="carte-res"><h2>Calibrated σ as a function of λ</h2><div class="graphe" id="g-e-lam-s"></div></div>
+          <div class="carte-res"><h2>Strike sensitivity</h2><div class="graphe" id="g-e-k"></div></div>
+          <div class="carte-res"><h2>Volatility level</h2><div class="graphe" id="g-e-vol"></div></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============================== MÉTHODE ============================== -->
-  <section class="vue texte" id="methode" hidden>
-    <h2>Le modèle</h2>
-    <p>Dans le cadre HJM, le forward instantané f(t,T) a pour volatilité <b>σ(t)·e<sup>−λ(T−t)</sup></b>. Ce choix séparable rend
-      le modèle markovien en un seul facteur, la variable d'état sans dérive</p>
-    <div class="formule">X_t = ∫₀ᵗ σ(u) e^{λu} dW_u ,   dX_t = η(t) dW_t ,   η(t) = σ(t) e^{λt}</div>
-    <p>Les zéro-coupons sont des exponentielles affines de X<sub>t</sub> :</p>
-    <div class="formule">P(t,T) = P(0,T)/P(0,t) · exp( −D(t,T) · ( c(t,T) + X_t ) )
-D(t,T) = B(T) − B(t),   B(t) = (1 − e^{−λt}) / λ
-c(t,T) = ½ (B(T) + B(t)) α(t) − γ(t)
-α(t) = ∫₀ᵗ σ² e^{2λu} du = Var[X_t],   γ(t) = ∫₀ᵗ σ² e^{2λu} B(u) du</div>
-    <p>et le taux court vaut r<sub>t</sub> = f(0,t) + e<sup>−λt</sup> (B(t) α(t) − γ(t)) + e<sup>−λt</sup> X<sub>t</sub>.</p>
+  <!-- ============================== THEORY ============================== -->
+  <section class="vue texte" id="theorie" hidden>
+    <ul class="sommaire">
+      <li><a href="#theorie/t-modele">1. Model</a></li><li><a href="#theorie/t-zc">2. Bonds and short rate</a></li>
+      <li><a href="#theorie/t-euro">3. European swaptions</a></li><li><a href="#theorie/t-calib">4. Calibration</a></li>
+      <li><a href="#theorie/t-berm">5. Bermudan</a></li><li><a href="#theorie/t-edp">6. PDE</a></li>
+      <li><a href="#theorie/t-lsmc">7. Longstaff-Schwartz</a></li><li><a href="#theorie/t-revue">8. Code review</a></li>
+      <li><a href="#theorie/t-valid">9. Validation</a></li><li><a href="rapport/report.pdf">Full report (PDF)</a></li>
+    </ul>
 
-    <h2>Revue du code : l'erreur de signe</h2>
-    <p><code>hjm_1f.py</code> écrit <code>P(t,T) = P(0,T)/P(0,t) · exp(D · (c − X))</code> : le terme de convexité c(t,T) a le
-      <b>mauvais signe</b>, et le taux court <code>short_rate</code>, qui en est la dérivée, en hérite. On le vérifie en intégrant
-      la dérive HJM : −∫ₜᵀ ∫₀ᵗ σ<sub>f</sub>(s,u) ∫ₛᵘ σ<sub>f</sub>(s,v) dv ds du = −D(t,T) c(t,T).</p>
-    <p>Conséquences mesurées (σ = 150 bp, λ = 3 %) :</p>
+    <h2 id="t-modele">1. The HJM framework and the separable volatility</h2>
+    <p>Heath, Jarrow and Morton model the whole curve of instantaneous forward rates <m>f(t,T)</m>. Under the risk-neutral measure
+      <m>\mathbb Q</m>, absence of arbitrage (discounted bonds are martingales) fixes the drift once the volatility is chosen:</p>
+    <md>df(t,T)=\sigma_f(t,T)\left(\int_t^T\sigma_f(t,u)\,du\right)dt+\sigma_f(t,T)\,dW_t .</md>
+    <p>The model uses the separable volatility <m>\sigma_f(t,T)=\sigma(t)\,e^{-\lambda(T-t)}</m>: a shock at time <m>t</m> moves
+      the forwards of all maturities, exponentially less for distant ones. Writing <m>\sigma_f(t,T)=\eta(t)\,b(T)</m> with
+      <m>\eta(t)=\sigma(t)e^{\lambda t}</m> and <m>b(T)=e^{-\lambda T}</m> makes the model <b>Markovian in a single, driftless Gaussian
+      factor</b>:</p>
+    <md>X_t=\int_0^t\eta(u)\,dW_u,\qquad X_t\sim\mathcal N\big(0,\alpha(t)\big),\qquad \alpha(t)=\int_0^t\sigma(u)^2e^{2\lambda u}\,du .</md>
+    <p>This is exactly the Hull–White model <m>dr_t=(\theta(t)-\lambda r_t)\,dt+\sigma(t)\,dW_t</m> with the curve fitted by
+      construction: <m>\lambda</m> is the speed of mean reversion of the short rate, <m>\sigma(t)</m> its instantaneous normal volatility.</p>
+
+    <h2 id="t-zc">2. Zero-coupon bonds and the short rate</h2>
+    <p>Integrating the drift with <m>\bar B(t)=\int_0^tb(u)\,du=(1-e^{-\lambda t})/\lambda</m> and
+      <m>\gamma(t)=\int_0^t\eta(u)^2\bar B(u)\,du</m> gives</p>
+    <md>f(t,T)=f(0,T)+b(T)\big[\bar B(T)\,\alpha(t)-\gamma(t)+X_t\big],</md>
+    <p>hence the short rate <m>r_t=f(t,t)</m> and, using <m>\int_t^Tb(u)\bar B(u)\,du=\tfrac12\big(\bar B(T)^2-\bar B(t)^2\big)</m>,
+      the bond price <m>P(t,T)=\exp\!\big(-\int_t^Tf(t,u)\,du\big)</m>:</p>
+    <md>\begin{aligned}
+      r_t&=f(0,t)+e^{-\lambda t}\big[\bar B(t)\,\alpha(t)-\gamma(t)\big]+e^{-\lambda t}X_t,\\
+      P(t,T)&=\frac{P(0,T)}{P(0,t)}\exp\!\Big(-D(t,T)\big[c(t,T)+X_t\big]\Big),\quad D(t,T)=\bar B(T)-\bar B(t),\\
+      c(t,T)&=\tfrac12\big(\bar B(T)+\bar B(t)\big)\alpha(t)-\gamma(t).
+    \end{aligned}</md>
+    <p>Bonds are exponential-affine in <m>X_t</m> and decreasing in it: a high factor means high rates. The term <m>c(t,T)</m> is the
+      convexity adjustment that makes <m>P(t,T)/\beta_t</m>, with <m>\beta_t=e^{\int_0^tr_s\,ds}</m>, a martingale. Its sign is
+      exactly what the original code got wrong (section 8).</p>
+
+    <h2 id="t-euro">3. European swaptions: Bachelier and Jamshidian</h2>
+    <p>A payer swaption with expiry <m>T_0</m>, fixed rate <m>K</m> and fixed dates <m>T_1,\dots,T_n</m> (accruals <m>\tau_i</m>) pays
+      <m>\big(1-P(T_0,T_n)-K\sum_i\tau_iP(T_0,T_i)\big)^+</m>. The market quotes it in <b>normal (Bachelier) volatility</b>
+      <m>\sigma_N</m>, with annuity <m>A_0=\sum_i\tau_iP(0,T_i)</m> and forward swap rate <m>S_0=(P(0,T_0)-P(0,T_n))/A_0</m>:</p>
+    <md>V^{\text{payer}}_0=A_0\Big[(S_0-K)\,\Phi(d)+\sigma_N\sqrt{T_0}\,\varphi(d)\Big],\qquad d=\frac{S_0-K}{\sigma_N\sqrt{T_0}} .</md>
+    <p>In the model, the payoff is a put with strike 1 on a coupon bond <m>\sum_ic_iP(T_0,T_i)</m>, <m>c_i=K\tau_i</m>,
+      <m>c_n=1+K\tau_n</m>. Since every <m>P(T_0,T_i)</m> decreases in the single factor, <b>Jamshidian's trick</b> applies: find
+      <m>x^\star</m> with <m>\sum_ic_iP(T_0,T_i;x^\star)=1</m>, set <m>K_i=P(T_0,T_i;x^\star)</m>, and</p>
+    <md>V^{\text{payer}}_0=\sum_{i=1}^nc_i\,\mathrm{ZBP}(T_0,T_i,K_i),\qquad
+      \mathrm{ZBP}=K_iP(0,T_0)\Phi(-h+v)-P(0,T_i)\Phi(-h),</md>
+    <p>with <m>v=D(T_0,T_i)\sqrt{\alpha(T_0)}</m> and <m>h=\ln\frac{P(0,T_i)}{K_iP(0,T_0)}/v+v/2</m>. The receiver uses calls on the
+      bonds; payer − receiver = forward swap is checked to <m>10^{-8}</m>.</p>
+
+    <h2 id="t-calib">4. Calibration: the co-terminal bootstrap</h2>
+    <p>Each exercise date <m>T_k</m> carries the European swaption <m>T_k\to T_N</m>. Its model price depends only on
+      <m>\alpha(T_k)=\sum_{j\le k}\sigma_j^2\,\frac{e^{2\lambda T_j}-e^{2\lambda T_{j-1}}}{2\lambda}</m>, i.e. on the segments
+      <m>\sigma_1,\dots,\sigma_k</m>. Solving the dates in order, each step is a one-dimensional root search (Brent) for
+      <m>\sigma_k</m>, and the fit is exact. <b>The co-terminal Europeans cannot identify <m>\lambda</m></b>: for any
+      <m>\lambda</m> there is a <m>\sigma(\cdot)</m> that matches them. <m>\lambda</m> is chosen outside the calibration (historical
+      correlations, or other instruments such as caps or diagonal swaptions), which is why its effect is studied in its own tab.</p>
+
+    <h2 id="t-berm">5. The Bermudan as an optimal stopping problem</h2>
+    <p>The holder may enter the swap at any <m>T_k</m>, <m>k=1,\dots,m</m>; the exercise value is the underlying co-terminal swap
+      <m>h_k(x)=\big(1-P(T_k,T_N)-K\sum_{T_i>T_k}\tau_iP(T_k,T_i)\big)^+</m>. By dynamic programming,</p>
+    <md>V_{T_m}=h_m,\qquad V_{T_k}=\max\big(h_k,\;C_k\big),\qquad
+      C_k=\mathbb E^{\mathbb Q}\!\left[e^{-\int_{T_k}^{T_{k+1}}r_s\,ds}\,V_{T_{k+1}}\,\middle|\,X_{T_k}\right],</md>
+    <p>and <m>V_0\ge\max_kV^{\text{Eur}}_k</m>: the difference is the early-exercise (switch) premium.</p>
+
+    <h2 id="t-edp">6. The PDE</h2>
+    <p>Between exercise dates, by Feynman–Kac, <m>V(t,x)</m> solves</p>
+    <md>\partial_tV+\tfrac12\eta(t)^2\,\partial_{xx}V-r(t,x)\,V=0,\qquad r(t,x)=A(t)+e^{-\lambda t}x,</md>
+    <p>solved backwards on <m>x\in[-n\sqrt{\alpha(T_m)},\,n\sqrt{\alpha(T_m)}]</m> with Dirichlet values equal to the intrinsic value,
+      and <m>V\leftarrow\max(V,h_k)</m> at each <m>T_k</m> (the exercise dates lie on the time grid). Each step solves a tridiagonal
+      system (Thomas algorithm, <m>O(n_x)</m>). The <m>\theta</m>-scheme</p>
+    <md>\frac{V^n-V^{n+1}}{\Delta t}=\theta\,\mathcal L^nV^n+(1-\theta)\,\mathcal L^{n+1}V^{n+1}</md>
+    <p>is first order for <m>\theta=1</m> (implicit Euler, the original code) and second order for <m>\theta=\tfrac12</m>
+      (Crank–Nicolson). Crank–Nicolson is not L-stable: the kink of the payoff at each exercise date excites oscillations, so a few
+      implicit <b>Rannacher</b> steps are taken after every date to damp them while keeping second order.</p>
+
+    <h2 id="t-lsmc">7. Longstaff-Schwartz Monte Carlo</h2>
+    <p>Paths of <m>X</m> are simulated exactly (Gaussian increments of variance <m>\alpha(T_{k+1})-\alpha(T_k)</m>). Going backwards,
+      the continuation value is estimated by least squares among in-the-money paths, on a polynomial basis
+      <m>\{1,\tilde x,\dots,\tilde x^d\}</m> with <m>\tilde x=x/\sqrt{\alpha(T_k)}</m> (better conditioned); the path exercises when
+      <m>h_k&gt;\hat C_k</m>. Two biases pull in opposite directions:</p>
     <ul>
-      <li>le zéro-coupon actualisé n'est plus une martingale : E[e<sup>−∫r</sup> P(3,7)] dépasse P(0,7) de 1,5 % (plus de 200 erreurs
-        standard ; avec la formule corrigée, l'écart est au niveau du bruit) ;</li>
-      <li>le modèle se contredit : une swaption <b>européenne</b> vaut 0,02534 par Jamshidian mais 0,02103 par l'EDP et le
-        Monte-Carlo du même modèle ; corrigé, les trois donnent 0,02534 ;</li>
-      <li>sur le cas du notebook, la bermudéenne passe de 0,014929 à <b>0,016737</b> (+12 %). Les σ calibrées ne bougent presque
-        pas : Jamshidian n'utilise que P(0,·) et la variance des zéro-coupons.</li>
+      <li><b>in-sample (high) bias</b>: regressing and pricing on the same paths lets the rule peek at the future;</li>
+      <li><b>sub-optimality (low) bias</b>: any exercise rule applied to independent paths gives a lower bound of the true price.</li>
     </ul>
-    <p>La page utilise la formule corrigée ; « Valeurs du notebook » remet celle du code et retrouve exactement les chiffres de
-      <code>Main.ipynb</code>.</p>
+    <p>The page offers both (option "Regress on independent paths"). Discounting must use the simulated
+      <m>\int r_s\,ds</m>: the page integrates <m>r</m> by the trapezoidal rule on a fine grid, path by path.</p>
 
-    <h2>Autres points relevés et améliorations</h2>
+    <h2 id="t-revue">8. Code review: the sign error and other findings</h2>
+    <div class="encadre attention"><span class="titre-encadre">Sign error</span>
+      <p><code>hjm_1f.py</code> writes <m>P(t,T)=\frac{P(0,T)}{P(0,t)}\exp\!\big(D(t,T)[c(t,T)-X_t]\big)</m>: the convexity term
+        <m>c(t,T)</m> has the <b>wrong sign</b>, and <code>short_rate</code>, which is its derivative in <m>T</m> at <m>T=t</m>,
+        inherits it. Section 2 derives the correct sign directly from the HJM drift.</p></div>
+    <p>Measured consequences (constant <m>\sigma=150</m> bp, <m>\lambda=3\,\%</m>, 400,000 paths for the martingale test):</p>
+    <table class="tab-texte"><thead><tr><th>check</th><th>original formula</th><th>corrected</th></tr></thead><tbody>
+      <tr><td><m>\mathbb E\big[e^{-\int_0^3r}\,P(3,7)\big]</m> vs <m>P(0,7)=0.842000</m></td><td>0.856942 (+1.78 %, 83 s.e.)</td><td>0.841949 (−0.3 s.e.)</td></tr>
+      <tr><td>European 3y→7y: Jamshidian / PDE / Monte Carlo</td><td>0.02582 / 0.02057 / 0.02049</td><td>0.02582 / 0.02582 / 0.02574 ± 0.00017</td></tr>
+      <tr><td>Notebook Bermudan (PDE, implicit)</td><td>0.014929</td><td>0.016737 (+12 %)</td></tr>
+    </tbody></table>
+    <p>The calibrated <m>\sigma</m> barely move: Jamshidian only uses <m>P(0,\cdot)</m> and the variance of the bonds, which do not
+      depend on <m>c</m>. The error only shows in the PDE and the Monte Carlo, which use <m>r(t,x)</m> and <m>P(t,T;x)</m>: the
+      model contradicts itself. "Notebook values" restores the original formula and reproduces <code>Main.ipynb</code> exactly.</p>
     <ul class="revue">
-      <li><b>Actualisation du Monte-Carlo</b>. <code>mc_1f.py</code> fige le taux court entre deux dates d'exercice, puis
-        actualise tout au taux court initial r(0) jusqu'à aujourd'hui, en ignorant la courbe : les facteurs d'actualisation sont
-        faux de 0,25 % à 2 ans et 0,54 % à 3 ans (tableau « Contrôle de martingale »). Ajouté : X tiré sur une grille fine et
-        e<sup>−∫r</sup> simulé chemin par chemin. Le LSMC rejoint alors l'EDP.</li>
-      <li><b>Biais de la régression</b>. Régresser et pricer sur les mêmes chemins biaise vers le haut. Ajouté : régression sur des
-        chemins indépendants (une borne basse) et degré du polynôme au choix.</li>
-      <li><b>Schéma en temps de l'EDP</b>. Euler implicite est d'ordre 1. Ajouté : Crank–Nicolson (ordre 2) avec des pas implicites de
-        Rannacher après chaque date d'exercice, pour amortir les oscillations nées de la non-régularité du gain.</li>
-      <li><b>Swaption receveuse</b>. Le Python renvoie la formule payeuse ; ici, Jamshidian avec des calls sur zéro-coupons. La
-        parité payeuse − receveuse = swap forward est vérifiée à 10<sup>−8</sup> près.</li>
-      <li><b>Liberté</b>. σ(t) imposée sans calibration, volatilités normales implicites du modèle affichées, toutes les grilles
-        et tous les choix numériques réglables.</li>
+      <li><b>Monte Carlo discounting</b>. <code>mc_1f.py</code> freezes the short rate between exercise dates and then discounts
+        everything at <m>r(0)</m> back to today, ignoring the curve: discount factors are off by 0.26 % at 2 years and 0.59 % at
+        3 years (table "Martingale check"), and the LSMC price is 3 bp of notional too high. Added: <m>X</m> on a fine grid and
+        <m>e^{-\int r}</m> simulated path by path; the LSMC then agrees with the PDE.</li>
+      <li><b>Regression bias</b>. Added: regression on independent paths (a lower bound) and a choice of polynomial degree.</li>
+      <li><b>PDE time scheme</b>. Added: Crank–Nicolson with Rannacher steps after each exercise date.</li>
+      <li><b>Receiver swaption</b>. The Python returns the payer formula; here Jamshidian with calls on the bonds.</li>
+      <li><b>Freedom</b>. User-set <m>\sigma(t)</m> without calibration, implied normal vols of the model, every grid and numerical
+        choice adjustable.</li>
     </ul>
 
-    <h2>La calibration</h2>
-    <p>Chaque date d'exercice porte une swaption européenne coterminale, cotée en volatilité normale : prix de marché par
-      <b>Bachelier</b>, prix modèle par la <b>décomposition de Jamshidian</b> (racine X* du swap à l'échéance, puis somme de puts
-      sur zéro-coupons). Le <b>bootstrap</b> résout par Brent, dans l'ordre des échéances, la σ de chaque segment.</p>
-
-    <h2>Le pricing de la bermudéenne</h2>
-    <p><b>EDP</b> : ∂V/∂t + ½ η(t)² ∂²V/∂x² − r(t,x) V = 0, à rebours, système tridiagonal (Thomas) sur ± n écarts-types de
-      X<sub>T</sub>, dates d'exercice exactement sur la grille (V = max(V, exercice)). <b>Longstaff-Schwartz</b> : à rebours, la
-      continuation est régressée sur un polynôme en X parmi les chemins dans la monnaie.</p>
-
-    <h2>Validation</h2>
-    <p>Avec les réglages du notebook, le moteur JavaScript retrouve à la 8<sup>e</sup> décimale tous les prix EDP de
-      <code>Main.ipynb</code> (grilles, domaines, λ de 0 à 0,3, strikes de 2 % à 4 %) et les σ calibrées à 10<sup>−17</sup> près.
-      Formule corrigée : Jamshidian, EDP et Monte-Carlo concordent sur l'européenne ; les zéro-coupons simulés retrouvent la
-      courbe dans leur intervalle de confiance.</p>
+    <h2 id="t-valid">9. Validation</h2>
+    <p>With the notebook settings, the JavaScript engine reproduces every PDE price of <code>Main.ipynb</code> to the 8th decimal
+      (grids, domains, <m>\lambda</m> from 0 to 0.3, strikes from 2 % to 4 %) and the calibrated <m>\sigma</m> to
+      <m>10^{-17}</m>. With the corrected formula, Jamshidian, the PDE and the Monte Carlo agree on the European, and the simulated
+      bonds recover the curve within their confidence interval. The <a href="rapport/report.pdf">full report</a> gives the
+      derivations, the proofs and the numerical study.</p>
   </section>
 
   <section class="vue" id="code" hidden></section>
 </main>
 
 <footer><div class="page">
-  <span>© 2026 Mohammed-Yassine Barnicha · licence MIT · calcul 100 % dans le navigateur</span>
-  <span><a href="code/HJM_Bermudan_Swaptions_Pricer_Report.pdf">Rapport (PDF)</a> ·
-    <a href="https://github.com/yassinebarnicha/Bermudian-Swaptions-pricer-under-HJM-">Dépôt d'origine</a></span>
+  <span>© 2026 Mohammed-Yassine Barnicha · MIT licence · computed 100 % in the browser</span>
+  <span><a href="rapport/report.pdf">Report (PDF)</a> ·
+    <a href="code/HJM_Bermudan_Swaptions_Pricer_Report.pdf">Original project report (PDF)</a> ·
+    <a href="https://github.com/yassinebarnicha/Bermudian-Swaptions-pricer-under-HJM-">Original repository</a></span>
 </div></footer>
 
 <script>
@@ -336,7 +405,7 @@ c(t,T) = ½ (B(T) + B(t)) α(t) − γ(t)
 /*__HJM__*/
 </script>
 <script type="text/plain" id="src-travail">
-// ---- fil de calcul : reçoit les entrées, renvoie les résultats ----
+// ---- worker thread: receives the inputs, returns the results ----
 function construire(p) {
   const courbe = HJM.Courbe(p.courbeT, p.courbeP);
   const inst = p.ex.map((e, i) => ({swaption: HJM.Swaption(e, p.terminal, p.K, p.paie, p.accr, p.payer), volN: p.vols[i]}));
@@ -390,7 +459,7 @@ function etudes(p, e, progres) {
   });
   return out;
 }
-// retour à la moyenne : recalibration pour chaque λ, corrélations, et comparaison à σ figées
+// mean reversion: recalibration for each λ, correlations, and comparison with frozen σ
 function etudeLambda(p, e, progres) {
   const q0 = Object.assign({}, p, {mode: "calibree"}), b0 = construire(q0), cal0 = caler(q0, b0);
   const tMax = p.ex[p.ex.length - 1], n = p.ex.length;
@@ -412,7 +481,7 @@ function etudeLambda(p, e, progres) {
     }
     return r;
   });
-  // impact de chaque paramètre, recalibré
+  // impact of each parameter, recalibrated
   const base = edp(cal0.modele, b0.berm, q0), eurBase = Math.max(...cal0.modeles);
   const scen = (q, recal = true) => {
     const b = construire(q);
@@ -422,11 +491,11 @@ function etudeLambda(p, e, progres) {
   const decale = (q, bp) => Object.assign({}, q, {courbeP: q.courbeP.map((d, k) => d * Math.exp(-bp * q.courbeT[k]))});
   const essai = f => { try { return f(); } catch (err) { pas(); return {erreur: err.message}; } };
   const chocs = [
-    {nom: "λ (recalibré)", choc: "± " + e.dl, bas: essai(() => scen(Object.assign({}, q0, {lam: Math.max(0, q0.lam - e.dl)}))), haut: essai(() => scen(Object.assign({}, q0, {lam: q0.lam + e.dl})))},
-    {nom: "vols de marché", choc: "± " + (e.dv * 100) + " %", bas: essai(() => scen(Object.assign({}, q0, {vols: q0.vols.map(v => v * (1 - e.dv))}))), haut: essai(() => scen(Object.assign({}, q0, {vols: q0.vols.map(v => v * (1 + e.dv))})))},
+    {nom: "λ (recalibrated)", choc: "± " + e.dl, bas: essai(() => scen(Object.assign({}, q0, {lam: Math.max(0, q0.lam - e.dl)}))), haut: essai(() => scen(Object.assign({}, q0, {lam: q0.lam + e.dl})))},
+    {nom: "market vols", choc: "± " + (e.dv * 100) + " %", bas: essai(() => scen(Object.assign({}, q0, {vols: q0.vols.map(v => v * (1 - e.dv))}))), haut: essai(() => scen(Object.assign({}, q0, {vols: q0.vols.map(v => v * (1 + e.dv))})))},
     {nom: "strike K", choc: "± " + (e.dk * 1e4) + " bp", bas: essai(() => scen(Object.assign({}, q0, {K: q0.K - e.dk}))), haut: essai(() => scen(Object.assign({}, q0, {K: q0.K + e.dk})))},
-    {nom: "courbe (parallèle)", choc: "± " + (e.dc * 1e4) + " bp", bas: essai(() => scen(decale(q0, -e.dc))), haut: essai(() => scen(decale(q0, e.dc)))},
-    {nom: "λ sans recalibration", choc: "± " + e.dl, bas: essai(() => scen(Object.assign({}, q0, {lam: Math.max(0, q0.lam - e.dl)}), false)), haut: essai(() => scen(Object.assign({}, q0, {lam: q0.lam + e.dl}), false))},
+    {nom: "curve (parallel)", choc: "± " + (e.dc * 1e4) + " bp", bas: essai(() => scen(decale(q0, -e.dc))), haut: essai(() => scen(decale(q0, e.dc)))},
+    {nom: "λ, no recalibration", choc: "± " + e.dl, bas: essai(() => scen(Object.assign({}, q0, {lam: Math.max(0, q0.lam - e.dl)}), false)), haut: essai(() => scen(Object.assign({}, q0, {lam: q0.lam + e.dl}), false))},
   ];
   return {lignes, base, eurBase, chocs, lam0: q0.lam};
 }
@@ -449,16 +518,16 @@ const COMMUN = {courbe: [[0, 1], [1, 0.978], [2, 0.954], [3, 0.930], [5, 0.885],
 const RECOMMANDE = Object.assign({}, COMMUN, {conv: "corrigee", schema: "0.5", ran: 2, nmc: 20000, actu: "exacte", spa: 52, deg: 2, indep: false});
 const NOTEBOOK = Object.assign({}, COMMUN, {conv: "code", schema: "1", ran: 0, nmc: 10000, actu: "code", spa: 52, deg: 2, indep: false});
 
-// ---------- tableaux éditables ----------
+// ---------- editable tables ----------
 function ligneCourbe(t, p) {
   const tr = document.createElement("tr");
-  tr.innerHTML = `<td><input type="number" step="0.25" value="${t}"></td><td><input type="number" step="0.001" value="${p}"></td><td class="zr"></td><td><button type="button" class="retirer" title="Retirer">×</button></td>`;
+  tr.innerHTML = `<td><input type="number" step="0.25" value="${t}"></td><td><input type="number" step="0.001" value="${p}"></td><td class="zr"></td><td><button type="button" class="retirer" title="Remove">×</button></td>`;
   tr.querySelector(".retirer").onclick = () => { tr.remove(); lancer(); };
   $("t-courbe").tBodies[0].append(tr);
 }
 function ligneEx(t, v, s) {
   const tr = document.createElement("tr");
-  tr.innerHTML = `<td><input type="number" step="0.25" value="${t}"></td><td><input type="number" step="1" value="${v}"></td><td><input type="number" step="1" value="${s}"></td><td><button type="button" class="retirer" title="Retirer">×</button></td>`;
+  tr.innerHTML = `<td><input type="number" step="0.25" value="${t}"></td><td><input type="number" step="1" value="${v}"></td><td><input type="number" step="1" value="${s}"></td><td><button type="button" class="retirer" title="Remove">×</button></td>`;
   tr.querySelector(".retirer").onclick = () => { tr.remove(); lancer(); };
   $("t-ex").tBodies[0].append(tr);
 }
@@ -471,7 +540,7 @@ function appliquer(d) {
 $("courbe-plus").onclick = () => { const r = [...$("t-courbe").tBodies[0].rows]; const last = r.length ? +r[r.length - 1].cells[0].querySelector("input").value : 0;
   const pl = r.length ? +r[r.length - 1].cells[1].querySelector("input").value : 1; ligneCourbe(last + 1, (pl * 0.97).toFixed(4)); lancer(); };
 $("courbe-plat").onclick = () => {
-  const s = prompt("Taux zéro continu (en %) pour toute la courbe :", "2.5"); if (s == null) return;
+  const s = prompt("Continuously compounded zero rate (in %) for the whole curve:", "2.5"); if (s == null) return;
   const r = parseFloat(s.replace(",", ".")) / 100; if (!isFinite(r)) return;
   [...$("t-courbe").tBodies[0].rows].forEach(tr => { const t = +tr.cells[0].querySelector("input").value; tr.cells[1].querySelector("input").value = Math.exp(-r * t).toFixed(6); });
   lancer();
@@ -504,26 +573,26 @@ function lire() {
     theta: +$("schema").value, ran: Math.round(N("ran", 0)), nstd: N("nstd", 5), nx: Math.round(N("nx", 501)), nt: Math.round(N("nt", 1000)),
     mc: $("mc-on").checked, nmc: Math.round(N("nmc", 10000)), graine: Math.round(N("graine", 1234)), actu: $("actu").value,
     spa: Math.round(N("spa", 52)), deg: Math.round(N("deg", 2)), indep: $("indep").checked};
-  if (!p.ex.length) throw new Error("ajoutez au moins une date d'exercice");
-  if (paie.length !== accr.length) throw new Error(`${paie.length} dates de paiement mais ${accr.length} fractions d'année`);
-  if (p.ex.some((t, i) => i && t === p.ex[i - 1])) throw new Error("deux dates d'exercice identiques");
-  if (p.ex[0] <= 0) throw new Error("les dates d'exercice doivent être positives");
-  if (p.ex[p.ex.length - 1] >= p.terminal) throw new Error("la dernière date d'exercice doit précéder la maturité finale T_N");
-  if (p.ex.some(t => !paie.some(u => u > t))) throw new Error("chaque date d'exercice doit être suivie d'au moins un paiement fixe");
-  if (p.vols.some(v => !(v > 0))) throw new Error("les volatilités normales doivent être positives");
-  if (p.mode === "imposee" && p.sigImp.some(v => !(v >= 0))) throw new Error("σ imposées : valeurs positives attendues");
-  if (!(p.nx >= 11 && p.nx <= 5001)) throw new Error("n_x entre 11 et 5001");
-  if (!(p.nt >= 10 && p.nt <= 20000)) throw new Error("n_t entre 10 et 20000");
-  if (!(p.nstd > 0)) throw new Error("domaine de l'EDP : n écarts-types > 0");
-  if (!(p.ran >= 0 && p.ran <= 50)) throw new Error("pas de Rannacher entre 0 et 50");
-  if (p.mc && !(p.nmc >= 100 && p.nmc <= 300000)) throw new Error("trajectoires Monte-Carlo entre 100 et 300 000");
-  if (!(p.spa >= 1 && p.spa <= 2000)) throw new Error("sous-pas par an entre 1 et 2000");
-  if (!(p.deg >= 1 && p.deg <= 6)) throw new Error("degré de la régression entre 1 et 6");
-  if (!(p.bas > 0 && p.haut > p.bas)) throw new Error("bornes du bootstrap : 0 < σ min < σ max");
+  if (!p.ex.length) throw new Error("add at least one exercise date");
+  if (paie.length !== accr.length) throw new Error(`${paie.length} payment dates but ${accr.length} accrual fractions`);
+  if (p.ex.some((t, i) => i && t === p.ex[i - 1])) throw new Error("two identical exercise dates");
+  if (p.ex[0] <= 0) throw new Error("exercise dates must be positive");
+  if (p.ex[p.ex.length - 1] >= p.terminal) throw new Error("the last exercise date must precede the final maturity T_N");
+  if (p.ex.some(t => !paie.some(u => u > t))) throw new Error("each exercise date must be followed by at least one fixed payment");
+  if (p.vols.some(v => !(v > 0))) throw new Error("normal volatilities must be positive");
+  if (p.mode === "imposee" && p.sigImp.some(v => !(v >= 0))) throw new Error("user-set σ: non-negative values expected");
+  if (!(p.nx >= 11 && p.nx <= 5001)) throw new Error("n_x between 11 and 5001");
+  if (!(p.nt >= 10 && p.nt <= 20000)) throw new Error("n_t between 10 and 20000");
+  if (!(p.nstd > 0)) throw new Error("PDE domain: n standard deviations > 0");
+  if (!(p.ran >= 0 && p.ran <= 50)) throw new Error("Rannacher steps between 0 and 50");
+  if (p.mc && !(p.nmc >= 100 && p.nmc <= 300000)) throw new Error("Monte Carlo paths between 100 and 300,000");
+  if (!(p.spa >= 1 && p.spa <= 2000)) throw new Error("sub-steps per year between 1 and 2000");
+  if (!(p.deg >= 1 && p.deg <= 6)) throw new Error("regression degree between 1 and 6");
+  if (!(p.bas > 0 && p.haut > p.bas)) throw new Error("bootstrap bounds: 0 < lowest σ < highest σ");
   return p;
 }
 
-// ---------- fil de calcul ----------
+// ---------- worker thread ----------
 const travail = UI.travailleur("src-hjm", "src-travail");
 let dernierId = 0, enCours = {};
 travail.onmessage = ev => { const m = ev.data, f = enCours[m.id]; if (!f) return; if (m.progres != null) { f.progres && f.progres(m.progres); return; } delete enCours[m.id]; f.fin(m); };
@@ -534,7 +603,7 @@ const lancer = differe(async () => {
   let p;
   try { p = lire(); } catch (err) { etat(err.message, "err"); return; }
   majCourbe(p);
-  etat("Calcul…");
+  etat("Computing…");
   const moi = ++numCalcul;
   const m = await demander("calcul", p);
   if (moi !== numCalcul) return;
@@ -549,87 +618,87 @@ function majCourbe(p) {
   try { c = HJM.Courbe(p.courbeT, p.courbeP); } catch (err) { etat(err.message, "err"); return; }
   [...$("t-courbe").tBodies[0].rows].forEach(tr => { const t = +tr.cells[0].querySelector("input").value, d = +tr.cells[1].querySelector("input").value;
     tr.querySelector(".zr").textContent = t > 0 && d > 0 ? pct(-Math.log(d) / t, 2) : "—"; });
-  // jusqu'au plus loin du dernier pilier et de T_N (au-delà du dernier pilier, l'extrapolation plate des log-facteurs donne un forward nul)
+  // up to the furthest of the last pillar and T_N (beyond the last pillar, flat log-factor extrapolation gives a zero forward)
   const tmax = Math.max(p.terminal, ...p.courbeT), xs = [], z = [], f = [];
   for (let i = 1; i <= 240; i++) { const t = Math.min(tmax * i / 240, tmax - 1e-4); xs.push(t); z.push(-Math.log(c.discount(t)) / t * 100); f.push(c.instFwd(t) * 100); }
-  Graphe.tracer($("g-courbe"), {series: [{nom: "taux zéro", x: xs, y: z, couleur: "c2"}, {nom: "forward instantané", x: xs, y: f, couleur: "c4", type: "marches"}],
-    xlab: "t (ans)", ylab: "taux (%)", yfmt: v => v.toFixed(2)});
+  Graphe.tracer($("g-courbe"), {series: [{nom: "zero rate", x: xs, y: z, couleur: "c2"}, {nom: "instantaneous forward", x: xs, y: f, couleur: "c4", type: "marches"}],
+    xlab: "t (years)", ylab: "rate (%)", yfmt: v => v.toFixed(2)});
   const dernierPilier = c.times[c.times.length - 1];
-  $("courbe-note").textContent = p.terminal > dernierPilier ? `Attention : T_N = ${p.terminal} dépasse le dernier pilier (${dernierPilier}) ; au-delà, l'extrapolation plate des log-facteurs donne un forward nul.` : "";
+  $("courbe-note").textContent = p.terminal > dernierPilier ? `Warning: T_N = ${p.terminal} is beyond the last pillar (${dernierPilier}); past it, the flat extrapolation of the log factors gives a zero forward.` : "";
 }
 
 const dens = (x, v) => Math.exp(-0.5 * x * x / v) / Math.sqrt(2 * Math.PI * v);
 function afficher(p, r) {
   const n = p.ex.length;
   $("alerte").hidden = p.conv !== "code";
-  $("alerte").textContent = "Formule des zéro-coupons du code d'origine : son terme de convexité a le mauvais signe, le modèle n'est pas sans arbitrage (onglet Méthode). Utile pour retrouver les chiffres du notebook.";
+  $("alerte").textContent = "Zero-coupon formula of the original code: its convexity term has the wrong sign and the model is not arbitrage-free (Theory tab, section 8). Useful to reproduce the notebook figures.";
   $("k-edp").textContent = fmt(r.edp.prix, 8);
-  $("k-edp-s").textContent = `${p.theta === 1 ? "implicite" : "Crank–Nicolson"} · ${p.nx} × ${r.edp.nPas} pas · ${r.tEdp} ms`;
-  if (r.mc) { $("k-mc").textContent = fmt(r.mc.prix, 8); $("k-mc-s").textContent = `± ${fmt(1.96 * r.mc.erreur, 6)} (95 %) · écart EDP ${bp(r.mc.prix - r.edp.prix)} · ${r.tMc} ms`; }
-  else { $("k-mc").textContent = "—"; $("k-mc-s").textContent = "désactivé"; }
+  $("k-edp-s").textContent = `${p.theta === 1 ? "implicit" : "Crank–Nicolson"} · ${p.nx} × ${r.edp.nPas} steps · ${r.tEdp} ms`;
+  if (r.mc) { $("k-mc").textContent = fmt(r.mc.prix, 8); $("k-mc-s").textContent = `± ${fmt(1.96 * r.mc.erreur, 6)} (95 %) · vs PDE ${bp(r.mc.prix - r.edp.prix)} · ${r.tMc} ms`; }
+  else { $("k-mc").textContent = "—"; $("k-mc-s").textContent = "off"; }
   const imax = r.modeles.indexOf(Math.max(...r.modeles));
-  $("k-eur").textContent = fmt(r.modeles[imax], 8); $("k-eur-s").textContent = `échéance ${p.ex[imax]} an${p.ex[imax] > 1 ? "s" : ""}`;
+  $("k-eur").textContent = fmt(r.modeles[imax], 8); $("k-eur-s").textContent = `expiry ${p.ex[imax]} year${p.ex[imax] > 1 ? "s" : ""}`;
   const eep = r.edp.prix - r.modeles[imax];
   $("k-eep").textContent = fmt(eep, 8);
-  $("k-eep-s").textContent = `${bp(eep)} · vs dernière européenne : ${fmt(r.edp.prix - r.modeles[n - 1], 8)}`;
+  $("k-eep-s").textContent = `${bp(eep)} · vs last European: ${fmt(r.edp.prix - r.modeles[n - 1], 8)}`;
   $("t-cal").tBodies[0].innerHTML = p.ex.map((t, i) => {
     const ec = r.modeles[i] - r.marche[i], ok = Math.abs(ec) < 1e-8;
     return `<tr><td>${t}</td><td>${pct(r.details[i].fwd, 3)}</td><td>${r.details[i].ann.toFixed(5)}</td><td>${(p.vols[i] * 1e4).toFixed(1)} bp</td>
       <td>${isFinite(r.details[i].volModele) ? (r.details[i].volModele * 1e4).toFixed(2) + " bp" : "—"}</td>
       <td>${fmt(r.marche[i], 8)}</td><td>${fmt(r.modeles[i], 8)}</td><td><span class="badge ${ok ? "ok" : "av"}">${ec.toExponential(1)}</span></td><td>${(r.sigmas[i] * 1e4).toFixed(2)} bp</td></tr>`;
   }).join("");
-  // σ vaut s_k sur ]T_(k-1), T_k] : paliers explicites
+  // σ equals s_k on ]T_(k-1), T_k]: explicit steps
   const sx = [], sy = [];
   p.ex.forEach((t, i) => { sx.push(i ? p.ex[i - 1] : 0, t); sy.push(r.sigmas[i] * 1e4, r.sigmas[i] * 1e4); });
-  Graphe.tracer($("g-sigma"), {series: [{nom: "σ(t)", x: sx, y: sy, couleur: "c1"}], xlab: "t (ans)", ylab: "σ (bp)", zero: true, yfmt: v => v.toFixed(1)});
-  // éventail du taux court
-  const ev = r.eventail, noms = ["1 %", "5 %", "25 %", "médiane", "75 %", "95 %", "99 %"], coul = ["c7", "c2", "c3", "c1", "c3", "c2", "c7"];
+  Graphe.tracer($("g-sigma"), {series: [{nom: "σ(t)", x: sx, y: sy, couleur: "c1"}], xlab: "t (years)", ylab: "σ (bp)", zero: true, yfmt: v => v.toFixed(1)});
+  // short-rate fan
+  const ev = r.eventail, noms = ["1 %", "5 %", "25 %", "median", "75 %", "95 %", "99 %"], coul = ["c7", "c2", "c3", "c1", "c3", "c2", "c7"];
   Graphe.tracer($("g-event"), {series: [
-    ...ev.q.map((q, i) => ({nom: "quantile " + noms[i], x: ev.ts, y: q.map(v => v * 100), couleur: coul[i], tirets: i !== 3, epaisseur: i === 3 ? 2 : 1.2, sansLegende: i > 3})),
+    ...ev.q.map((q, i) => ({nom: (i === 3 ? "" : "quantile ") + noms[i], x: ev.ts, y: q.map(v => v * 100), couleur: coul[i], tirets: i !== 3, epaisseur: i === 3 ? 2 : 1.2, sansLegende: i > 3})),
     {nom: "forward f(0,t)", x: ev.ts, y: ev.fwd.map(v => v * 100), couleur: "c5", epaisseur: 1.5}],
-    xlab: "t (ans)", ylab: "taux court (%)", yfmt: v => v.toFixed(2)});
-  // densités de X aux dates d'exercice + frontière EDP
+    xlab: "t (years)", ylab: "short rate (%)", yfmt: v => v.toFixed(2)});
+  // densities of X at the exercise dates + PDE boundary
   const frontiere = r.edp.tranches.map(tr => { const xs = r.edp.xs;
     for (let j = 1; j < xs.length; j++) { const a = tr.e[j - 1] - tr.c[j - 1], b = tr.e[j] - tr.c[j]; if (tr.e[j] > 0 && (a <= 0) !== (b <= 0)) return xs[j - 1] + (xs[j] - xs[j - 1]) * a / (a - b); }
     return null; });
   const sdMax = Math.sqrt(Math.max(...r.alphas)), xg = Array.from({length: 241}, (_, k) => -4 * sdMax + 8 * sdMax * k / 240), series = [];
   p.ex.forEach((t, i) => {
     const c = "c" + (1 + i % 8), v = r.alphas[i], dmax = dens(0, v);
-    series.push({nom: `X à T = ${t}`, x: xg, y: xg.map(x => dens(x, v)), couleur: c});
-    if (frontiere[i] != null) series.push({nom: `frontière T = ${t}`, x: [frontiere[i], frontiere[i]], y: [0, dmax], couleur: c, tirets: true, sansLegende: true});
+    series.push({nom: `X at T = ${t}`, x: xg, y: xg.map(x => dens(x, v)), couleur: c});
+    if (frontiere[i] != null) series.push({nom: `boundary T = ${t}`, x: [frontiere[i], frontiere[i]], y: [0, dmax], couleur: c, tirets: true, sansLegende: true});
   });
-  Graphe.tracer($("g-densite"), {series, xlab: "facteur X", ylab: "densité", xfmt: v => v.toFixed(3), yfmt: v => v.toFixed(0)});
-  // frontière d'exercice
+  Graphe.tracer($("g-densite"), {series, xlab: "factor X", ylab: "density", xfmt: v => v.toFixed(3), yfmt: v => v.toFixed(0)});
+  // exercise boundary
   const sel = $("tranche"), avant = sel.value;
-  sel.innerHTML = r.edp.tranches.map((tr, i) => `<option value="${i}">T = ${tr.t}${i === r.edp.tranches.length - 1 ? " (dernière)" : ""}</option>`).join("");
+  sel.innerHTML = r.edp.tranches.map((tr, i) => `<option value="${i}">T = ${tr.t}${i === r.edp.tranches.length - 1 ? " (last)" : ""}</option>`).join("");
   if (avant && +avant < r.edp.tranches.length) sel.value = avant;
   dessinerFrontiere(frontiere);
-  // Monte-Carlo
+  // Monte Carlo
   $("c-mc").hidden = !r.mc;
   if (r.mc) {
-    Graphe.tracer($("g-mc"), {series: [{nom: "trajectoires exercées", x: p.ex, y: r.mc.nbExerces, type: "barres", couleur: "c3"}], xlab: "date d'exercice", ylab: "trajectoires", yfmt: v => v.toFixed(0)});
+    Graphe.tracer($("g-mc"), {series: [{nom: "exercised paths", x: p.ex, y: r.mc.nbExerces, type: "barres", couleur: "c3"}], xlab: "exercise date", ylab: "paths", yfmt: v => v.toFixed(0)});
     const rs = $("reg-date"), av = rs.value, dispo = r.mc.details.map((d, j) => d ? j : -1).filter(j => j >= 0);
-    rs.innerHTML = dispo.map(j => `<option value="${j}">T = ${p.ex[j]}</option>`).join("") || `<option value="">(aucune régression)</option>`;
+    rs.innerHTML = dispo.map(j => `<option value="${j}">T = ${p.ex[j]}</option>`).join("") || `<option value="">(no regression)</option>`;
     if (av && dispo.includes(+av)) rs.value = av;
     dessinerRegression();
     $("t-mart").tBodies[0].innerHTML = r.mc.martingale.map(m => { const e = m.mc - m.courbe, z = m.se > 0 ? Math.abs(e) / m.se : (Math.abs(e) > 1e-12 ? Infinity : 0);
       return `<tr><td>${m.t}</td><td>${m.courbe.toFixed(6)}</td><td>${m.mc.toFixed(6)}${m.se > 0 ? ` <small>± ${(1.96 * m.se).toFixed(6)}</small>` : ""}</td>
         <td><span class="badge ${z < 3 ? "ok" : "ko"}">${e >= 0 ? "+" : ""}${e.toExponential(1)}</span></td></tr>`; }).join("");
   }
-  etat(`${p.mode === "imposee" ? "σ imposées" : "Calibré"} et pricé · σ(X_T) = ${fmt(r.sdX, 5)} · domaine EDP [${fmt(r.grille.xMin, 4)}, ${fmt(r.grille.xMax, 4)}]`, "ok");
+  etat(`${p.mode === "imposee" ? "User-set σ" : "Calibrated"} and priced · σ(X_T) = ${fmt(r.sdX, 5)} · PDE domain [${fmt(r.grille.xMin, 4)}, ${fmt(r.grille.xMax, 4)}]`, "ok");
 }
 function dessinerFrontiere(frontiere) {
   if (!dernier) return;
   const r = dernier.r, i = +$("tranche").value || 0, tr = r.edp.tranches[i];
   if (!tr) return;
   Graphe.tracer($("g-front"), {series: [
-    {nom: "valeur de continuation", x: r.edp.xs, y: tr.c, couleur: "c2"},
-    {nom: "valeur d'exercice", x: r.edp.xs, y: tr.e, couleur: "c4", tirets: true}],
-    xlab: "facteur X", ylab: "valeur", xfmt: v => v.toFixed(3)});
+    {nom: "continuation value", x: r.edp.xs, y: tr.c, couleur: "c2"},
+    {nom: "exercise value", x: r.edp.xs, y: tr.e, couleur: "c4", tirets: true}],
+    xlab: "factor X", ylab: "value", xfmt: v => v.toFixed(3)});
   const f = (frontiere || dernier.frontiere || [])[i];
   if (frontiere) dernier.frontiere = frontiere;
   const sd = Math.sqrt(r.alphas[i] || 0);
-  $("front-note").textContent = f == null ? "" : `Exercice dès que X dépasse ${f.toFixed(4)} (${(f / sd).toFixed(2)} écart-type) : probabilité ${(100 * 0.5 * (1 - HJM.erf(f / sd / Math.SQRT2))).toFixed(1)} % sous la loi de X à cette date.`;
+  $("front-note").textContent = f == null ? "" : `Exercise as soon as X exceeds ${f.toFixed(4)} (${(f / sd).toFixed(2)} standard deviations): probability ${(100 * 0.5 * (1 - HJM.erf(f / sd / Math.SQRT2))).toFixed(1)} % under the law of X at this date.`;
 }
 function dessinerRegression() {
   if (!dernier || !dernier.r.mc) return;
@@ -639,108 +708,108 @@ function dessinerRegression() {
   const cont = xs.map(x => d.beta.reduce((s, b, k) => s + b * Math.pow(x / d.sd, k), 0));
   const ordre = d.x.map((x, k) => k).sort((a, b) => d.x[a] - d.x[b]);
   Graphe.tracer($("g-reg"), {series: [
-    {nom: "valeur future actualisée (chemins)", x: d.x, y: d.y, type: "points", rayon: 1.6, couleur: "c2"},
-    {nom: `continuation (degré ${d.beta.length - 1})`, x: xs, y: cont, couleur: "c1", epaisseur: 2.5},
-    {nom: "valeur d'exercice", x: ordre.map(k => d.x[k]), y: ordre.map(k => d.v[k]), couleur: "c4", tirets: true, epaisseur: 2}],
-    xlab: "facteur X", ylab: "valeur", xfmt: v => v.toFixed(3)});
+    {nom: "discounted future value (paths)", x: d.x, y: d.y, type: "points", rayon: 1.6, couleur: "c2"},
+    {nom: `continuation (degree ${d.beta.length - 1})`, x: xs, y: cont, couleur: "c1", epaisseur: 2.5},
+    {nom: "exercise value", x: ordre.map(k => d.x[k]), y: ordre.map(k => d.v[k]), couleur: "c4", tirets: true, epaisseur: 2}],
+    xlab: "factor X", ylab: "value", xfmt: v => v.toFixed(3)});
 }
 $("tranche").onchange = () => dessinerFrontiere();
 $("reg-date").onchange = dessinerRegression;
 document.querySelector("#pricer .reglages").addEventListener("input", lancer);
 document.querySelector("#pricer .reglages").addEventListener("change", lancer);
 
-// ---------- études ----------
+// ---------- studies ----------
 $("e-go").onclick = async () => {
   let p; try { p = lire(); } catch (err) { $("e-etat").textContent = err.message; $("e-etat").className = "etat err"; return; }
   const e = {grilles: $("e-grilles").value.trim().split(/\s+/).map(s => s.split("/").map(Number)).filter(g => g.length === 2 && g.every(v => v > 3)),
     nstd: listeNombres($("e-nstd").value).filter(v => v > 0), mc: listeNombres($("e-mc").value).filter(v => v >= 100 && v <= 300000).map(Math.round),
     lam: listeNombres($("e-lam").value), k: listeNombres($("e-k").value).map(v => v / 100), vol: listeNombres($("e-vol").value).filter(v => v > 0), deux: $("e-deux").checked};
-  $("e-go").disabled = true; $("e-prog").hidden = false; $("e-prog").value = 0; $("e-etat").className = "etat"; $("e-etat").textContent = "Calcul des études…";
+  $("e-go").disabled = true; $("e-prog").hidden = false; $("e-prog").value = 0; $("e-etat").className = "etat"; $("e-etat").textContent = "Running the studies…";
   const t0 = Date.now();
   const m = await demander("etudes", p, e, f => { $("e-prog").value = f; });
   $("e-go").disabled = false; $("e-prog").hidden = true;
   if (!m.ok) { $("e-etat").textContent = m.msg; $("e-etat").className = "etat err"; return; }
   const r = m.res;
-  $("e-etat").textContent = `Terminé en ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("e-etat").className = "etat ok";
+  $("e-etat").textContent = `Done in ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("e-etat").className = "etat ok";
   const f8 = v => v.toFixed(6);
-  Graphe.tracer($("g-e-grille"), {series: [{nom: "prix EDP", x: r.grilles.map((g, i) => i), y: r.grilles.map(g => g.prix), couleur: "c1", marqueurs: true,
-    etiquettes: r.grilles.map(g => `n_x/n_t = ${g.nx}/${g.nt}`)}], xlab: "grille", ylab: "prix", yfmt: f8,
+  Graphe.tracer($("g-e-grille"), {series: [{nom: "PDE price", x: r.grilles.map((g, i) => i), y: r.grilles.map(g => g.prix), couleur: "c1", marqueurs: true,
+    etiquettes: r.grilles.map(g => `n_x/n_t = ${g.nx}/${g.nt}`)}], xlab: "grid", ylab: "price", yfmt: f8,
     xfmt: v => (r.grilles[Math.round(v)] && Math.abs(v - Math.round(v)) < 1e-9) ? r.grilles[Math.round(v)].nx + "/" + r.grilles[Math.round(v)].nt : ""});
-  Graphe.tracer($("g-e-nstd"), {series: [{nom: "prix EDP", x: r.nstd.map(o => o.n), y: r.nstd.map(o => o.prix), couleur: "c1", marqueurs: true}], xlab: "n écarts-types", ylab: "prix", yfmt: f8});
+  Graphe.tracer($("g-e-nstd"), {series: [{nom: "PDE price", x: r.nstd.map(o => o.n), y: r.nstd.map(o => o.prix), couleur: "c1", marqueurs: true}], xlab: "n standard deviations", ylab: "price", yfmt: f8});
   Graphe.tracer($("g-e-mc"), {series: [
     {nom: "LSMC", x: r.mc.map(o => o.n), y: r.mc.map(o => o.prix), couleur: "c3", marqueurs: true, bande: [r.mc.map(o => o.prix - 1.96 * o.err), r.mc.map(o => o.prix + 1.96 * o.err)]},
-    {nom: "EDP", x: r.mc.map(o => o.n), y: r.mc.map(() => r.edp), couleur: "c1", tirets: true}], xlab: "trajectoires", ylab: "prix", yfmt: f8});
-  const ok = a => a.filter(o => !o.erreur), nomC = c => c === "code" ? "formule du code" : "formule corrigée", coulC = c => c === "code" ? "c5" : "c1";
+    {nom: "PDE", x: r.mc.map(o => o.n), y: r.mc.map(() => r.edp), couleur: "c1", tirets: true}], xlab: "paths", ylab: "price", yfmt: f8});
+  const ok = a => a.filter(o => !o.erreur), nomC = c => c === "code" ? "original formula" : "corrected formula", coulC = c => c === "code" ? "c5" : "c1";
   const lamS = [], kS = [], volS = [];
   r.parConv.forEach(pc => {
     const lam = ok(pc.lam), k = ok(pc.k), vol = ok(pc.vol), tir = pc.conv === "code";
     lamS.push({nom: nomC(pc.conv), x: lam.map(o => o.l), y: lam.map(o => o.prix), couleur: coulC(pc.conv), marqueurs: true, tirets: tir});
-    kS.push({nom: "bermudéenne, " + nomC(pc.conv), x: k.map(o => o.k * 100), y: k.map(o => o.prix), couleur: coulC(pc.conv), marqueurs: true, tirets: tir});
-    volS.push({nom: "bermudéenne, " + nomC(pc.conv), x: vol.map(o => o.f), y: vol.map(o => o.prix), couleur: coulC(pc.conv), marqueurs: true, tirets: tir});
+    kS.push({nom: "Bermudan, " + nomC(pc.conv), x: k.map(o => o.k * 100), y: k.map(o => o.prix), couleur: coulC(pc.conv), marqueurs: true, tirets: tir});
+    volS.push({nom: "Bermudan, " + nomC(pc.conv), x: vol.map(o => o.f), y: vol.map(o => o.prix), couleur: coulC(pc.conv), marqueurs: true, tirets: tir});
     if (pc === r.parConv[0]) {
-      kS.push({nom: "plus chère des européennes", x: k.map(o => o.k * 100), y: k.map(o => o.eur), couleur: "c3", tirets: true, marqueurs: true});
-      volS.push({nom: "plus chère des européennes", x: vol.map(o => o.f), y: vol.map(o => o.eur), couleur: "c3", tirets: true, marqueurs: true});
-      Graphe.tracer($("g-e-lam-s"), {series: p.ex.map((t, j) => ({nom: `segment jusqu'à t = ${t}`, x: lam.map(o => o.l), y: lam.map(o => o.sig[j] * 1e4), couleur: "c" + (1 + j % 8), marqueurs: true})),
+      kS.push({nom: "most expensive European", x: k.map(o => o.k * 100), y: k.map(o => o.eur), couleur: "c3", tirets: true, marqueurs: true});
+      volS.push({nom: "most expensive European", x: vol.map(o => o.f), y: vol.map(o => o.eur), couleur: "c3", tirets: true, marqueurs: true});
+      Graphe.tracer($("g-e-lam-s"), {series: p.ex.map((t, j) => ({nom: `segment up to t = ${t}`, x: lam.map(o => o.l), y: lam.map(o => o.sig[j] * 1e4), couleur: "c" + (1 + j % 8), marqueurs: true})),
         xlab: "λ", ylab: "σ (bp)", yfmt: v => v.toFixed(1)});
     }
   });
-  Graphe.tracer($("g-e-lam"), {series: lamS, xlab: "λ", ylab: "prix", yfmt: f8});
-  Graphe.tracer($("g-e-k"), {series: kS, xlab: "K (%)", ylab: "prix", yfmt: f8});
-  Graphe.tracer($("g-e-vol"), {series: volS, xlab: "facteur sur les vols", ylab: "prix", yfmt: f8});
+  Graphe.tracer($("g-e-lam"), {series: lamS, xlab: "λ", ylab: "price", yfmt: f8});
+  Graphe.tracer($("g-e-k"), {series: kS, xlab: "K (%)", ylab: "price", yfmt: f8});
+  Graphe.tracer($("g-e-vol"), {series: volS, xlab: "factor on the vols", ylab: "price", yfmt: f8});
   const echecs = r.parConv.flatMap(pc => [...pc.lam, ...pc.k, ...pc.vol]).filter(o => o.erreur);
-  if (echecs.length) { $("e-etat").textContent += ` · ${echecs.length} point(s) sans calibration possible : ${echecs[0].erreur}`; $("e-etat").className = "etat err"; }
+  if (echecs.length) { $("e-etat").textContent += ` · ${echecs.length} point(s) could not be calibrated: ${echecs[0].erreur}`; $("e-etat").className = "etat err"; }
 };
 
-// ---------- retour à la moyenne ----------
+// ---------- mean reversion ----------
 let lambdaFait = false;
 async function lancerLambda() {
   let p; try { p = lire(); } catch (err) { $("l-etat").textContent = err.message; $("l-etat").className = "etat err"; return; }
   const lams = listeNombres($("l-vals").value).filter(v => v >= 0 && v <= 2).sort((a, b) => a - b);
-  if (lams.length < 2) { $("l-etat").textContent = "au moins deux valeurs de λ (entre 0 et 2)"; $("l-etat").className = "etat err"; return; }
+  if (lams.length < 2) { $("l-etat").textContent = "at least two values of λ (between 0 and 2)"; $("l-etat").className = "etat err"; return; }
   const e = {lams, sans: $("l-sans").checked, dl: Math.abs(lireNombre($("i-lam"), 0.02)), dv: Math.abs(lireNombre($("i-vol"), 10)) / 100,
     dk: Math.abs(lireNombre($("i-k"), 25)) / 1e4, dc: Math.abs(lireNombre($("i-c"), 25)) / 1e4};
-  $("l-go").disabled = true; $("l-prog").hidden = false; $("l-prog").value = 0; $("l-etat").className = "etat"; $("l-etat").textContent = "Recalibrations…";
+  $("l-go").disabled = true; $("l-prog").hidden = false; $("l-prog").value = 0; $("l-etat").className = "etat"; $("l-etat").textContent = "Recalibrating…";
   const t0 = Date.now();
   const m = await demander("lambda", p, e, f => { $("l-prog").value = f; });
   $("l-go").disabled = false; $("l-prog").hidden = true;
   if (!m.ok) { $("l-etat").textContent = m.msg; $("l-etat").className = "etat err"; return; }
   lambdaFait = true;
   const r = m.res, L = r.lignes.filter(o => !o.erreur), n = p.ex.length, f6 = v => v.toFixed(6);
-  $("l-etat").textContent = `${L.length} recalibrations en ${((Date.now() - t0) / 1000).toFixed(1)} s` + (L.length < r.lignes.length ? ` · ${r.lignes.length - L.length} λ sans calibration possible` : "");
+  $("l-etat").textContent = `${L.length} recalibrations in ${((Date.now() - t0) / 1000).toFixed(1)} s` + (L.length < r.lignes.length ? ` · ${r.lignes.length - L.length} λ could not be calibrated` : "");
   $("l-etat").className = "etat " + (L.length < r.lignes.length ? "err" : "ok");
   const xs = L.map(o => o.l), eurMax = L.map(o => Math.max(...o.eur));
-  const sPrix = [{nom: "bermudéenne (recalibrée)", x: xs, y: L.map(o => o.berm), couleur: "c1", marqueurs: true, epaisseur: 2.5},
-    {nom: "plus chère des européennes (recalibrée)", x: xs, y: eurMax, couleur: "c3", marqueurs: true}];
-  p.ex.forEach((t, i) => { if (i < n - 1) sPrix.push({nom: `européenne T = ${t}`, x: xs, y: L.map(o => o.eur[i]), couleur: "c3", epaisseur: 1, sansLegende: true}); });
+  const sPrix = [{nom: "Bermudan (recalibrated)", x: xs, y: L.map(o => o.berm), couleur: "c1", marqueurs: true, epaisseur: 2.5},
+    {nom: "most expensive European (recalibrated)", x: xs, y: eurMax, couleur: "c3", marqueurs: true}];
+  p.ex.forEach((t, i) => { if (i < n - 1) sPrix.push({nom: `European T = ${t}`, x: xs, y: L.map(o => o.eur[i]), couleur: "c3", epaisseur: 1, sansLegende: true}); });
   if (e.sans) {
-    sPrix.push({nom: "bermudéenne sans recalibration", x: xs, y: L.map(o => o.bermSans), couleur: "c1", tirets: true});
-    sPrix.push({nom: "européenne max sans recalibration", x: xs, y: L.map(o => o.eurSans), couleur: "c3", tirets: true});
+    sPrix.push({nom: "Bermudan, no recalibration", x: xs, y: L.map(o => o.bermSans), couleur: "c1", tirets: true});
+    sPrix.push({nom: "max European, no recalibration", x: xs, y: L.map(o => o.eurSans), couleur: "c3", tirets: true});
   }
-  Graphe.tracer($("g-l-prix"), {series: sPrix, xlab: "λ", ylab: "prix", yfmt: f6});
-  Graphe.tracer($("g-l-sig"), {series: p.ex.map((t, j) => ({nom: `σ sur ]${j ? p.ex[j - 1] : 0}, ${t}]`, x: xs, y: L.map(o => o.sig[j] * 1e4), couleur: "c" + (1 + j % 8), marqueurs: true})),
-    xlab: "λ", ylab: "σ calibrée (bp)", yfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-l-prix"), {series: sPrix, xlab: "λ", ylab: "price", yfmt: f6});
+  Graphe.tracer($("g-l-sig"), {series: p.ex.map((t, j) => ({nom: `σ on ]${j ? p.ex[j - 1] : 0}, ${t}]`, x: xs, y: L.map(o => o.sig[j] * 1e4), couleur: "c" + (1 + j % 8), marqueurs: true})),
+    xlab: "λ", ylab: "calibrated σ (bp)", yfmt: v => v.toFixed(0)});
   const paires = L[0].corr;
   Graphe.tracer($("g-l-corr"), {series: paires.map((c, k) => ({nom: `corr(T = ${p.ex[c.i]}, T = ${p.ex[c.j]})`, x: xs, y: L.map(o => o.corr[k].v), couleur: "c" + (1 + k % 8), marqueurs: true})),
-    xlab: "λ", ylab: "corrélation", yfmt: v => v.toFixed(2)});
+    xlab: "λ", ylab: "correlation", yfmt: v => v.toFixed(2)});
   const k1n = paires.findIndex(c => c.i === 0 && c.j === n - 1);
-  Graphe.tracer($("g-l-eep"), {series: [{nom: "prime d'exercice anticipé", x: L.map(o => o.corr[k1n].v), y: L.map((o, k) => o.berm - eurMax[k]), couleur: "c4", marqueurs: true,
-    etiquettes: L.map(o => `λ = ${o.l}, corrélation = ${o.corr[k1n].v.toFixed(3)}`)}], xlab: `corr(T = ${p.ex[0]}, T = ${p.ex[n - 1]})`, ylab: "bermudéenne − européenne max", yfmt: f6, xfmt: v => v.toFixed(2)});
+  Graphe.tracer($("g-l-eep"), {series: [{nom: "early-exercise premium", x: L.map(o => o.corr[k1n].v), y: L.map((o, k) => o.berm - eurMax[k]), couleur: "c4", marqueurs: true,
+    etiquettes: L.map(o => `λ = ${o.l}, correlation = ${o.corr[k1n].v.toFixed(3)}`)}], xlab: `corr(T = ${p.ex[0]}, T = ${p.ex[n - 1]})`, ylab: "Bermudan − max European", yfmt: f6, xfmt: v => v.toFixed(2)});
   $("t-l").tBodies[0].innerHTML = L.map((o, k) => `<tr><td>${o.l}</td><td>${o.sig.map(s => (s * 1e4).toFixed(1)).join(" / ")}</td><td>${o.corr[k1n].v.toFixed(4)}</td>
     <td>${f6(eurMax[k])}</td><td>${f6(o.berm)}</td><td>${f6(o.berm - eurMax[k])}</td><td>${o.bermSans != null ? f6(o.bermSans) : "—"}</td></tr>`).join("");
-  // impact de chaque paramètre
+  // impact of each parameter
   const C = r.chocs, bpN = v => v == null || !isFinite(v) ? NaN : v * 1e4;
   Graphe.tracer($("g-impact"), {series: [
-    {nom: "choc à la baisse", x: C.map((c, k) => k), y: C.map(c => bpN(c.bas.berm)), type: "barres", couleur: "c2", etiquettes: C.map(c => c.nom + " (baisse)")},
-    {nom: "choc à la hausse", x: C.map((c, k) => k), y: C.map(c => bpN(c.haut.berm)), type: "barres", couleur: "c4", etiquettes: C.map(c => c.nom + " (hausse)")}],
-    xlab: "paramètre", ylab: "Δ bermudéenne (bp)", yfmt: v => v.toFixed(1),
+    {nom: "down shock", x: C.map((c, k) => k), y: C.map(c => bpN(c.bas.berm)), type: "barres", couleur: "c2", etiquettes: C.map(c => c.nom + " (down)")},
+    {nom: "up shock", x: C.map((c, k) => k), y: C.map(c => bpN(c.haut.berm)), type: "barres", couleur: "c4", etiquettes: C.map(c => c.nom + " (up)")}],
+    xlab: "parameter", ylab: "Δ Bermudan (bp)", yfmt: v => v.toFixed(1),
     xfmt: v => { const k = Math.round(v); return Math.abs(v - k) < 1e-9 && C[k] ? C[k].nom : ""; }});
-  const cel = (o, cle) => o.erreur ? `<td class="vide">non calibrable</td>` : `<td>${(o[cle] * 1e4 >= 0 ? "+" : "") + (o[cle] * 1e4).toFixed(2)} bp</td>`;
+  const cel = (o, cle) => o.erreur ? `<td class="vide">no calibration</td>` : `<td>${(o[cle] * 1e4 >= 0 ? "+" : "") + (o[cle] * 1e4).toFixed(2)} bp</td>`;
   $("t-impact").tBodies[0].innerHTML = C.map(c => `<tr><td>${c.nom}</td><td>${c.choc}</td>${cel(c.bas, "berm")}${cel(c.haut, "berm")}${cel(c.bas, "eur")}${cel(c.haut, "eur")}</tr>`).join("");
 }
 $("l-go").onclick = lancerLambda;
 document.addEventListener("vue", ev => { if (ev.detail === "lambda" && !lambdaFait) lancerLambda(); });
 
-// ---------- code source ----------
+// ---------- source code ----------
 const CODE = /*__CODE__*/;
 let codePret = false;
 document.addEventListener("vue", ev => { if (ev.detail === "code" && !codePret) { codePret = true; UI.lecteurCode($("code"), CODE, "__DEPOT__"); } });

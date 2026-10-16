@@ -1,212 +1,226 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Options lookback — Mohammed-Yassine Barnicha</title>
-<meta name="description" content="Pricer d'options lookback à strike flottant : les deux moteurs Monte-Carlo C++ du projet (pont brownien exact, schéma en temps avec BGK) et la formule fermée, portés en JavaScript, avec dividende, extremum observé et tous les réglages.">
+<title>Lookback options — Mohammed-Yassine Barnicha</title>
+<meta name="description" content="Floating-strike lookback option pricer: the project's two C++ Monte Carlo engines (exact Brownian bridge, time stepping with BGK) and the closed form, ported to JavaScript, with dividend, observed extremum and every setting.">
 <meta name="theme-color" content="#080b12">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23161616'/%3E%3Cpath d='M5 24 Q11 6 16 16 T27 8' stroke='%230f62fe' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23080b12'/%3E%3Cpath d='M7 22 13 10l5 12 7-13' stroke='%2391b9ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 <style>
 /*__STYLE__*/
 .tab-res td small{color:var(--ink2);display:block;font-size:11px}
 .tab-res td.vide{color:var(--ink2)}
 .revue li{margin-bottom:8px}
-.remarque{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);padding:16px 20px}
+.remarque{background:var(--glass);border:1px solid var(--edge);border-left:3px solid var(--accent);border-radius:0 18px 18px 0;padding:16px 20px}
 .remarque h2{font-size:18px;font-weight:600;margin:0 0 8px}
-.remarque p,.remarque li{color:var(--ink2);font-size:14px;max-width:95ch}
+.remarque p,.remarque li{color:var(--ink2);font-size:14px;max-width:100ch}
 .remarque b{color:var(--ink)}
-.remarque .phrase{font-style:italic;color:var(--ink);border-top:1px solid var(--sunk);padding-top:10px;margin-bottom:0}
+.remarque .phrase{font-style:italic;color:var(--ink);border-top:1px solid var(--edge);padding-top:10px;margin-bottom:0}
+details summary.aide{cursor:pointer}
 </style>
 </head>
 <body>
-<!--GABARIT--><p style="margin:0;padding:12px 16px;background:#fff1c7;color:#684e00;font:600 14px system-ui,sans-serif">Ceci est le gabarit, sans styles ni calculs : ouvrez <code>index.html</code> (construit par <code>python construire.py</code> à la racine du dépôt).</p><!--/GABARIT-->
+<!--GABARIT--><p style="margin:0;padding:12px 16px;background:#fff1c7;color:#684e00;font:600 14px system-ui,sans-serif">This is the template, without styles or computations: open <code>index.html</code> (built by <code>python construire.py</code> at the root of the repository).</p><!--/GABARIT-->
 <div class="barre"><div class="page">
-  <a class="mono-nom" href="../" title="Page d'accueil">MYB</a>
-  <span class="titre">Options lookback à strike flottant</span>
-  <nav><a href="../">← Projets</a><a href="#code">Code source</a></nav>
+  <a class="mono-nom" href="../" title="Home page">MYB</a>
+  <span class="titre">Floating-strike lookback options</span>
+  <nav><a href="../">← Projects</a><a href="#theorie">Theory</a><a href="rapport/report.pdf">Report (PDF)</a><a href="#code">Code</a></nav>
 </div></div>
 
 <main class="page">
   <header class="entete">
-    <p class="surtitre">C++ · Monte-Carlo · pont brownien · correction BGK · formule fermée</p>
-    <h1>Pricer d'options lookback</h1>
-    <p class="chapeau">Les deux moteurs C++ du projet, le <b>pont brownien exact</b> et le <b>schéma en temps avec correction BGK</b>,
-      sont portés ici en JavaScript ligne à ligne, avec le même générateur aléatoire que le C++ : réglages par défaut,
-      la page donne les nombres de la DLL. Au-delà, tout est réglable : dividende, <b>option en cours de vie</b>, correction de la
-      surveillance discrète, tailles des bumps des grecques.</p>
+    <p class="surtitre">C++ · Monte Carlo · Brownian bridge · BGK correction · closed form</p>
+    <h1>Lookback option pricer</h1>
+    <p class="chapeau">The project's two C++ engines, the <b>exact Brownian bridge</b> and the <b>time-stepping scheme with the BGK
+      correction</b>, are ported here to JavaScript line by line, with the same random generator as the C++: with the default
+      settings the page returns the DLL's numbers. Beyond that, everything can be set: dividend, <b>seasoned option</b>
+      (extremum already observed), discrete-monitoring correction, bump sizes of the Greeks.</p>
   </header>
 
   <div class="onglets" role="tablist">
     <button type="button" data-vue="pricer">Pricer</button>
-    <button type="button" data-vue="homogene">Δ constant</button>
-    <button type="button" data-vue="courbes">Courbes</button>
-    <button type="button" data-vue="convergence">Convergence et biais</button>
-    <button type="button" data-vue="methode">Méthode et revue</button>
-    <button type="button" data-vue="code">Code source</button>
+    <button type="button" data-vue="homogene">Constant Δ</button>
+    <button type="button" data-vue="courbes">Curves</button>
+    <button type="button" data-vue="convergence">Convergence and bias</button>
+    <button type="button" data-vue="theorie">Theory and code review</button>
+    <button type="button" data-vue="code">Source code</button>
   </div>
 
   <!-- ============================== PRICER ============================== -->
   <section class="vue" id="pricer">
     <div class="espace">
-      <aside class="panneau reglages" aria-label="Entrées">
-        <h3>Contrat</h3>
-        <div class="champ"><label for="type">Type</label><select id="type"><option value="0">Call : S<sub>T</sub> − min S</option><option value="1" selected>Put : max S − S<sub>T</sub></option></select></div>
-        <div class="champ"><label for="t0">Date d'évaluation T<sub>0</sub></label><input type="date" id="t0" value="2026-01-01"></div>
-        <div class="champ"><label for="t1">Échéance T</label><input type="date" id="t1" value="2027-01-01"></div>
-        <div class="champ"><label for="ttm">Maturité restante (ans)</label><input type="number" id="ttm" step="0.05" value="1"></div>
-        <p class="aide">Maturité = (T − T<sub>0</sub>) / 365, comme dans l'Excel ; on peut aussi la saisir directement.</p>
-        <label class="case"><input type="checkbox" id="vie"> Option en cours de vie</label>
-        <div class="champ" id="ch-ext" hidden><label for="ext" id="lb-ext">Minimum déjà observé</label><input type="number" id="ext" value="90" step="1"></div>
-        <p class="aide" id="aide-ext" hidden>L'extremum atteint depuis l'émission ; à l'émission il vaut le spot. Le Γ n'est nul qu'à l'émission.</p>
+      <aside class="panneau reglages" aria-label="Inputs">
+        <h3>Contract</h3>
+        <div class="champ"><label for="type">Type</label><select id="type"><option value="0">Call: S<sub>T</sub> − min S</option><option value="1" selected>Put: max S − S<sub>T</sub></option></select></div>
+        <div class="champ"><label for="t0">Valuation date T<sub>0</sub></label><input type="date" id="t0" value="2026-01-01"></div>
+        <div class="champ"><label for="t1">Expiry T</label><input type="date" id="t1" value="2027-01-01"></div>
+        <div class="champ"><label for="ttm">Time to maturity (years)</label><input type="number" id="ttm" step="0.05" value="1"></div>
+        <p class="aide">Maturity = (T − T<sub>0</sub>) / 365, as in the Excel workbook; it can also be typed in directly.</p>
+        <label class="case"><input type="checkbox" id="vie"> Seasoned option (extremum already observed)</label>
+        <div class="champ" id="ch-ext" hidden><label for="ext" id="lb-ext">Minimum already observed</label><input type="number" id="ext" value="90" step="1"></div>
+        <p class="aide" id="aide-ext" hidden>The extremum reached since issue; at issue it equals the spot. With an extremum fixed, the Greeks are
+          those of a contract held (the extremum does not move with the spot).</p>
 
-        <h3>Marché (Black-Scholes)</h3>
+        <h3>Market (Black-Scholes)</h3>
         <div class="champ"><label for="spot"><b>S</b> spot</label><input type="number" id="spot" value="100" step="1"></div>
-        <div class="champ"><label for="rate"><b>r</b> taux continu</label><input type="number" id="rate" value="0.05" step="0.005"></div>
-        <div class="champ"><label for="q"><b>q</b> dividende continu</label><input type="number" id="q" value="0" step="0.005"></div>
-        <div class="champ"><label for="vol"><b>σ</b> volatilité</label><input type="number" id="vol" value="0.2" step="0.01"></div>
+        <div class="champ"><label for="rate"><b>r</b> continuous rate</label><input type="number" id="rate" value="0.05" step="0.005"></div>
+        <div class="champ"><label for="q"><b>q</b> continuous dividend</label><input type="number" id="q" value="0" step="0.005"></div>
+        <div class="champ"><label for="vol"><b>σ</b> volatility</label><input type="number" id="vol" value="0.2" step="0.01"></div>
 
-        <h3>Pont brownien exact (Barnicha)</h3>
-        <div class="champ"><label for="pc">Chemins</label><input type="number" id="pc" value="10000" step="1000"></div>
-        <div class="champ"><label for="seed">Graine</label><input type="number" id="seed" value="42"></div>
-        <label class="case"><input type="checkbox" id="anti" checked> Variable antithétique (z ↔ −z)</label>
-        <label class="case"><input type="checkbox" id="thc"> Θ par différence centrée (le C++ : d'un seul côté)</label>
-        <details><summary class="aide" style="cursor:pointer">Tailles des bumps</summary>
-          <div class="champ"><label for="bS">spot (relatif)</label><input type="number" id="bS" value="0.0001" step="0.0001"></div>
-          <div class="champ"><label for="br">r (absolu)</label><input type="number" id="br" value="0.0001" step="0.0001"></div>
-          <div class="champ"><label for="bv">σ (absolu)</label><input type="number" id="bv" value="0.0001" step="0.0001"></div>
-          <div class="champ"><label for="bT">T (absolu, ans)</label><input type="number" id="bT" value="0.0001" step="0.0001"></div>
+        <h3>Exact Brownian bridge (Barnicha)</h3>
+        <div class="champ"><label for="pc">Paths</label><input type="number" id="pc" value="10000" step="1000"></div>
+        <div class="champ"><label for="seed">Seed</label><input type="number" id="seed" value="42"></div>
+        <label class="case"><input type="checkbox" id="anti" checked> Antithetic variates (z ↔ −z)</label>
+        <label class="case"><input type="checkbox" id="thc"> Centred Θ (the C++: one-sided)</label>
+        <details><summary class="aide">Bump sizes</summary>
+          <div class="champ"><label for="bS">spot (relative)</label><input type="number" id="bS" value="0.0001" step="0.0001"></div>
+          <div class="champ"><label for="br">r (absolute)</label><input type="number" id="br" value="0.0001" step="0.0001"></div>
+          <div class="champ"><label for="bv">σ (absolute)</label><input type="number" id="bv" value="0.0001" step="0.0001"></div>
+          <div class="champ"><label for="bT">T (absolute, years)</label><input type="number" id="bT" value="0.0001" step="0.0001"></div>
         </details>
 
-        <h3>Schéma en temps (Chivet)</h3>
-        <div class="champ"><label for="pb">Chemins</label><input type="number" id="pb" value="10000" step="1000"></div>
-        <div class="champ"><label for="steps">Pas de temps</label><input type="number" id="steps" value="100" step="10"></div>
-        <div class="champ"><label for="seedb">Graine</label><input type="number" id="seedb" value="42"></div>
-        <div class="champ"><label for="corr">Surveillance discrète</label><select id="corr"><option value="aucune">sans correction</option><option value="bgk">correction BGK</option><option value="pont">pont exact par pas</option></select></div>
-        <div class="champ"><label for="beta">β de BGK</label><input type="number" id="beta" value="0.5826" step="0.0001"></div>
-        <label class="case"><input type="checkbox" id="stderr" checked> Erreurs standard des grecques</label>
-        <details><summary class="aide" style="cursor:pointer">Tailles des bumps (toutes relatives)</summary>
+        <h3>Time stepping (Chivet)</h3>
+        <div class="champ"><label for="pb">Paths</label><input type="number" id="pb" value="10000" step="1000"></div>
+        <div class="champ"><label for="steps">Time steps</label><input type="number" id="steps" value="100" step="10"></div>
+        <div class="champ"><label for="seedb">Seed</label><input type="number" id="seedb" value="42"></div>
+        <div class="champ"><label for="corr">Discrete monitoring</label><select id="corr"><option value="aucune">no correction</option><option value="bgk">BGK correction</option><option value="pont">exact bridge per step</option></select></div>
+        <div class="champ"><label for="beta">BGK β</label><input type="number" id="beta" value="0.5826" step="0.0001"></div>
+        <label class="case"><input type="checkbox" id="stderr" checked> Standard errors of the Greeks</label>
+        <details><summary class="aide">Bump sizes (all relative)</summary>
           <div class="champ"><label for="cS">spot</label><input type="number" id="cS" value="0.001" step="0.0001"></div>
           <div class="champ"><label for="cv">σ</label><input type="number" id="cv" value="0.001" step="0.0001"></div>
           <div class="champ"><label for="cr">r</label><input type="number" id="cr" value="0.0001" step="0.0001"></div>
           <div class="champ"><label for="cT">T</label><input type="number" id="cT" value="0.00273972602739726" step="0.0001"></div>
         </details>
-        <div class="btns"><button type="button" class="btn" id="go">Calculer</button><button type="button" class="btn creux" id="defaut">Valeurs de l'Excel</button></div>
+        <div class="btns"><button type="button" class="btn" id="go">Compute</button><button type="button" class="btn creux" id="defaut">Excel values</button></div>
       </aside>
       <div class="resultats">
         <div class="etat" id="etat" role="status"></div>
         <div class="kpis">
-          <div class="kpi"><div class="lbl">Formule fermée</div><div class="val" id="k-f">—</div><div class="sous" id="k-f-s"></div></div>
-          <div class="kpi"><div class="lbl">Pont brownien exact (MC)</div><div class="val" id="k-c">—</div><div class="sous" id="k-c-s"></div></div>
-          <div class="kpi"><div class="lbl">Schéma en temps (MC)</div><div class="val" id="k-b">—</div><div class="sous" id="k-b-s"></div></div>
+          <div class="kpi"><div class="lbl">Closed form</div><div class="val" id="k-f">—</div><div class="sous" id="k-f-s"></div></div>
+          <div class="kpi"><div class="lbl">Exact Brownian bridge (MC)</div><div class="val" id="k-c">—</div><div class="sous" id="k-c-s"></div></div>
+          <div class="kpi"><div class="lbl">Time stepping (MC)</div><div class="val" id="k-b">—</div><div class="sous" id="k-b-s"></div></div>
         </div>
         <div class="carte-res">
-          <h2>Prix et grecques</h2>
-          <p class="aide">Les 48 valeurs de <code>price_lookback</code> : estimation et, pour le Monte-Carlo, ± 1,96 erreur standard.
-            Chaque moteur garde ses conventions : Θ<sub>Barnicha</sub> = −∂V/∂T, Θ<sub>Chivet</sub> = +∂V/∂T.</p>
-          <div class="defile"><table class="tab-res" id="t-res"><thead><tr><th>grandeur</th><th>pont exact (MC)</th><th>formule — conv. Barnicha</th><th>schéma en temps (MC)</th><th>formule — conv. Chivet</th></tr></thead><tbody></tbody></table></div>
+          <h2>Price and Greeks</h2>
+          <p class="aide">The 48 values of <code>price_lookback</code>: estimate and, for the Monte Carlo, ± 1.96 standard errors.
+            Each engine keeps its own convention: <m>\Theta_{\text{Barnicha}}=-\partial V/\partial T</m>,
+            <m>\Theta_{\text{Chivet}}=+\partial V/\partial T</m>.</p>
+          <div class="defile"><table class="tab-res" id="t-res"><thead><tr><th>quantity</th><th>exact bridge (MC)</th><th>closed form — Barnicha conv.</th><th>time stepping (MC)</th><th>closed form — Chivet conv.</th></tr></thead><tbody></tbody></table></div>
         </div>
         <div class="grille-res">
-          <div class="carte-res"><h2>Distribution des gains actualisés</h2>
-            <p class="aide">Pont exact, un gain par chemin (sans antithétique). Le prix est la moyenne de cette distribution.</p>
+          <div class="carte-res"><h2>Distribution of the discounted payoffs</h2>
+            <p class="aide">Exact bridge, one payoff per path (no antithetic). The price is the mean of this distribution.</p>
             <div class="graphe" id="g-hist"></div></div>
-          <div class="carte-res"><h2>Chaque chemin : S<sub>T</sub> et son extremum</h2>
-            <p class="aide">En log-rendement. Le gain est l'écart vertical à la diagonale : l'extremum est toujours au-delà de 0 et de log(S<sub>T</sub>/S).</p>
+          <div class="carte-res"><h2>Each path: S<sub>T</sub> and its extremum</h2>
+            <p class="aide">In log-returns. The payoff is the vertical distance to the diagonal: the extremum always lies beyond both 0 and
+              <m>\log(S_T/S)</m>.</p>
             <div class="graphe" id="g-nuage"></div></div>
-          <div class="carte-res"><h2>Loi de l'extremum : simulation contre théorie</h2>
-            <p class="aide">Histogramme des extrema tirés par le pont brownien et densité exacte de l'extremum d'un mouvement brownien
-              avec dérive : la superposition valide l'échantillonneur.</p>
+          <div class="carte-res"><h2>Law of the extremum: simulation against theory</h2>
+            <p class="aide">Histogram of the extrema drawn by the Brownian bridge and exact density of the extremum of a drifted Brownian
+              motion (reflection principle): the overlay validates the sampler.</p>
             <div class="graphe" id="g-ext"></div></div>
-          <div class="carte-res"><h2>Ce qui fait le prix</h2>
-            <p class="aide">Décomposition de l'espérance actualisée : E[extremum] et E[S<sub>T</sub>], simulées et exactes.</p>
-            <div class="defile"><table id="t-dec"><thead><tr><th>terme</th><th>simulé</th><th>exact</th></tr></thead><tbody></tbody></table></div></div>
+          <div class="carte-res"><h2>What makes the price</h2>
+            <p class="aide">Decomposition of the discounted expectation: <m>\mathbb E[\text{extremum}]</m> and <m>\mathbb E[S_T]</m>, simulated and exact.</p>
+            <div class="defile"><table id="t-dec"><thead><tr><th>term</th><th>simulated</th><th>exact</th></tr></thead><tbody></tbody></table></div></div>
         </div>
         <div class="carte-res">
-          <h2>Trajectoires et extrema courants</h2>
-          <p class="aide">Quelques chemins avec leur minimum (call) ou maximum (put) courant : le gain du lookback est l'écart final
-            entre la trajectoire et son extremum. Illustration.</p>
+          <h2>Paths and running extrema</h2>
+          <p class="aide">A few paths with their running minimum (call) or maximum (put): the lookback payoff is the final gap between
+            the path and its extremum. Illustration.</p>
           <div class="graphe haut" id="g-traj"></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============================== Δ CONSTANT ============================== -->
+  <!-- ============================== CONSTANT DELTA ============================== -->
   <section class="vue" id="homogene" hidden>
     <div class="remarque">
-      <h2>Remarque : pourquoi le Δ d'un lookback flottant est constant à l'émission</h2>
-      <p>Sous Black-Scholes, toute la trajectoire est proportionnelle au spot : S<sub>t</sub> = S · exp((r − q − σ²/2) t + σ W<sub>t</sub>).
-        À l'émission, l'extremum de départ est le spot lui-même, donc <b>S se met en facteur de tout le gain</b> :</p>
-      <div class="formule">S_T − min S = S · ( S_T/S − min S/S )      ⇒      V(S) = S · f(r, q, σ, T)</div>
-      <p>où f ne dépend pas de S. Le prix est <b>linéaire en S</b> (homogène de degré 1), d'où :</p>
+      <h2>Remark: why the Δ of a floating-strike lookback is constant at issue</h2>
+      <p>Under Black-Scholes the whole path is proportional to the spot: <m>S_t=S\,e^{(r-q-\sigma^2/2)t+\sigma W_t}</m>. At issue the
+        starting extremum is the spot itself, so <b>S factors out of the whole payoff</b>:</p>
+      <md>S_T-\min_{[0,T]}S=S\Big(\tfrac{S_T}{S}-\min_{[0,T]}\tfrac{S_t}{S}\Big)\quad\Longrightarrow\quad V(S)=S\,f(r,q,\sigma,T),</md>
+      <p>where <m>f</m> does not depend on <m>S</m>. The issue price is <b>linear in S</b> (homogeneous of degree 1), hence:</p>
       <ul>
-        <li><b>Δ = ∂V/∂S = f = V/S</b> : le même quel que soit le spot ; il se lit directement sur le prix, sans différences finies ;</li>
-        <li><b>Γ = 0</b> : la valeur de Γ que renvoient les moteurs Monte-Carlo n'est que du bruit autour de zéro ;</li>
-        <li><b>Vega, ρ et Θ sont proportionnels à S</b> : doubler le spot double toutes les autres grecques.</li>
+        <li><b><m>\Delta=\partial V/\partial S=f=V/S</m></b>: the same for every spot; it is read directly from the price, with no finite
+          difference;</li>
+        <li><b>Vega, ρ and Θ are proportional to S</b>: doubling the spot doubles every other Greek;</li>
+        <li>the second derivative of the issue price <m>S\mapsto V(S)</m> is zero, which is what the engines report: they bump the
+          spot <em>and</em> the starting extremum together, and on common random numbers each path's payoff is itself linear in
+          <m>S</m>, so their Γ is exactly zero up to rounding.</li>
       </ul>
-      <p>En cours de vie, l'extremum déjà observé m ne bouge pas avec le spot : V(S, m) = S · g(m/S) reste homogène en (S, m) mais plus
-        en S seul. Par Euler, V = S ∂V/∂S + m ∂V/∂m, donc <b>Δ = V/S − (m/S) ∂V/∂m</b> varie avec le spot et <b>Γ ≠ 0</b>.</p>
-      <p class="phrase">En une phrase : « À l'émission, le prix d'un lookback flottant est homogène de degré 1 en S : on peut sortir S de
-        l'espérance, donc Δ = V/S est constant et Γ = 0 ; en cours de vie, l'extremum déjà observé casse cette invariance d'échelle. »</p>
+      <p><b>A subtlety for hedging.</b> Once the option is held, the extremum <m>m</m> is fixed and the price is <m>V(S,m)=S\,g(m/S)</m>,
+        homogeneous in <m>(S,m)</m> jointly. By Euler, <m>V=S\,\partial_SV+m\,\partial_mV</m>, so
+        <m>\Delta=V/S-(m/S)\,\partial_mV</m>. At <m>m=S</m>, <m>\partial_mV=0</m> (the path immediately sets a new extremum, so the
+        old one no longer matters): <b>the hedging Δ is still V/S</b>. But the hedging Γ is
+        <m>\partial_{SS}V=g''(1)/S</m>, <b>not zero</b>: 0.0312 for the put and 0.0455 for the call at <m>S=100</m>, <m>r=5\,\%</m>,
+        <m>\sigma=20\,\%</m>, <m>T=1</m>. The chart "Γ" shows both.</p>
+      <p class="phrase">In one sentence: "At issue the price of a floating-strike lookback is homogeneous of degree 1 in S: S comes out of
+        the expectation, so Δ = V/S is constant; the issue price has no curvature, but a contract already held, whose extremum stays
+        fixed, does — its Γ is g''(1)/S > 0."</p>
     </div>
     <div class="espace" style="margin-top:20px">
       <aside class="panneau reglages">
-        <p class="aide" style="margin-top:0">Type, taux, dividende, volatilité et maturité : ceux de l'onglet Pricer. Les graphes se calculent à
-          l'ouverture de l'onglet (formule fermée et Monte-Carlo du pont exact).</p>
-        <div class="champ"><label for="h-s0">Spot de référence S<sub>0</sub></label><input type="number" id="h-s0" value="100"></div>
-        <div class="champ"><label for="h-min">Spot minimum</label><input type="number" id="h-min" value="50"></div>
-        <div class="champ"><label for="h-max">Spot maximum</label><input type="number" id="h-max" value="150"></div>
-        <div class="champ"><label for="h-ext" id="h-ext-l">Extremum observé (en cours de vie)</label><input type="number" id="h-ext" value="110"></div>
-        <p class="aide">Pour le cas en cours de vie : un minimum ≤ au spot pour le call, un maximum ≥ au spot pour le put.</p>
-        <div class="btns"><button type="button" class="btn" id="h-go">Recalculer</button></div>
+        <p class="aide" style="margin-top:0">Type, rate, dividend, volatility and maturity: those of the Pricer tab. The charts are computed when
+          the tab is opened (closed form and exact-bridge Monte Carlo).</p>
+        <div class="champ"><label for="h-s0">Reference spot S<sub>0</sub></label><input type="number" id="h-s0" value="100"></div>
+        <div class="champ"><label for="h-min">Lowest spot</label><input type="number" id="h-min" value="50"></div>
+        <div class="champ"><label for="h-max">Highest spot</label><input type="number" id="h-max" value="150"></div>
+        <div class="champ"><label for="h-ext" id="h-ext-l">Observed extremum (seasoned)</label><input type="number" id="h-ext" value="110"></div>
+        <p class="aide">For the seasoned case: a minimum ≤ the spot for the call, a maximum ≥ the spot for the put.</p>
+        <div class="btns"><button type="button" class="btn" id="h-go">Recompute</button></div>
         <div class="etat" id="h-etat"></div>
       </aside>
       <div class="resultats">
         <div class="grille-res">
-          <div class="carte-res"><h2>1. À l'émission, le prix est une droite</h2>
-            <p class="aide">V(S) = S · f : une droite qui passe par l'origine. En cours de vie (extremum fixé), la courbe se courbe.</p>
+          <div class="carte-res"><h2>1. At issue the price is a straight line</h2>
+            <p class="aide"><m>V(S)=S\,f</m>: a line through the origin. For a seasoned option (extremum fixed) the curve bends.</p>
             <div class="graphe haut" id="g-h-prix"></div></div>
-          <div class="carte-res"><h2>2. Le Δ est constant, égal à V/S</h2>
-            <p class="aide">Δ par différences finies sur la formule fermée, et V/S : les deux se confondent à l'émission. En cours de vie, Δ varie.</p>
+          <div class="carte-res"><h2>2. Δ is constant and equals V/S</h2>
+            <p class="aide">Δ by finite differences on the closed form, and <m>V/S</m>: they coincide at issue. For a seasoned option, Δ varies.</p>
             <div class="graphe haut" id="g-h-delta"></div></div>
-          <div class="carte-res"><h2>3. Γ est nul à l'émission</h2>
-            <p class="aide">Γ par différences finies : nul à l'émission, positif en cours de vie.</p>
+          <div class="carte-res"><h2>3. Γ: the issue price against a contract held</h2>
+            <p class="aide">Second derivative of the issue price <m>V(S,S)</m>: zero. Γ of a contract held from issue (extremum fixed at
+              <m>m=S</m>): <m>g''(1)/S&gt;0</m>. Seasoned contract with the extremum above: positive as well.</p>
             <div class="graphe haut" id="g-h-gamma"></div></div>
-          <div class="carte-res"><h2>4. Les autres grecques sont proportionnelles à S</h2>
-            <p class="aide">Vega, ρ et Θ divisés par S : constants à l'émission.</p>
+          <div class="carte-res"><h2>4. The other Greeks are proportional to S</h2>
+            <p class="aide">Vega, ρ and Θ divided by <m>S</m>: constant at issue.</p>
             <div class="graphe haut" id="g-h-autres"></div></div>
         </div>
         <div class="carte-res">
-          <h2>Contrôle sur le Monte-Carlo</h2>
-          <p class="aide">Pont exact, mêmes réglages que l'onglet Pricer : le Δ estimé par bump coïncide avec V/S estimé sur les mêmes chemins.</p>
-          <div class="defile"><table id="t-h"><thead><tr><th>spot</th><th>V (MC)</th><th>V/S (MC)</th><th>Δ par bump (MC)</th><th>Δ formule</th><th>Γ (MC)</th></tr></thead><tbody></tbody></table></div>
+          <h2>Check on the Monte Carlo</h2>
+          <p class="aide">Exact bridge, same settings as the Pricer tab: the Δ estimated by bumping coincides with <m>V/S</m> estimated on the
+            same paths, and the bumped Γ is zero up to rounding.</p>
+          <div class="defile"><table id="t-h"><thead><tr><th>spot</th><th>V (MC)</th><th>V/S (MC)</th><th>Δ by bump (MC)</th><th>Δ closed form</th><th>Γ (MC)</th><th>Γ held (closed form)</th></tr></thead><tbody></tbody></table></div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============================== COURBES ============================== -->
+  <!-- ============================== CURVES ============================== -->
   <section class="vue" id="courbes" hidden>
     <div class="espace">
       <aside class="panneau reglages">
-        <p class="aide" style="margin-top:0">Comme la feuille « CurveData » de l'Excel : une grandeur en fonction d'une entrée, les
-          autres restant celles de l'onglet Pricer.</p>
-        <div class="champ"><label for="cx">Variable en abscisse</label><select id="cx"><option value="spot">Spot S</option><option value="vol">Volatilité σ</option><option value="rate">Taux r</option><option value="q">Dividende q</option><option value="ttm">Maturité T</option></select></div>
+        <p class="aide" style="margin-top:0">Like the "CurveData" sheet of the Excel workbook: one quantity as a function of one input, the
+          others being those of the Pricer tab.</p>
+        <div class="champ"><label for="cx">Variable on the x-axis</label><select id="cx"><option value="spot">Spot S</option><option value="vol">Volatility σ</option><option value="rate">Rate r</option><option value="q">Dividend q</option><option value="ttm">Maturity T</option></select></div>
         <div class="champ"><label for="cmin">Minimum</label><input type="number" id="cmin" value="80"></div>
         <div class="champ"><label for="cmax">Maximum</label><input type="number" id="cmax" value="120"></div>
-        <div class="champ"><label for="cn">Nombre de points</label><input type="number" id="cn" value="20"></div>
-        <div class="champ"><label for="cm1">Graphe 1</label><select id="cm1"></select></div>
-        <div class="champ"><label for="cm2">Graphe 2</label><select id="cm2"></select></div>
-        <label class="case"><input type="checkbox" id="c-cond" checked> Pont brownien exact</label>
-        <label class="case"><input type="checkbox" id="c-bgk" checked> Schéma en temps</label>
-        <label class="case"><input type="checkbox" id="c-an" checked> Formule fermée</label>
-        <p class="aide">Option en cours de vie et spot en abscisse : l'extremum observé reste fixe, le spot varie.</p>
-        <div class="btns"><button type="button" class="btn" id="c-go">Tracer</button></div>
+        <div class="champ"><label for="cn">Number of points</label><input type="number" id="cn" value="20"></div>
+        <div class="champ"><label for="cm1">Chart 1</label><select id="cm1"></select></div>
+        <div class="champ"><label for="cm2">Chart 2</label><select id="cm2"></select></div>
+        <label class="case"><input type="checkbox" id="c-cond" checked> Exact Brownian bridge</label>
+        <label class="case"><input type="checkbox" id="c-bgk" checked> Time stepping</label>
+        <label class="case"><input type="checkbox" id="c-an" checked> Closed form</label>
+        <p class="aide">Seasoned option with the spot on the x-axis: the observed extremum stays fixed and the spot moves.</p>
+        <div class="btns"><button type="button" class="btn" id="c-go">Plot</button></div>
         <progress id="c-prog" max="1" value="0" hidden></progress>
         <div class="etat" id="c-etat"></div>
       </aside>
       <div class="resultats">
-        <div class="carte-res"><h2 id="c-t1">Prix</h2><div class="graphe haut" id="g-c1"></div></div>
+        <div class="carte-res"><h2 id="c-t1">Price</h2><div class="graphe haut" id="g-c1"></div></div>
         <div class="carte-res"><h2 id="c-t2">Delta</h2><div class="graphe haut" id="g-c2"></div></div>
       </div>
     </div>
@@ -216,88 +230,129 @@
   <section class="vue" id="convergence" hidden>
     <div class="espace">
       <aside class="panneau reglages">
-        <h3>Convergence en nombre de chemins</h3>
-        <div class="champ"><label for="v-ch">Chemins</label><input type="text" id="v-ch" value="1000 2000 5000 10000 20000 50000 100000"></div>
-        <h3>Biais de discrétisation</h3>
-        <div class="champ"><label for="v-pas">Pas de temps</label><input type="text" id="v-pas" value="5 10 25 50 100 250"></div>
-        <div class="champ"><label for="v-pch">Chemins par point</label><input type="number" id="v-pch" value="20000"></div>
-        <p class="aide">Un extremum relevé à dates discrètes manque le vrai extremum entre deux dates. BGK le décale de
-          e<sup>±β σ √Δt</sup> (approximation) ; le pont par pas tire l'extremum exact entre deux dates (sans biais).</p>
-        <div class="btns"><button type="button" class="btn" id="v-go">Lancer</button></div>
+        <h3>Convergence in the number of paths</h3>
+        <div class="champ"><label for="v-ch">Paths</label><input type="text" id="v-ch" value="1000 2000 5000 10000 20000 50000 100000"></div>
+        <h3>Discretisation bias</h3>
+        <div class="champ"><label for="v-pas">Time steps</label><input type="text" id="v-pas" value="5 10 25 50 100 250"></div>
+        <div class="champ"><label for="v-pch">Paths per point</label><input type="number" id="v-pch" value="20000"></div>
+        <p class="aide">An extremum read at discrete dates misses the true extremum between two dates. BGK shifts it by
+          <m>e^{\pm\beta\sigma\sqrt{\Delta t}}</m> (an approximation); the bridge per step draws the exact extremum between two dates
+          (no bias).</p>
+        <div class="btns"><button type="button" class="btn" id="v-go">Run</button></div>
         <progress id="v-prog" max="1" value="0" hidden></progress>
         <div class="etat" id="v-etat"></div>
       </aside>
       <div class="resultats">
-        <div class="carte-res"><h2>Prix contre nombre de chemins</h2><p class="aide">Bandes : intervalles de confiance à 95 %.</p><div class="graphe haut" id="g-v1"></div></div>
-        <div class="carte-res"><h2>Biais de discrétisation selon la correction</h2><div class="graphe haut" id="g-v2"></div></div>
+        <div class="carte-res"><h2>Price against the number of paths</h2><p class="aide">Bands: 95 % confidence intervals.</p><div class="graphe haut" id="g-v1"></div></div>
+        <div class="carte-res"><h2>Discretisation bias by correction</h2><div class="graphe haut" id="g-v2"></div></div>
       </div>
     </div>
   </section>
 
-  <!-- ============================== MÉTHODE ============================== -->
-  <section class="vue texte" id="methode" hidden>
-    <h2>Le contrat</h2>
-    <p>Lookback européen à strike flottant sous Black-Scholes avec dividende continu q :</p>
-    <div class="formule">call : S_T − min(m, min_{t≤s≤T} S_s)        put : max(M, max_{t≤s≤T} S_s) − S_T</div>
-    <p>où m (ou M) est l'extremum déjà atteint ; à l'émission, m = M = S.</p>
+  <!-- ============================== THEORY ============================== -->
+  <section class="vue texte" id="theorie" hidden>
+    <ul class="sommaire">
+      <li><a href="#theorie/l-contrat">1. Contract</a></li><li><a href="#theorie/l-loi">2. Law of the extremum</a></li>
+      <li><a href="#theorie/l-ferme">3. Closed form</a></li><li><a href="#theorie/l-homog">4. Homogeneity and Greeks</a></li>
+      <li><a href="#theorie/l-pont">5. Exact bridge</a></li><li><a href="#theorie/l-pas">6. Time stepping and BGK</a></li>
+      <li><a href="#theorie/l-grecques">7. Monte Carlo Greeks</a></li><li><a href="#theorie/l-revue">8. Code review</a></li>
+      <li><a href="#theorie/l-valid">9. Validation</a></li><li><a href="rapport/report.pdf">Full report (PDF)</a></li>
+    </ul>
 
-    <h2>Moteur A — pont brownien exact en un pas (Barnicha)</h2>
-    <p>On tire X<sub>T</sub> = log S<sub>T</sub> exactement, puis l'extremum du pont brownien entre X<sub>t</sub> et X<sub>T</sub> :</p>
-    <div class="formule">P( max X ≤ y | X_t, X_T ) = 1 − exp( −2 (y − X_t)(y − X_T) / (σ² τ) )</div>
-    <p>dont l'inversion est une équation du second degré : un seul pas, <b>aucun biais de discrétisation</b>.</p>
+    <h2 id="l-contrat">1. The contract</h2>
+    <p>A European floating-strike lookback, under Black-Scholes with continuous dividend <m>q</m> (carry <m>b=r-q</m>):</p>
+    <md>\text{call: }S_T-\min\Big(m,\min_{t\le s\le T}S_s\Big),\qquad \text{put: }\max\Big(M,\max_{t\le s\le T}S_s\Big)-S_T,</md>
+    <p>where <m>m</m> (or <m>M</m>) is the extremum already reached; at issue, <m>m=M=S</m>. The holder buys at the lowest price
+      (call) or sells at the highest (put) over the life of the option: the payoff is always non-negative.</p>
 
-    <h2>Moteur B — schéma en temps (Chivet)</h2>
-    <p>Trajectoires sur N pas, extremum relevé aux dates de la grille, donc biaisé. Trois choix ici :</p>
+    <h2 id="l-loi">2. The law of the running extremum</h2>
+    <p>Write <m>X_t=\ln(S_t/S)=\mu t+\sigma W_t</m>, <m>\mu=b-\sigma^2/2</m>, and <m>M_T=\max_{[0,T]}X</m>. The reflection principle,
+      with a Girsanov change of measure to remove the drift, gives</p>
+    <md>\mathbb P(M_T\le y)=\Phi\!\left(\frac{y-\mu T}{\sigma\sqrt T}\right)-e^{2\mu y/\sigma^2}\,\Phi\!\left(\frac{-y-\mu T}{\sigma\sqrt T}\right),\qquad y\ge0,</md>
+    <p>and, conditionally on the end point, the <b>Brownian bridge</b> law, which does not depend on the drift:</p>
+    <md>\mathbb P\big(M_\tau\ge y\,\big|\,X_0=x_0,\,X_\tau=x_1\big)=\exp\!\left(-\frac{2(y-x_0)(y-x_1)}{\sigma^2\tau}\right),\qquad y\ge\max(x_0,x_1).</md>
+    <p>The page plots the first one against the simulated extrema; the second one is the heart of both Monte Carlo engines.</p>
+
+    <h2 id="l-ferme">3. Closed form (Goldman, Sosin and Gatto)</h2>
+    <p>Since <m>V^{\text{put}}=e^{-rT}\,\mathbb E\big[\max(M,S\,e^{M_T})\big]-S\,e^{-qT}</m>, integrating against the law above gives, with
+      <m>b_1=\frac{\ln(S/M)+(b+\sigma^2/2)T}{\sigma\sqrt T}</m> and <m>b_2=b_1-\sigma\sqrt T</m>,</p>
+    <md>V^{\text{put}}=-S\,e^{(b-r)T}\Phi(-b_1)+M e^{-rT}\Phi(-b_2)+S\,e^{-rT}\frac{\sigma^2}{2b}\Big[-\Big(\frac SM\Big)^{-2b/\sigma^2}\Phi\Big(b_1-\frac{2b}{\sigma}\sqrt T\Big)+e^{bT}\Phi(b_1)\Big],</md>
+    <p>and symmetrically for the call. The limit <m>b\to0</m> is finite (the page averages <m>b=\pm10^{-6}</m>; the Barnicha code has the
+      exact limit). At issue and without dividend, each engine uses its own code's formula; the general form agrees to
+      <m>10^{-10}</m>.</p>
+
+    <h2 id="l-homog">4. Homogeneity and the Greeks</h2>
+    <p>Because the dynamics is multiplicative, <m>V(\lambda S,\lambda m)=\lambda V(S,m)</m>. Hence <m>V=S\,\partial_SV+m\,\partial_mV</m>
+      (Euler) and, since <m>\partial_mV=0</m> at <m>m=S</m>, <b><m>\Delta=V/S</m> at issue</b>, whether one differentiates the issue
+      price or the contract held. Writing <m>V(S,m)=S\,g(m/S)</m>,</p>
+    <md>\Delta=g(z)-z\,g'(z),\qquad\Gamma=\frac{z^2g''(z)}{S},\qquad z=\frac mS,</md>
+    <p>so at issue <m>\Delta=g(1)</m> and the hedging Γ is <m>g''(1)/S&gt;0</m>, while the issue price <m>S\mapsto S\,g(1)</m> is a straight
+      line. Vega, ρ and Θ are proportional to <m>S</m>. See the "Constant Δ" tab.</p>
+
+    <h2 id="l-pont">5. Engine A: exact Brownian bridge in one step (Barnicha)</h2>
+    <p>Draw <m>X_T=\mu T+\sigma\sqrt T\,Z</m> exactly, then the extremum of the bridge by inverting the law above with a uniform
+      <m>U</m>:</p>
+    <md>M_T=\tfrac12\Big(X_T+\sqrt{X_T^2-2\sigma^2T\ln U}\Big),\qquad m_T=\tfrac12\Big(X_T-\sqrt{X_T^2-2\sigma^2T\ln U'}\Big).</md>
+    <p>One step, <b>no discretisation bias</b>, and the antithetic pair <m>(Z,-Z)</m> divides the variance by about 2 (standard error
+      ÷ 1.42 on the default case).</p>
+
+    <h2 id="l-pas">6. Engine B: time stepping, BGK and the bridge per step (Chivet)</h2>
+    <p>Paths on <m>n</m> steps of length <m>\Delta t=T/n</m>, extremum read at the grid dates: it misses the excursions between dates, a
+      bias of order <m>\sqrt{\Delta t}</m> (<m>-1.25</m> on a price of 14.29 with 100 steps). Three choices:</p>
     <ul>
-      <li><b>sans correction</b> : la surveillance discrète, telle quelle ;</li>
-      <li><b>BGK</b> (le C++) : extremum décalé de e<sup>β σ √Δt</sup>, β = −ζ(½)/√(2π) ≈ 0,5826, une approximation asymptotique ;</li>
-      <li><b>pont exact par pas</b> (ajouté) : sur chaque pas, l'extremum du pont brownien est tiré avec la loi ci-dessus.
-        Le schéma devient exact pour la surveillance continue, quel que soit le nombre de pas.</li>
+      <li><b>no correction</b>: discrete monitoring, as is;</li>
+      <li><b>BGK</b> (the C++, Broadie, Glasserman and Kou): <m>\max S\leftarrow e^{\beta\sigma\sqrt{\Delta t}}\max S</m> with
+        <m>\beta=-\zeta(\tfrac12)/\sqrt{2\pi}\approx0.5826</m>, an asymptotic correction whose residual bias is of order
+        <m>\Delta t</m>;</li>
+      <li><b>exact bridge per step</b> (added): on each step, the bridge extremum is drawn from the law of section 2. The scheme is then
+        exact for continuous monitoring, whatever the number of steps.</li>
     </ul>
 
-    <h2>Formule fermée</h2>
-    <p>Goldman-Sosin-Gatto, avec portage b = r − q et extremum observé (forme générale de Haug). À l'émission et sans dividende,
-      la page utilise la formule du code de chaque moteur ; la forme générale la retrouve à 10<sup>−10</sup> près, y compris
-      pour r = 0.</p>
-    <p>Propriété utile : le prix est homogène de degré 1 en (S, m). À l'émission, V = S · f(r, q, σ, T), donc
-      <b>Δ = V/S et Γ = 0</b> exactement : le Γ Monte-Carlo n'y est que du bruit. En cours de vie, Γ ≠ 0.</p>
+    <h2 id="l-grecques">7. Monte Carlo Greeks</h2>
+    <p>Greeks are computed by bump and revalue with <b>common random numbers</b>: the bumped prices reuse the same draws, so for a
+      payoff Lipschitz in the parameter the variance of <m>(V(\theta+h)-V(\theta-h))/2h</m> stays bounded as <m>h\to0</m> instead of growing
+      like <m>1/h^2</m>. At issue each path's payoff is linear in <m>S</m>, so the bumped Δ equals <m>V/S</m> path by path and the bumped
+      Γ is zero up to rounding.</p>
 
-    <h2>Revue du code : défauts relevés</h2>
+    <h2 id="l-revue">8. Code review: defects found</h2>
     <ul class="revue">
-      <li><b>Le programme Barnicha ne compile pas</b> : <code>Barnicha/app/main.cpp</code> fait <code>using namespace lookback;</code>
-        alors que le namespace s'appelle <code>Barnicha</code>. C'est l'exécutable que les macros de l'Excel appellent.</li>
-      <li><b>Chivet ignore la graine</b> : <code>getRandomSeed()</code> renvoie l'horloge, deux calculs identiques diffèrent. Ici, la
-        graine saisie est utilisée.</li>
-      <li><b>Chivet : tirages communs imparfaits</b>. <code>setRandomSeed</code> réamorce le générateur, mais la loi normale garde
-        la valeur mise en réserve par la méthode polaire : les prix décalés ne partent pas des mêmes nombres, ce qui ajoute du
-        bruit aux grecques. Ici, la loi repart de zéro à chaque prix.</li>
-      <li><b>Chivet : erreur standard du ρ fausse</b>. L'estimation divise par 2·bump·r, l'erreur standard seulement par 2·bump.
-        Corrigé ici.</li>
-      <li><b>Chivet : Γ fermé quatre fois trop petit</b>. Divisé par (S·0,0002)² au lieu de (S·0,0001)² ; invisible à l'émission,
-        où Γ = 0. Corrigé ici.</li>
-      <li><b>Chivet : r = 0 interdit</b>. Le bump relatif sur r et la formule fermée (division par 2r) ne sont pas définis :
-        la page affiche « non défini ». Le moteur Barnicha traite la limite r → 0.</li>
-      <li><b>Conventions de Θ opposées</b> : Barnicha calcule (V(T−h) − V(T))/h, d'un seul côté ; Chivet calcule +∂V/∂T, centré.
-        Option ici : Θ centré pour Barnicha.</li>
-      <li><b>Barnicha tire u<sub>max</sub> et u<sub>min</sub> indépendamment</b> : juste pour ces contrats, qui n'utilisent qu'un
-        des deux extrema. Pour un payoff qui utilise les deux (max − min), il faudrait leur loi jointe.</li>
-      <li><b><code>out_size</code> jamais renseigné</b> par les deux fonctions exportées : l'appelant doit connaître la taille (48).</li>
+      <li><b>The Barnicha program does not compile</b>: <code>Barnicha/app/main.cpp</code> has <code>using namespace lookback;</code>
+        while the namespace is called <code>Barnicha</code>. It is the executable the Excel macros call.</li>
+      <li><b>Chivet ignores the seed</b>: <code>getRandomSeed()</code> returns the clock, so two identical runs differ. Here the seed
+        entered is used.</li>
+      <li><b>Chivet: imperfect common random numbers</b>. <code>setRandomSeed</code> reseeds the generator, but the normal law keeps
+        the value held in reserve by the polar method: bumped prices do not start from the same numbers, which adds noise to the
+        Greeks. Here the law restarts at each price.</li>
+      <li><b>Chivet: wrong standard error of ρ</b>. The estimate divides by <m>2\,h\,r</m>, the standard error only by <m>2h</m>.
+        Fixed here.</li>
+      <li><b>Chivet: closed-form Γ four times too small</b>. Divided by <m>(0.0002\,S)^2</m> instead of <m>(0.0001\,S)^2</m>; invisible
+        at issue, where the issue-price Γ is 0. Fixed here.</li>
+      <li><b>Chivet: r = 0 not allowed</b>. The relative bump on <m>r</m> and the closed form (division by <m>2r</m>) are undefined: the
+        page shows "undefined". The Barnicha engine handles the limit <m>r\to0</m>.</li>
+      <li><b>Opposite Θ conventions</b>: Barnicha computes <m>(V(T-h)-V(T))/h</m>, one-sided; Chivet <m>+\partial V/\partial T</m>,
+        centred. Option here: centred Θ for Barnicha.</li>
+      <li><b>Γ at issue is not the hedging Γ</b>: both engines bump the spot and the starting extremum together, which gives the
+        curvature of the issue price (zero), not that of a contract held (<m>g''(1)/S</m>). The seasoned mode gives the latter.</li>
+      <li><b>Barnicha draws <m>u_{\max}</m> and <m>u_{\min}</m> independently</b>: correct for these contracts, which use only one of the
+        two extrema. A payoff using both (max − min) would need their joint law.</li>
+      <li><b><code>out_size</code> is never set</b> by the two exported functions: the caller must know the size (48).</li>
     </ul>
 
-    <h2>Validation du portage</h2>
-    <p>Le générateur <code>std::mt19937</code> et les lois de libstdc++ sont reproduits bit à bit. Avec la même graine, le moteur
-      Barnicha donne les prix du programme C++ compilé avec g++ à 10<sup>−15</sup> près. Le moteur Chivet donne de même les prix
-      du simulateur C++ (sans BGK et avec BGK) à 10<sup>−12</sup> près. Les grecques de la formule fermée sont celles de
-      l'Excel à 10<sup>−10</sup> près. Avec dividende ou en cours de vie, le Monte-Carlo retrouve la formule générale dans son
-      intervalle de confiance. Le pont par pas n'a aucun biais visible, même avec 5 pas.</p>
+    <h2 id="l-valid">9. Validation of the port</h2>
+    <p>The generator <code>std::mt19937</code> and libstdc++'s distributions are reproduced bit for bit. With the same seed, the
+      Barnicha engine returns the prices of the C++ program compiled with g++ to <m>10^{-15}</m>, and the Chivet engine those of the C++
+      simulator (with and without BGK) to <m>10^{-12}</m>. The closed-form Greeks are those of the Excel workbook to <m>10^{-10}</m>.
+      With a dividend or a seasoned extremum, the Monte Carlo recovers the general formula within its confidence interval, and the
+      bridge per step shows no visible bias even with 2 steps. The <a href="rapport/report.pdf">full report</a> gives the proofs
+      and the numerical study.</p>
   </section>
 
   <section class="vue" id="code" hidden></section>
 </main>
 
 <footer><div class="page">
-  <span>© 2026 Mohammed-Yassine Barnicha et coauteur · licence MIT · calcul dans le navigateur</span>
-  <span><a href="https://github.com/yassinebarnicha/Lookback_Options_Pricer">Dépôt d'origine</a></span>
+  <span>© 2026 Mohammed-Yassine Barnicha and co-author · MIT licence · computed in the browser</span>
+  <span><a href="rapport/report.pdf">Report (PDF)</a> · <a href="https://github.com/yassinebarnicha/Lookback_Options_Pricer">Original repository</a></span>
 </div></footer>
 
 <script>
@@ -310,28 +365,28 @@
 /*__LB__*/
 </script>
 <script type="text/plain" id="src-travail">
-// ---- fil de calcul : appelle LB.priceLookback (portage de la DLL) ----
+// ---- worker thread: calls LB.priceLookback (port of the DLL) ----
 function appel(method, p, s) {
   const q = Object.assign({}, p, s || {});
   return LB.priceLookback(method, q.ttm, q.type, q.spot, q.rate, q.vol, method === 1 ? q.pc : q.pb, q.steps, method === 1 ? q.seed : q.seedb,
     q.stderr, q.corr === "bgk", {q: q.q, extremum: q.vie ? q.ext : null, antithetique: q.anti, thetaCentre: q.thc, correction: q.corr, beta: q.beta,
       bumpsBarnicha: q.bB, bumpsChivet: q.bC});
 }
-// graphes descriptifs : détail du pont exact chemin par chemin
+// descriptive charts: path-by-path detail of the exact bridge
 function descriptif(p) {
   const n = Math.min(p.pc, 50000), t = LB.tiragesPont(n, p.seed >>> 0), put = p.type === 1;
   const m = {put, S: p.spot, r: p.rate, q: p.q, sig: p.vol, T: p.ttm, ext: p.vie ? p.ext : null};
   const d = LB.detailPont(t, m), mu = p.rate - p.q - 0.5 * p.vol * p.vol;
   const quantile = (a, u) => { const s = Float64Array.from(a).sort(); return s[Math.min(s.length - 1, Math.max(0, Math.floor(u * (s.length - 1))))]; };
-  // gains
+  // payoffs
   const gmax = quantile(d.gain, 0.995) || 1, nb = 40, w = gmax / nb, hg = new Array(nb).fill(0);
   let sg = 0; for (const v of d.gain) { sg += v; const j = Math.floor(v / w); if (j >= 0 && j < nb) hg[j]++; }
-  // extremum (log) : histogramme et densité exacte par bin
+  // extremum (log): histogram and exact density per bin
   const lo = put ? 0 : quantile(d.le, 0.003), hi = put ? quantile(d.le, 0.997) : 0, ne = 50, we = (hi - lo) / ne, he = new Array(ne).fill(0);
   for (const v of d.le) { const j = Math.floor((v - lo) / we); if (j >= 0 && j < ne) he[j]++; }
   const F = y => LB.repartitionExtremum(put, y, mu, p.vol, p.ttm);
   const theo = he.map((_, j) => { const a = lo + j * we, b = a + we; return (put ? F(b) - F(a) : F(a) - F(b)) / we; });
-  // décomposition : E[e^{-rT} ext], E[e^{-rT} S_T]
+  // decomposition: E[e^{-rT} ext], E[e^{-rT} S_T]
   const disc = Math.exp(-p.rate * p.ttm); let se = 0, ss = 0;
   for (let i = 0; i < n; i++) { let ext = p.spot * Math.exp(d.le[i]); if (m.ext != null) ext = put ? Math.max(ext, m.ext) : Math.min(ext, m.ext); se += disc * ext; ss += disc * p.spot * Math.exp(d.lx[i]); }
   const k = Math.min(n, 1500);
@@ -340,7 +395,7 @@ function descriptif(p) {
     nuage: {x: Array.from(d.lx.slice(0, k)), y: Array.from(d.le.slice(0, k))}, eExt: se / n, eST: ss / n,
     eSTexact: p.spot * Math.exp(-p.q * p.ttm)};
 }
-// homogénéité : grecques de la formule fermée le long du spot, à l'émission et en cours de vie, et contrôle Monte-Carlo
+// homogeneity: closed-form Greeks along the spot, at issue and seasoned, and Monte Carlo check
 function homogene(p, e) {
   const put = p.type === 1, F = (S, ext) => LB.prixFermeGeneral(put, S, ext == null ? S : ext, p.rate, p.q, p.vol, p.ttm);
   const greques = (S, ext) => {
@@ -352,17 +407,19 @@ function homogene(p, e) {
     const theta = -(avecM({r: p.rate, sig: p.vol, T: p.ttm + ht}) - avecM({r: p.rate, sig: p.vol, T: Math.max(1e-8, p.ttm - ht)})) / (2 * ht);
     return {V, delta: (Vu - Vd) / (2 * h), gamma: (Vu - 2 * V + Vd) / (h * h), vega, rho, theta};
   };
-  const xs = [], emis = [], vie = [];
+  // Γ of a contract held from issue: extremum fixed at m = S, second derivative one-sided (the spot can only move away from m)
+  const gammaTenu = S => { const h = S * 1e-3, sg = put ? -1 : 1, f = k => F(S + sg * k * h, S); return (2 * f(0) - 5 * f(1) + 4 * f(2) - f(3)) / (h * h); };
+  const xs = [], emis = [], vie = [], tenu = [];
   for (let k = 0; k <= 60; k++) {
     const S = e.min + (e.max - e.min) * k / 60; xs.push(S);
-    emis.push(greques(S, null));
+    emis.push(greques(S, null)); tenu.push(gammaTenu(S));
     vie.push((put ? e.ext >= S : e.ext <= S) ? greques(S, e.ext) : null);
   }
   const mc = [0.5, 0.75, 1, 1.25, 1.5].map(f => {
     const S = e.s0 * f, R = LB.priceLookback(1, p.ttm, p.type, S, p.rate, p.vol, p.pc, 0, p.seed, true, false, {q: p.q, antithetique: p.anti, bumpsBarnicha: p.bB});
-    return {S, V: R[0], delta: R[4], gamma: R[8], dF: greques(S, null).delta};
+    return {S, V: R[0], delta: R[4], gamma: R[8], dF: greques(S, null).delta, gT: gammaTenu(S)};
   });
-  return {xs, emis, vie, mc};
+  return {xs, emis, vie, tenu, mc};
 }
 self.onmessage = ev => {
   const {id, type, p, e} = ev.data;
@@ -392,26 +449,26 @@ self.onmessage = ev => {
 "use strict";
 const $ = id => document.getElementById(id);
 const {lireNombre, listeNombres, differe} = UI;
-const GRANDEURS = ["Prix", "Delta", "Gamma", "Theta", "Rho", "Vega"];
+const GRANDEURS = ["Price", "Delta", "Gamma", "Theta", "Rho", "Vega"];
 ["cm1", "cm2"].forEach((s, k) => { $(s).innerHTML = GRANDEURS.map((g, i) => `<option value="${i}">${g}</option>`).join(""); $(s).value = k; });
 const DEFAUT = {type: "1", t0: "2026-01-01", t1: "2027-01-01", ttm: 1, spot: 100, rate: 0.05, q: 0, vol: 0.2, pc: 10000, seed: 42, pb: 10000, steps: 100, seedb: 42,
   corr: "aucune", beta: 0.5826, bS: 0.0001, br: 0.0001, bv: 0.0001, bT: 0.0001, cS: 0.001, cv: 0.001, cr: 0.0001, cT: 1 / 365, ext: 90,
   vie: false, anti: true, thc: false, stderr: true};
 
-// ---------- fil de calcul ----------
+// ---------- worker thread ----------
 const travail = UI.travailleur("src-lb", "src-travail");
 let num = 0; const attente = {};
 travail.onmessage = ev => { const m = ev.data, f = attente[m.id]; if (!f) return; if (m.progres != null) { f.p && f.p(m.progres); return; } delete attente[m.id]; f.r(m); };
 const demander = (type, p, e, prog) => new Promise(r => { const id = ++num; attente[id] = {r, p: prog}; travail.postMessage({id, type, p, e}); });
 
-// ---------- entrées ----------
+// ---------- inputs ----------
 const jours = (a, b) => (Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000;
 function majTtm() { const d = jours($("t0").value, $("t1").value); if (isFinite(d)) $("ttm").value = +(d / 365).toFixed(6); }
 $("t0").addEventListener("change", majTtm); $("t1").addEventListener("change", majTtm);
 function majVie() {
   const v = $("vie").checked, put = $("type").value === "1";
   $("ch-ext").hidden = !v; $("aide-ext").hidden = !v;
-  $("lb-ext").textContent = put ? "Maximum déjà observé" : "Minimum déjà observé";
+  $("lb-ext").textContent = put ? "Maximum already observed" : "Minimum already observed";
 }
 $("vie").addEventListener("change", majVie); $("type").addEventListener("change", () => {
   const S = lireNombre($("spot"), 100); if ($("vie").checked) $("ext").value = $("type").value === "1" ? Math.round(S * 1.1) : Math.round(S * 0.9); majVie(); });
@@ -427,62 +484,62 @@ function lire() {
     corr: $("corr").value, beta: N("beta", 0.5826), stderr: $("stderr").checked, anti: $("anti").checked, thc: $("thc").checked,
     vie: $("vie").checked, ext: N("ext", NaN),
     bB: {S: N("bS", 1e-4), r: N("br", 1e-4), sig: N("bv", 1e-4), T: N("bT", 1e-4)}, bC: {S: N("cS", 1e-3), sig: N("cv", 1e-3), r: N("cr", 1e-4), T: N("cT", 1 / 365)}};
-  if (!(p.ttm > 0)) throw new Error("la maturité doit être positive (T après T0)");
-  if (!(p.spot > 0)) throw new Error("le spot doit être positif");
-  if (!(p.vol > 0)) throw new Error("la volatilité doit être positive");
-  if (!isFinite(p.rate) || !isFinite(p.q)) throw new Error("taux ou dividende invalide");
-  if (p.vie && !(p.ext > 0)) throw new Error("extremum observé invalide");
-  if (p.vie && (p.type === 1 ? p.ext < p.spot : p.ext > p.spot)) throw new Error(p.type === 1 ? "le maximum déjà observé doit être ≥ au spot" : "le minimum déjà observé doit être ≤ au spot");
-  if (!(p.pc >= 10 && p.pc <= 2e6)) throw new Error("chemins du pont exact : entre 10 et 2 000 000");
-  if (!(p.pb >= 10 && p.pb <= 1e6)) throw new Error("chemins du schéma en temps : entre 10 et 1 000 000");
-  if (!(p.steps >= 1 && p.steps <= 10000)) throw new Error("pas de temps : entre 1 et 10 000");
-  if (p.pb * p.steps > 5e7) throw new Error("schéma en temps : chemins × pas limité à 50 millions (temps de calcul)");
-  for (const v of [...Object.values(p.bB), ...Object.values(p.bC)]) if (!(v > 0 && v < 0.5)) throw new Error("tailles de bump : entre 0 et 0,5");
+  if (!(p.ttm > 0)) throw new Error("the maturity must be positive (T after T0)");
+  if (!(p.spot > 0)) throw new Error("the spot must be positive");
+  if (!(p.vol > 0)) throw new Error("the volatility must be positive");
+  if (!isFinite(p.rate) || !isFinite(p.q)) throw new Error("invalid rate or dividend");
+  if (p.vie && !(p.ext > 0)) throw new Error("invalid observed extremum");
+  if (p.vie && (p.type === 1 ? p.ext < p.spot : p.ext > p.spot)) throw new Error(p.type === 1 ? "the maximum already observed must be ≥ the spot" : "the minimum already observed must be ≤ the spot");
+  if (!(p.pc >= 10 && p.pc <= 2e6)) throw new Error("exact-bridge paths: between 10 and 2,000,000");
+  if (!(p.pb >= 10 && p.pb <= 1e6)) throw new Error("time-stepping paths: between 10 and 1,000,000");
+  if (!(p.steps >= 1 && p.steps <= 10000)) throw new Error("time steps: between 1 and 10,000");
+  if (p.pb * p.steps > 5e7) throw new Error("time stepping: paths × steps limited to 50 million (computing time)");
+  for (const v of [...Object.values(p.bB), ...Object.values(p.bC)]) if (!(v > 0 && v < 0.5)) throw new Error("bump sizes: between 0 and 0.5");
   return p;
 }
 
 // ---------- pricer ----------
 const f = (v, d = 6) => !isFinite(v) ? "—" : (Math.abs(v) !== 0 && (Math.abs(v) < 1e-4 || Math.abs(v) >= 1e7) ? v.toExponential(3) : v.toFixed(d));
 const cellule = (a, i, mc) => { const est = a[i * 4], se = a[i * 4 + 1];
-  if (!isFinite(est)) return `<td class="vide">— <small>non défini</small></td>`;
+  if (!isFinite(est)) return `<td class="vide">— <small>undefined</small></td>`;
   return `<td>${f(est)}${mc ? `<small>± ${f(1.96 * se, 6)}</small>` : ""}</td>`; };
 let numCalcul = 0;
 async function calculer() {
   let p; try { p = lire(); } catch (err) { etat(err.message, "err"); return; }
   const moi = ++numCalcul;
-  etat("Calcul…");
+  etat("Computing…");
   const m = await demander("calcul", p);
   if (moi !== numCalcul) return;
   if (!m.ok) { etat(m.msg, "err"); return; }
   const {cond, bgk} = m.res;
   $("t-res").tBodies[0].innerHTML = GRANDEURS.map((g, i) => `<tr><td>${g}</td>${cellule(cond, i, true)}${cellule(cond, 6 + i, false)}${cellule(bgk, i, p.stderr || i === 0)}${cellule(bgk, 6 + i, false)}</tr>`).join("");
   const ref = cond[24];
-  $("k-f").textContent = f(ref); $("k-f-s").textContent = p.vie || p.q ? "Goldman-Sosin-Gatto général" : "Goldman-Sosin-Gatto";
-  $("k-c").textContent = f(cond[0]); $("k-c-s").textContent = `± ${f(1.96 * cond[1], 4)} · écart ${f(cond[0] - ref, 4)} · ${m.res.tc.toFixed(0)} ms`;
-  const nomCorr = {aucune: "", bgk: " · BGK", pont: " · pont par pas"}[p.corr];
-  $("k-b").textContent = f(bgk[0]); $("k-b-s").textContent = `± ${f(1.96 * bgk[1], 4)} · écart ${f(bgk[0] - ref, 4)}${nomCorr} · ${m.res.tb.toFixed(0)} ms`;
-  etat(`Pont exact ${p.pc} chemins · schéma ${p.pb} × ${p.steps} pas${nomCorr}`, "ok");
+  $("k-f").textContent = f(ref); $("k-f-s").textContent = p.vie || p.q ? "general Goldman-Sosin-Gatto" : "Goldman-Sosin-Gatto";
+  $("k-c").textContent = f(cond[0]); $("k-c-s").textContent = `± ${f(1.96 * cond[1], 4)} · gap ${f(cond[0] - ref, 4)} · ${m.res.tc.toFixed(0)} ms`;
+  const nomCorr = {aucune: "", bgk: " · BGK", pont: " · bridge per step"}[p.corr];
+  $("k-b").textContent = f(bgk[0]); $("k-b-s").textContent = `± ${f(1.96 * bgk[1], 4)} · gap ${f(bgk[0] - ref, 4)}${nomCorr} · ${m.res.tb.toFixed(0)} ms`;
+  etat(`Exact bridge ${p.pc} paths · time stepping ${p.pb} × ${p.steps} steps${nomCorr}`, "ok");
   descriptifs(p, m.res.desc, ref);
   trajectoires(p);
 }
 function descriptifs(p, d, ref) {
   const put = p.type === 1, nomExt = put ? "maximum" : "minimum";
-  Graphe.tracer($("g-hist"), {series: [{nom: "densité des gains", x: d.centres, y: d.hg, type: "barres", couleur: "c2"},
-    {nom: `moyenne ${d.moy.toFixed(3)}`, x: [d.moy, d.moy], y: [0, Math.max(...d.hg)], couleur: "c5", epaisseur: 2},
-    {nom: `prix fermé ${ref.toFixed(3)}`, x: [ref, ref], y: [0, Math.max(...d.hg)], couleur: "c3", tirets: true}],
-    xlab: "gain actualisé", ylab: "densité", yfmt: v => v.toPrecision(2)});
+  Graphe.tracer($("g-hist"), {series: [{nom: "payoff density", x: d.centres, y: d.hg, type: "barres", couleur: "c2"},
+    {nom: `mean ${d.moy.toFixed(3)}`, x: [d.moy, d.moy], y: [0, Math.max(...d.hg)], couleur: "c5", epaisseur: 2},
+    {nom: `closed form ${ref.toFixed(3)}`, x: [ref, ref], y: [0, Math.max(...d.hg)], couleur: "c3", tirets: true}],
+    xlab: "discounted payoff", ylab: "density", yfmt: v => v.toPrecision(2)});
   const xs = d.nuage.x, lim = [Math.min(...xs, 0), Math.max(...xs, 0)];
-  Graphe.tracer($("g-nuage"), {series: [{nom: "chemins", x: xs, y: d.nuage.y, type: "points", rayon: 1.6, couleur: "c1", sansLegende: true},
+  Graphe.tracer($("g-nuage"), {series: [{nom: "paths", x: xs, y: d.nuage.y, type: "points", rayon: 1.6, couleur: "c1", sansLegende: true},
     {nom: "extremum = S_T", x: lim, y: lim, couleur: "c5", tirets: true}],
     xlab: "log(S_T / S)", ylab: `log(${nomExt} / S)`, xfmt: v => v.toFixed(2), yfmt: v => v.toFixed(2)});
-  Graphe.tracer($("g-ext"), {series: [{nom: "simulé (pont exact)", x: d.ce, y: d.he, type: "barres", couleur: "c2"},
-    {nom: "densité exacte", x: d.ce, y: d.theo, couleur: "c5", epaisseur: 2}],
-    xlab: `log(${nomExt} / S)`, ylab: "densité", xfmt: v => v.toFixed(2), yfmt: v => v.toPrecision(2)});
+  Graphe.tracer($("g-ext"), {series: [{nom: "simulated (exact bridge)", x: d.ce, y: d.he, type: "barres", couleur: "c2"},
+    {nom: "exact density", x: d.ce, y: d.theo, couleur: "c5", epaisseur: 2}],
+    xlab: `log(${nomExt} / S)`, ylab: "density", xfmt: v => v.toFixed(2), yfmt: v => v.toPrecision(2)});
   const sgn = put ? "E[e<sup>−rT</sup> max] − E[e<sup>−rT</sup> S<sub>T</sub>]" : "E[e<sup>−rT</sup> S<sub>T</sub>] − E[e<sup>−rT</sup> min]";
   $("t-dec").tBodies[0].innerHTML = `<tr><td>E[e<sup>−rT</sup> ${nomExt}]</td><td>${d.eExt.toFixed(4)}</td><td>${(put ? ref + d.eSTexact : d.eSTexact - ref).toFixed(4)}</td></tr>
     <tr><td>E[e<sup>−rT</sup> S<sub>T</sub>] = S e<sup>−qT</sup></td><td>${d.eST.toFixed(4)}</td><td>${d.eSTexact.toFixed(4)}</td></tr>
-    <tr><td>prix = ${sgn}</td><td>${(put ? d.eExt - d.eST : d.eST - d.eExt).toFixed(4)}</td><td>${ref.toFixed(4)}</td></tr>
-    <tr><td>chemins (sans antithétique)</td><td>${d.n}</td><td></td></tr>`;
+    <tr><td>price = ${sgn}</td><td>${(put ? d.eExt - d.eST : d.eST - d.eExt).toFixed(4)}</td><td>${ref.toFixed(4)}</td></tr>
+    <tr><td>paths (no antithetic)</td><td>${d.n}</td><td></td></tr>`;
 }
 function etat(msg, cls) { $("etat").textContent = msg; $("etat").className = "etat" + (cls ? " " + cls : ""); }
 function trajectoires(p) {
@@ -494,73 +551,75 @@ function trajectoires(p) {
     const e0 = p.vie ? p.ext : p.spot, S = [p.spot], E = [p.type === 0 ? Math.min(e0, p.spot) : Math.max(e0, p.spot)];
     for (let k = 0; k < nPas; k++) { const v = S[k] * Math.exp((p.rate - p.q - 0.5 * p.vol * p.vol) * dt + p.vol * Math.sqrt(dt) * gauss()); S.push(v); E.push(p.type === 0 ? Math.min(E[k], v) : Math.max(E[k], v)); }
     const coul = "c" + (1 + c);
-    series.push({nom: `chemin ${c + 1}`, x: xs, y: S, couleur: coul, epaisseur: 1.5, sansLegende: true}, {nom: `${p.type === 0 ? "minimum" : "maximum"} courant ${c + 1}`, x: xs, y: E, couleur: coul, tirets: true, epaisseur: 1.2, sansLegende: true});
+    series.push({nom: `path ${c + 1}`, x: xs, y: S, couleur: coul, epaisseur: 1.5, sansLegende: true}, {nom: `running ${p.type === 0 ? "minimum" : "maximum"} ${c + 1}`, x: xs, y: E, couleur: coul, tirets: true, epaisseur: 1.2, sansLegende: true});
   }
-  Graphe.tracer($("g-traj"), {series, xlab: "temps (ans)", ylab: "S", yfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-traj"), {series, xlab: "time (years)", ylab: "S", yfmt: v => v.toFixed(0)});
 }
 $("go").onclick = calculer;
 $("defaut").onclick = () => { appliquer(DEFAUT); calculer(); };
 const auto = differe(calculer, 350);
 document.querySelector("#pricer .reglages").addEventListener("change", auto);
 
-// ---------- Δ constant ----------
+// ---------- constant Δ ----------
 let homogeneFait = false;
-function majExtH() { const put = $("type").value === "1"; $("h-ext-l").textContent = put ? "Maximum observé (en cours de vie)" : "Minimum observé (en cours de vie)";
+function majExtH() { const put = $("type").value === "1"; $("h-ext-l").textContent = put ? "Observed maximum (seasoned)" : "Observed minimum (seasoned)";
   const s0 = lireNombre($("h-s0"), 100); $("h-ext").value = put ? Math.round(s0 * 1.1) : Math.round(s0 * 0.9); }
 $("type").addEventListener("change", () => { majExtH(); homogeneFait = false; });
 async function lancerHomogene() {
   let p; try { p = lire(); } catch (err) { erreurIci("h-etat", err.message); return; }
   const e = {s0: lireNombre($("h-s0"), 100), min: lireNombre($("h-min"), 50), max: lireNombre($("h-max"), 150), ext: lireNombre($("h-ext"), 110)};
-  if (!(e.min > 0 && e.max > e.min && e.s0 > 0 && e.ext > 0)) { erreurIci("h-etat", "spots et extremum positifs, minimum < maximum"); return; }
-  $("h-etat").textContent = "Calcul…"; $("h-etat").className = "etat";
+  if (!(e.min > 0 && e.max > e.min && e.s0 > 0 && e.ext > 0)) { erreurIci("h-etat", "positive spots and extremum, lowest < highest"); return; }
+  $("h-etat").textContent = "Computing…"; $("h-etat").className = "etat";
   const m = await demander("homogene", p, e);
   if (!m.ok) { erreurIci("h-etat", m.msg); return; }
   homogeneFait = true;
   const r = m.res, put = p.type === 1, nomExt = put ? "max" : "min";
-  $("h-etat").textContent = `Formule fermée sur ${r.xs.length} spots · Monte-Carlo ${p.pc} chemins par spot`; $("h-etat").className = "etat ok";
+  $("h-etat").textContent = `Closed form on ${r.xs.length} spots · Monte Carlo ${p.pc} paths per spot`; $("h-etat").className = "etat ok";
   const serie = (nom, arr, cle, coul, tir, f) => ({nom, x: r.xs, y: arr.map((g, k) => g ? (f ? f(g, r.xs[k]) : g[cle]) : NaN), couleur: coul, tirets: tir, epaisseur: tir ? 1.8 : 2.5});
-  const vie = `en cours de vie (${nomExt} observé = ${e.ext})`;
+  const vie = `seasoned (observed ${nomExt} = ${e.ext})`;
   const f0 = r.emis[0].V / r.xs[0];
-  Graphe.tracer($("g-h-prix"), {series: [serie("à l'émission : V = S · f", r.emis, "V", "c1"),
-    {nom: "prolongement jusqu'à l'origine", x: [0, r.xs[0]], y: [0, f0 * r.xs[0]], couleur: "c1", tirets: true, epaisseur: 1.2, sansLegende: true},
-    serie(vie, r.vie, "V", "c4", true)], xlab: "spot S", ylab: "prix", zero: true, xmin: 0, xfmt: v => v.toFixed(0)});
-  Graphe.tracer($("g-h-delta"), {series: [serie("Δ à l'émission", r.emis, "delta", "c1"), serie("V/S à l'émission", r.emis, null, "c3", true, g => g.V / 1),
-    serie("Δ " + vie, r.vie, "delta", "c4", true)].map((s0, k) => k === 1 ? Object.assign(s0, {y: r.emis.map((g, j) => g.V / r.xs[j])}) : s0), xlab: "spot S", ylab: "Δ", yfmt: v => v.toFixed(4), xfmt: v => v.toFixed(0)});
-  Graphe.tracer($("g-h-gamma"), {series: [serie("Γ à l'émission", r.emis, "gamma", "c1"), serie("Γ " + vie, r.vie, "gamma", "c4", true)], xlab: "spot S", ylab: "Γ", yfmt: v => v.toPrecision(2), zero: true, xfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-h-prix"), {series: [serie("at issue: V = S · f", r.emis, "V", "c1"),
+    {nom: "extended to the origin", x: [0, r.xs[0]], y: [0, f0 * r.xs[0]], couleur: "c1", tirets: true, epaisseur: 1.2, sansLegende: true},
+    serie(vie, r.vie, "V", "c4", true)], xlab: "spot S", ylab: "price", zero: true, xmin: 0, xfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-h-delta"), {series: [serie("Δ at issue", r.emis, "delta", "c1"), serie("V/S at issue", r.emis, null, "c3", true, (g, S) => g.V / S),
+    serie("Δ " + vie, r.vie, "delta", "c4", true)], xlab: "spot S", ylab: "Δ", yfmt: v => v.toFixed(4), xfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-h-gamma"), {series: [serie("Γ of the issue price V(S, S)", r.emis, "gamma", "c1"),
+    {nom: "Γ of the contract held from issue (m = S fixed)", x: r.xs, y: r.tenu, couleur: "c2", epaisseur: 2.5},
+    serie("Γ " + vie, r.vie, "gamma", "c4", true)], xlab: "spot S", ylab: "Γ", yfmt: v => v.toPrecision(2), zero: true, xfmt: v => v.toFixed(0)});
   Graphe.tracer($("g-h-autres"), {series: [serie("vega / S", r.emis, null, "c2", false, (g, S) => g.vega / S), serie("ρ / S", r.emis, null, "c5", false, (g, S) => g.rho / S),
-    serie("Θ / S", r.emis, null, "c6", false, (g, S) => g.theta / S)], xlab: "spot S", ylab: "grecque / S", yfmt: v => v.toFixed(3), xfmt: v => v.toFixed(0)});
-  $("t-h").tBodies[0].innerHTML = r.mc.map(o => `<tr><td>${o.S.toFixed(1)}</td><td>${o.V.toFixed(4)}</td><td>${(o.V / o.S).toFixed(6)}</td><td>${o.delta.toFixed(6)}</td><td>${o.dF.toFixed(6)}</td><td>${o.gamma.toExponential(1)}</td></tr>`).join("");
+    serie("Θ / S", r.emis, null, "c6", false, (g, S) => g.theta / S)], xlab: "spot S", ylab: "Greek / S", yfmt: v => v.toFixed(3), xfmt: v => v.toFixed(0)});
+  $("t-h").tBodies[0].innerHTML = r.mc.map(o => `<tr><td>${o.S.toFixed(1)}</td><td>${o.V.toFixed(4)}</td><td>${(o.V / o.S).toFixed(6)}</td><td>${o.delta.toFixed(6)}</td><td>${o.dF.toFixed(6)}</td><td>${o.gamma.toExponential(1)}</td><td>${o.gT.toFixed(5)}</td></tr>`).join("");
 }
 $("h-go").onclick = lancerHomogene;
 document.addEventListener("vue", ev => { if (ev.detail === "homogene" && !homogeneFait) lancerHomogene(); });
 majExtH();
 
-// ---------- courbes ----------
+// ---------- curves ----------
 const BORNES = {spot: [80, 120], vol: [0.1, 0.5], rate: [0, 0.1], q: [0, 0.08], ttm: [0.25, 3]};
 $("cx").onchange = () => { const b = BORNES[$("cx").value]; $("cmin").value = b[0]; $("cmax").value = b[1]; };
 const erreurIci = (id, msg) => { $(id).textContent = msg; $(id).className = "etat err"; };
 $("c-go").onclick = async () => {
   let p; try { p = lire(); } catch (err) { erreurIci("c-etat", err.message); return; }
   const a = lireNombre($("cmin"), NaN), b = lireNombre($("cmax"), NaN), n = Math.round(lireNombre($("cn"), 20)), v = $("cx").value;
-  if (!(b > a) || !(n >= 2 && n <= 200)) { erreurIci("c-etat", "bornes ou nombre de points invalides (2 à 200)"); return; }
-  if ((v === "spot" || v === "vol" || v === "ttm") && !(a > 0)) { erreurIci("c-etat", "le minimum doit être positif pour cette variable"); return; }
-  if (v === "spot" && p.vie && (p.type === 1 ? b > p.ext : a < p.ext)) { erreurIci("c-etat", "en cours de vie, le spot doit rester du bon côté de l'extremum observé"); return; }
+  if (!(b > a) || !(n >= 2 && n <= 200)) { erreurIci("c-etat", "invalid bounds or number of points (2 to 200)"); return; }
+  if ((v === "spot" || v === "vol" || v === "ttm") && !(a > 0)) { erreurIci("c-etat", "the minimum must be positive for this variable"); return; }
+  if (v === "spot" && p.vie && (p.type === 1 ? b > p.ext : a < p.ext)) { erreurIci("c-etat", "for a seasoned option, the spot must stay on the right side of the observed extremum"); return; }
   const xs = Array.from({length: n}, (_, i) => a + (b - a) * i / (n - 1));
   const e = {var: v, xs, cond: $("c-cond").checked || $("c-an").checked, bgk: $("c-bgk").checked};
-  $("c-go").disabled = true; $("c-prog").hidden = false; $("c-etat").textContent = "Calcul…"; $("c-etat").className = "etat";
+  $("c-go").disabled = true; $("c-prog").hidden = false; $("c-etat").textContent = "Computing…"; $("c-etat").className = "etat";
   const t0 = Date.now();
   const m = await demander("courbe", p, e, fr => { $("c-prog").value = fr; });
   $("c-go").disabled = false; $("c-prog").hidden = true;
   if (!m.ok) { erreurIci("c-etat", m.msg); return; }
-  $("c-etat").textContent = `${n} points en ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("c-etat").className = "etat ok";
+  $("c-etat").textContent = `${n} points in ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("c-etat").className = "etat ok";
   const nomX = $("cx").selectedOptions[0].textContent;
   [["cm1", "g-c1", "c-t1"], ["cm2", "g-c2", "c-t2"]].forEach(([sel, g, t]) => {
     const i = +$(sel).value, series = [], xs2 = m.res.map(o => o.x);
-    $(t).textContent = GRANDEURS[i] + " en fonction de " + nomX.toLowerCase();
-    if ($("c-cond").checked) series.push({nom: "pont exact (MC)", x: xs2, y: m.res.map(o => o.cond[i * 4]), couleur: "c1", marqueurs: true,
+    $(t).textContent = GRANDEURS[i] + " as a function of " + nomX.toLowerCase();
+    if ($("c-cond").checked) series.push({nom: "exact bridge (MC)", x: xs2, y: m.res.map(o => o.cond[i * 4]), couleur: "c1", marqueurs: true,
       bande: [m.res.map(o => o.cond[i * 4 + 2]), m.res.map(o => o.cond[i * 4 + 3])]});
-    if ($("c-bgk").checked) series.push({nom: "schéma en temps (MC)", x: xs2, y: m.res.map(o => o.bgk[i * 4]), couleur: "c4", marqueurs: true});
-    if ($("c-an").checked) series.push({nom: "formule fermée (conv. Barnicha)", x: xs2, y: m.res.map(o => o.cond[24 + i * 4]), couleur: "c3", tirets: true});
+    if ($("c-bgk").checked) series.push({nom: "time stepping (MC)", x: xs2, y: m.res.map(o => o.bgk[i * 4]), couleur: "c4", marqueurs: true});
+    if ($("c-an").checked) series.push({nom: "closed form (Barnicha conv.)", x: xs2, y: m.res.map(o => o.cond[24 + i * 4]), couleur: "c3", tirets: true});
     Graphe.tracer($(g), {series, xlab: nomX, ylab: GRANDEURS[i]});
   });
 };
@@ -569,27 +628,27 @@ $("c-go").onclick = async () => {
 $("v-go").onclick = async () => {
   let p; try { p = lire(); } catch (err) { erreurIci("v-etat", err.message); return; }
   const e = {chemins: listeNombres($("v-ch").value).map(Math.round).filter(x => x >= 10 && x <= 1e6), pas: listeNombres($("v-pas").value).map(Math.round).filter(x => x >= 1 && x <= 5000), pch: Math.round(lireNombre($("v-pch"), 20000))};
-  if (!e.chemins.length || !e.pas.length || !(e.pch >= 100)) { erreurIci("v-etat", "listes vides ou chemins par point < 100"); return; }
-  if (Math.max(...e.pas) * e.pch > 2e7 || Math.max(...e.chemins) * p.steps > 5e7) { erreurIci("v-etat", "trop de chemins × pas (limite : 20 millions par point de biais, 50 millions par point de convergence)"); return; }
-  $("v-go").disabled = true; $("v-prog").hidden = false; $("v-etat").textContent = "Calcul…"; $("v-etat").className = "etat";
+  if (!e.chemins.length || !e.pas.length || !(e.pch >= 100)) { erreurIci("v-etat", "empty lists or fewer than 100 paths per point"); return; }
+  if (Math.max(...e.pas) * e.pch > 2e7 || Math.max(...e.chemins) * p.steps > 5e7) { erreurIci("v-etat", "too many paths × steps (limit: 20 million per bias point, 50 million per convergence point)"); return; }
+  $("v-go").disabled = true; $("v-prog").hidden = false; $("v-etat").textContent = "Computing…"; $("v-etat").className = "etat";
   const t0 = Date.now();
   const m = await demander("convergence", p, e, fr => { $("v-prog").value = fr; });
   $("v-go").disabled = false; $("v-prog").hidden = true;
   if (!m.ok) { erreurIci("v-etat", m.msg); return; }
-  $("v-etat").textContent = `Terminé en ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("v-etat").className = "etat ok";
+  $("v-etat").textContent = `Done in ${((Date.now() - t0) / 1000).toFixed(1)} s`; $("v-etat").className = "etat ok";
   const r = m.res, ref = r.ref[24], bande = (a, k) => [a.map(o => o[k][2]), a.map(o => o[k][3])];
   Graphe.tracer($("g-v1"), {series: [
-    {nom: "pont exact (MC)", x: r.ch.map(o => o.n), y: r.ch.map(o => o.cond[0]), couleur: "c1", marqueurs: true, bande: bande(r.ch, "cond")},
-    {nom: `schéma en temps, ${p.steps} pas`, x: r.ch.map(o => o.n), y: r.ch.map(o => o.bgk[0]), couleur: "c4", marqueurs: true, bande: bande(r.ch, "bgk")},
-    {nom: "formule fermée", x: r.ch.map(o => o.n), y: r.ch.map(() => ref), couleur: "c3", tirets: true}], xlab: "chemins", ylab: "prix", xfmt: v => v >= 1000 ? (v / 1000) + "k" : v.toFixed(0)});
+    {nom: "exact bridge (MC)", x: r.ch.map(o => o.n), y: r.ch.map(o => o.cond[0]), couleur: "c1", marqueurs: true, bande: bande(r.ch, "cond")},
+    {nom: `time stepping, ${p.steps} steps`, x: r.ch.map(o => o.n), y: r.ch.map(o => o.bgk[0]), couleur: "c4", marqueurs: true, bande: bande(r.ch, "bgk")},
+    {nom: "closed form", x: r.ch.map(o => o.n), y: r.ch.map(() => ref), couleur: "c3", tirets: true}], xlab: "paths", ylab: "price", xfmt: v => v >= 1000 ? (v / 1000) + "k" : v.toFixed(0)});
   Graphe.tracer($("g-v2"), {series: [
-    {nom: "sans correction", x: r.pas.map(o => o.n), y: r.pas.map(o => o.brut[0]), couleur: "c5", marqueurs: true, bande: bande(r.pas, "brut")},
+    {nom: "no correction", x: r.pas.map(o => o.n), y: r.pas.map(o => o.brut[0]), couleur: "c5", marqueurs: true, bande: bande(r.pas, "brut")},
     {nom: "BGK", x: r.pas.map(o => o.n), y: r.pas.map(o => o.bgk[0]), couleur: "c1", marqueurs: true, bande: bande(r.pas, "bgk")},
-    {nom: "pont exact par pas", x: r.pas.map(o => o.n), y: r.pas.map(o => o.pont[0]), couleur: "c6", marqueurs: true, bande: bande(r.pas, "pont")},
-    {nom: "formule fermée (continu)", x: r.pas.map(o => o.n), y: r.pas.map(() => ref), couleur: "c3", tirets: true}], xlab: "pas de temps", ylab: "prix"});
+    {nom: "exact bridge per step", x: r.pas.map(o => o.n), y: r.pas.map(o => o.pont[0]), couleur: "c6", marqueurs: true, bande: bande(r.pas, "pont")},
+    {nom: "closed form (continuous)", x: r.pas.map(o => o.n), y: r.pas.map(() => ref), couleur: "c3", tirets: true}], xlab: "time steps", ylab: "price"});
 };
 
-// ---------- code source ----------
+// ---------- source code ----------
 const CODE = /*__CODE__*/;
 let codePret = false;
 document.addEventListener("vue", ev => { if (ev.detail === "code" && !codePret) { codePret = true; UI.lecteurCode($("code"), CODE, "__DEPOT__"); } });

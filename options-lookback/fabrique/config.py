@@ -1,13 +1,14 @@
-"""Page « Options lookback » (lue par construire.py)."""
+"""Page "Lookback options" (read by construire.py)."""
 
-# repère du gabarit -> moteur JavaScript de fabrique/
+# template marker -> JavaScript engine of fabrique/
 MOTEURS = {"LB": "lookback.js"}
 
-# code montré dans l'onglet « Code source » : (groupe, [motifs relatifs au dossier du projet])
+# code shown in the "Source code" tab: (group, [patterns relative to the project folder])
 FICHIERS = [
-    ("Moteur Barnicha : pont brownien exact", ["code/Barnicha/include/lookback/*.h", "code/Barnicha/src/*.cpp",
-                                               "code/Barnicha/app/main.cpp"]),
-    ("Moteur Chivet : schéma en temps + BGK", ["code/Chivet/include/*.hpp", "code/Chivet/src/*.cpp", "code/Chivet/app/main.cpp"]),
-    ("DLL unifiée et Excel", ["code/unified/unified_dll.cpp", "code/CMakeLists.txt", "code/excel/modLookback_ttm.bas"]),
-    ("Portage JavaScript (cette page)", ["fabrique/lookback.js"]),
+    ("Barnicha engine: exact Brownian bridge", ["code/Barnicha/include/lookback/*.h", "code/Barnicha/src/*.cpp",
+                                                "code/Barnicha/app/main.cpp"]),
+    ("Chivet engine: time stepping + BGK", ["code/Chivet/include/*.hpp", "code/Chivet/src/*.cpp", "code/Chivet/app/main.cpp"]),
+    ("Unified DLL and Excel", ["code/unified/unified_dll.cpp", "code/CMakeLists.txt", "code/excel/modLookback_ttm.bas"]),
+    ("JavaScript port (this page)", ["fabrique/lookback.js"]),
+    ("Report (LaTeX source)", ["rapport/report.tex"]),
 ]

@@ -1,24 +1,26 @@
-/* lookback.js — portage JavaScript de la DLL unifiée du projet (code/unified/unified_dll.cpp), étendu.
+/* lookback.js — JavaScript port of the project's unified DLL (code/unified/unified_dll.cpp), extended.
 
    priceLookback(method, ttm, optionType, spot, rate, vol, paths, steps, seed, withStdErrors, useBGK, options)
-   renvoie les 48 valeurs de la fonction C++ price_lookback : pour le Monte-Carlo puis la formule fermée, 6 grandeurs
-   (prix, Δ, Γ, Θ, ρ, vega) × (estimation, erreur standard, IC 95 % bas, IC 95 % haut).
-     method 1 : moteur Barnicha (pont brownien exact en un pas)   — code/Barnicha/src/lookback_dll.cpp
-     method 0 : moteur Chivet (schéma en temps, correction BGK)  — code/Chivet/src/LookbackDLL.cpp
-   Sans « options », le calcul est celui du C++ (voir les écarts ci-dessous).
+   returns the 48 values of the C++ function price_lookback: for the Monte Carlo then the closed form, 6 quantities
+   (price, Δ, Γ, Θ, ρ, vega) × (estimate, standard error, 95 % CI low, 95 % CI high).
+     method 1: Barnicha engine (exact one-step Brownian bridge)   — code/Barnicha/src/lookback_dll.cpp
+     method 0: Chivet engine (time stepping, BGK correction)      — code/Chivet/src/LookbackDLL.cpp
+   Without "options", the computation is the C++ one (see the differences below).
 
-   Générateur : std::mt19937 et les lois uniform_real_distribution / normal_distribution de libstdc++ reproduits à
-   l'identique : avec la même graine, le moteur Barnicha donne les nombres du C++ compilé avec g++ (vérifié à 1e-15).
+   Generator: std::mt19937 and libstdc++'s uniform_real_distribution / normal_distribution reproduced exactly: with
+   the same seed, the Barnicha engine gives the numbers of the C++ compiled with g++ (checked to 1e-15).
 
-   Écarts volontaires avec le C++ (défauts relevés à la relecture, signalés dans la page) :
-   - Chivet : la graine saisie est utilisée (le C++ prend l'horloge) et la loi normale repart de zéro à chaque prix
-     (le C++ garde d'un prix à l'autre la normale mise en réserve : les tirages communs des grecques sont décalés) ;
-   - Chivet : l'erreur standard du rho est divisée par 2·bump·r comme l'estimation (le C++ oublie le facteur r) ;
-   - Chivet, formule fermée : Γ divisé par h² (le C++ divise par (2h)² : Γ quatre fois trop petit).
+   Deliberate differences with the C++ (defects found in the review, reported on the page):
+   - Chivet: the seed entered is used (the C++ takes the clock) and the normal law restarts at each price (the C++
+     keeps the reserved normal from one price to the next: the common draws of the Greeks are shifted);
+   - Chivet: the standard error of rho is divided by 2·bump·r like the estimate (the C++ forgets the factor r);
+   - Chivet, closed form: Γ divided by h² (the C++ divides by (2h)²: Γ four times too small).
 
-   Extensions (options) : dividende continu q ; extremum déjà observé (option en cours de vie) ; correction de la
-   surveillance discrète au choix (aucune, BGK, ou pont brownien exact sur chaque pas) ; tailles des bumps ;
-   variable antithétique ; Θ centré ; coefficient β de BGK. */
+   Extensions (options): continuous dividend q; extremum already observed (seasoned option); choice of the discrete
+   monitoring correction (none, BGK, or exact Brownian bridge on each step); bump sizes; antithetic variable;
+   centred Θ; BGK coefficient β.
+   Note: at inception (no extremum given) a spot bump also moves the starting extremum, so the Greeks are those of the
+   inception price V(S, S) (Γ = 0); with an extremum given, the extremum stays fixed (Greeks of a held contract). */
 (function (racine) {
   "use strict";
 
@@ -47,13 +49,13 @@
       return y >>> 0;
     };
   }
-  // std::generate_canonical<double, 53>(mt19937) de libstdc++ : deux tirages de 32 bits
+  // libstdc++'s std::generate_canonical<double, 53>(mt19937): two 32-bit draws
   const DEUX32 = 4294967296, UN_MOINS = 1 - Math.pow(2, -53);
   function canonique(g) {
     const r = (g() + g() * DEUX32) / (DEUX32 * DEUX32);
     return r >= 1 ? UN_MOINS : r;
   }
-  // std::normal_distribution<double> de libstdc++ : méthode polaire, une valeur gardée en réserve
+  // libstdc++'s std::normal_distribution<double>: polar method, one value kept in reserve
   function LoiNormale() {
     let reserve = 0, dispo = false;
     return function (g) {
@@ -66,8 +68,8 @@
     };
   }
 
-  // ------------------------------------------------------------------ loi normale
-  function erfc(x) { // ~1e-15 : série (|x| < 3) ou fraction continue de Lentz
+  // ------------------------------------------------------------------ normal law
+  function erfc(x) { // ~1e-15: series (|x| < 3) or Lentz continued fraction
     if (x < 0) return 2 - erfc(-x);
     if (x < 3) {
       let t = x, s = x;
@@ -81,8 +83,8 @@
   const N = x => 0.5 * erfc(-x / Math.SQRT2);
   const n = x => 0.3989422804014327 * Math.exp(-0.5 * x * x);
 
-  // ------------------------------------------------------------------ formules fermées
-  // Barnicha (analytic_lookback.cpp) : émission (extremum = spot), sans dividende, limite exacte en r → 0
+  // ------------------------------------------------------------------ closed forms
+  // Barnicha (analytic_lookback.cpp): inception (extremum = spot), no dividend, exact limit as r → 0
   function prixFermeBarnicha(put, S, r, sig, T) {
     if (Math.abs(r) < 1e-10) {
       const d = 0.5 * sig * Math.sqrt(T), pd = n(d), cd = N(d);
@@ -93,13 +95,13 @@
     if (!put) return S * N(a1) - S * disc * N(a2) - mult * (N(-a1) - disc * N(-a3));
     return -S * N(-a1) + S * disc * N(-a2) + mult * (N(a1) - disc * N(a3));
   }
-  // Chivet (AnalyticLookback.cpp) : même prix écrit autrement ; non défini pour r = 0 (division par 2r)
+  // Chivet (AnalyticLookback.cpp): the same price written differently; undefined for r = 0 (division by 2r)
   function prixFermeChivet(put, S0, T, sig, r) {
     const dp = (Math.log(1) + (r + 0.5 * sig * sig) * T) / (sig * Math.sqrt(T)), dm = (Math.log(1) + (r - 0.5 * sig * sig) * T) / (sig * Math.sqrt(T));
     if (!put) return S0 * N(dp) - S0 * Math.exp(-r * T) * N(dm) + Math.exp(-r * T) * (sig * sig * S0 / (2 * r)) * N(dm) - N(-dp) * S0 * (sig * sig / (2 * r));
     return S0 * Math.exp(-r * T) * N(-dm) + S0 * N(dp) * (1 + (sig * sig) / (2 * r)) - Math.exp(-r * T) * S0 * (sig * sig / (2 * r)) * N(-dm) - S0;
   }
-  // Goldman-Sosin-Gatto général : portage b = r − q, extremum déjà observé m (min pour le call, max pour le put)
+  // general Goldman-Sosin-Gatto: carry b = r − q, extremum already observed m (min for the call, max for the put)
   function gsg(put, S, m, r, b, sig, T) {
     const sq = Math.sqrt(T), v2 = sig * sig;
     if (!put) {
@@ -113,17 +115,17 @@
   }
   function prixFermeGeneral(put, S, m, r, q, sig, T) {
     const b = r - q;
-    if (Math.abs(b) < 1e-6) return 0.5 * (gsg(put, S, m, r, 1e-6, sig, T) + gsg(put, S, m, r, -1e-6, sig, T)); // limite b → 0
+    if (Math.abs(b) < 1e-6) return 0.5 * (gsg(put, S, m, r, 1e-6, sig, T) + gsg(put, S, m, r, -1e-6, sig, T)); // limit b → 0
     return gsg(put, S, m, r, b, sig, T);
   }
-  // prix fermé utilisé par un moteur : celui de son code tant qu'on reste dans son cadre (émission, q = 0)
+  // closed form used by an engine: its own code's formula while within its scope (inception, q = 0)
   function prixFerme(moteur, m) {
     const ext = m.ext == null ? m.S : m.ext;
     if (m.q === 0 && ext === m.S) return moteur === 1 ? prixFermeBarnicha(m.put, m.S, m.r, m.sig, m.T) : prixFermeChivet(m.put, m.S, m.T, m.sig, m.r);
     return prixFermeGeneral(m.put, m.S, ext, m.r, m.q, m.sig, m.T);
   }
 
-  // ------------------------------------------------------------------ statistiques (pricing_engine.cpp)
+  // ------------------------------------------------------------------ statistics (pricing_engine.cpp)
   function stats(xs) {
     const k = xs.length;
     if (!k) return [0, 0, 0, 0];
@@ -134,8 +136,8 @@
   }
   const avec = (m, o) => Object.assign({}, m, o);
 
-  // ================================================================== moteur Barnicha
-  // tirages (z, u_max, u_min) : OneStepBridgeSampler::generate, dans l'ordre du C++
+  // ================================================================== Barnicha engine
+  // draws (z, u_max, u_min): OneStepBridgeSampler::generate, in the C++ order
   function tiragesPont(nChemins, graine) {
     const g = MT19937(graine), loi = LoiNormale();
     const z = new Float64Array(nChemins), umax = new Float64Array(nChemins), umin = new Float64Array(nChemins);
@@ -144,15 +146,15 @@
       let u = canonique(g); umax[i] = u === 0 ? 1e-16 : u;
       u = canonique(g); umin[i] = u === 0 ? 1e-16 : u;
     }
-    // logarithmes des uniformes calculés une fois (ils resservent pour chaque marché décalé des grecques)
+    // logarithms of the uniforms computed once (reused for every bumped market of the Greeks)
     const lmax = umax.map(Math.log), lmin = umin.map(Math.log);
     return {z, umax, umin, lmax, lmin, n: nChemins};
   }
-  // gains actualisés par chemin (monte_carlo_engine.cpp + lookback_payoff_evaluator.cpp)
+  // discounted payoff per path (monte_carlo_engine.cpp + lookback_payoff_evaluator.cpp)
   function gainsPont(t, m, antithetique) {
     const out = new Float64Array(t.n), x0 = Math.log(m.S), derive = (m.r - m.q - 0.5 * m.sig * m.sig) * m.T, vol = m.sig * Math.sqrt(m.T);
     const disc = Math.exp(-m.r * m.T), k = -0.5 * m.sig * m.sig * m.T, put = m.put;
-    const ext = m.ext == null ? null : m.ext; // extremum déjà observé (sinon : le spot)
+    const ext = m.ext == null ? null : m.ext; // extremum already observed (otherwise: the spot)
     const gain = (z, lumax, lumin) => {
       const xT = x0 + derive + vol * z, dx = (x0 - xT) * (x0 - xT);
       if (!put) { let mn = Math.exp(0.5 * (x0 + xT - Math.sqrt(dx + 4 * (k * lumin)))); if (ext !== null && ext < mn) mn = ext; return Math.exp(xT) - mn; }
@@ -164,8 +166,8 @@
     }
     return out;
   }
-  // détail chemin par chemin (sans antithétique) pour les graphes descriptifs :
-  // log(S_T/S), log(extremum du pont / S) et gain actualisé
+  // path-by-path detail (no antithetic) for the descriptive charts:
+  // log(S_T/S), log(bridge extremum / S) and discounted payoff
   function detailPont(t, m) {
     const k = t.n, lx = new Float64Array(k), le = new Float64Array(k), gain = new Float64Array(k);
     const derive = (m.r - m.q - 0.5 * m.sig * m.sig) * m.T, vol = m.sig * Math.sqrt(m.T), c = -0.5 * m.sig * m.sig * m.T, disc = Math.exp(-m.r * m.T);
@@ -179,15 +181,15 @@
     }
     return {lx, le, gain};
   }
-  // fonction de répartition exacte de l'extremum de X_t = μt + σW_t sur [0, T] (en log-rendement)
-  //   max : P(M ≤ y) = N((y − μT)/(σ√T)) − e^{2μy/σ²} N((−y − μT)/(σ√T)), y ≥ 0
-  //   min : P(m ≥ y) = N((−y + μT)/(σ√T)) − e^{2μy/σ²} N((y + μT)/(σ√T)), y ≤ 0
+  // exact distribution function of the extremum of X_t = μt + σW_t on [0, T] (in log-return)
+  //   max: P(M ≤ y) = N((y − μT)/(σ√T)) − e^{2μy/σ²} N((−y − μT)/(σ√T)), y ≥ 0
+  //   min: P(m ≥ y) = N((−y + μT)/(σ√T)) − e^{2μy/σ²} N((y + μT)/(σ√T)), y ≤ 0
   function repartitionExtremum(put, y, mu, sig, T) {
     const s = sig * Math.sqrt(T);
     if (put) return y <= 0 ? 0 : N((y - mu * T) / s) - Math.exp(2 * mu * y / (sig * sig)) * N((-y - mu * T) / s);
     return y >= 0 ? 0 : N((-y + mu * T) / s) - Math.exp(2 * mu * y / (sig * sig)) * N((y + mu * T) / s);
   }
-  // BumpAndRevalueGreeks::compute (bumps par défaut de bump_and_revalue_greeks.h : 1e-4)
+  // BumpAndRevalueGreeks::compute (default bumps of bump_and_revalue_greeks.h: 1e-4)
   function grecquesBarnicha(gains, m, bp, thetaCentre) {
     const base = gains(m), k = base.length, o = new Array(24);
     const fixer = (j, arr) => { const s = stats(arr); for (let q = 0; q < 4; q++) o[j * 4 + q] = s[q]; };
@@ -212,14 +214,14 @@
     return mc.concat(an);
   }
 
-  // ================================================================== moteur Chivet
+  // ================================================================== Chivet engine
   const BGK_BETA1 = 0.5826; // −ζ(1/2)/√(2π)
-  // computeRawPrice : mêmes tirages (graine fixe) pour chaque marché décalé.
-  // correction : "aucune", "bgk" (C++), ou "pont" : extremum exact du pont brownien sur chaque pas (sans biais)
-  // Plusieurs marchés décalés évalués sur les MÊMES tirages : chaque chemin tire ses normales (et ses uniformes pour le
-  // pont) une seule fois, dans l'ordre du C++, puis les rejoue pour chaque marché. Résultat identique à une simulation
-  // séparée par marché réamorcée à la même graine (ce que fait le C++), en une seule passe du générateur.
-  // Calcul en log : l'extremum de S est l'exponentielle de l'extremum de log S.
+  // computeRawPrice: the same draws (fixed seed) for every bumped market.
+  // correction: "aucune" (none), "bgk" (C++), or "pont" (bridge): exact Brownian-bridge extremum on each step (unbiased)
+  // Several bumped markets evaluated on the SAME draws: each path draws its normals (and its uniforms for the bridge)
+  // once, in the C++ order, then replays them for every market. Identical to one simulation per market reseeded with
+  // the same seed (what the C++ does), in a single pass of the generator.
+  // Computed in logs: the extremum of S is the exponential of the extremum of log S.
   function gainsChivetMulti(seed, paths, steps, correction, beta, marches) {
     const g = MT19937(seed), loi = LoiNormale(), pont = correction === "pont", bgk = correction === "bgk";
     const z = new Float64Array(steps), lu = pont ? new Float64Array(steps) : null;
@@ -234,7 +236,7 @@
         let x = q.x0, xmax = x, xmin = x;
         const derive = q.derive, s = q.s;
         if (pont) {
-          // extremum d'un pont brownien entre x et x1 : P(max ≤ y) = 1 − exp(−2 (y − x)(y − x1) / (σ² Δt))
+          // extremum of a Brownian bridge between x and x1: P(max ≤ y) = 1 − exp(−2 (y − x)(y − x1) / (σ² Δt))
           for (let k = 0; k < steps; k++) {
             const x1 = x + derive + s * z[k], dx = x1 - x, w = Math.sqrt(dx * dx - q.v2dt * lu[k]);
             if (q.put) { const e = 0.5 * (x + x1 + w); if (e > xmax) xmax = e; } else { const e = 0.5 * (x + x1 - w); if (e < xmin) xmin = e; }
@@ -256,7 +258,7 @@
     const bc = Object.assign({S: 0.001, sig: 0.001, r: 0.0001, T: 1 / 365}, o.bumpsChivet), beta = o.beta == null ? BGK_BETA1 : o.beta;
     const moy = a => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i]; return s / a.length; };
     const ecart = a => stats(a)[1];
-    // les 9 marchés de Pricer::compute, sur les mêmes tirages
+    // the 9 markets of Pricer::compute, on the same draws
     const [base, up, dn, tA, tB, rU, rD, vU, vD] = gainsChivetMulti(seed, paths, steps, correction, beta, [
       m, avec(m, {S: m.S * (1 + bc.S)}), avec(m, {S: m.S * (1 - bc.S)}), avec(m, {T: m.T * (1 + bc.T)}), avec(m, {T: m.T * (1 - bc.T)}),
       avec(m, {r: m.r * (1 + bc.r)}), avec(m, {r: m.r * (1 - bc.r)}), avec(m, {sig: m.sig * (1 + bc.sig)}), avec(m, {sig: m.sig * (1 - bc.sig)})]);
@@ -274,7 +276,7 @@
     }
     const out = [];
     for (let j = 0; j < 6; j++) out.push(est[j], se[j], est[j] - 1.96 * se[j], est[j] + 1.96 * se[j]);
-    // formule fermée et grecques par bumps relatifs de 1e-4 (AnalyticLookback.cpp), Γ corrigé
+    // closed form and Greeks by relative bumps of 1e-4 (AnalyticLookback.cpp), Γ corrected
     const F = x => prixFerme(0, avec(m, x)), V0 = F({}), Vp = F({S: m.S * 1.0001}), Vm = F({S: m.S * 0.9999});
     const ex = v => [v, 0, v, v];
     out.push(...ex(V0), ...ex((Vp - Vm) / (m.S * 0.0002)), ...ex((Vp - 2 * V0 + Vm) / Math.pow(m.S * 0.0001, 2)),
@@ -284,17 +286,17 @@
     return out;
   }
 
-  // ================================================================== point d'entrée (unified_dll.cpp)
+  // ================================================================== entry point (unified_dll.cpp)
   function priceLookback(method, ttm, optionType, spot, rate, vol, paths, steps, seed, withStdErrors, useBGK, options) {
     const o = options || {};
-    if (!(ttm > 0)) throw new Error("maturité nulle ou négative (code -2 de la DLL)");
-    if (!(paths > 0)) throw new Error("nombre de chemins nul (code -3 de la DLL)");
+    if (!(ttm > 0)) throw new Error("zero or negative maturity (DLL code -2)");
+    if (!(paths > 0)) throw new Error("zero number of paths (DLL code -3)");
     const put = optionType === 1, ext = o.extremum == null ? null : +o.extremum;
-    if (ext !== null && (put ? ext < spot : ext > spot)) throw new Error(put ? "le maximum déjà observé doit être ≥ au spot" : "le minimum déjà observé doit être ≤ au spot");
+    if (ext !== null && (put ? ext < spot : ext > spot)) throw new Error(put ? "the maximum already observed must be ≥ the spot" : "the minimum already observed must be ≤ the spot");
     const m = {put, S: spot, r: rate, q: o.q || 0, sig: vol, T: ttm, ext};
     if (method === 1) return barnicha(m, Math.round(paths), seed >>> 0, o);
     if (method === 0) return chivet(m, Math.round(paths), Math.max(1, Math.round(steps)), seed >>> 0, !!withStdErrors, o.correction || (useBGK ? "bgk" : "aucune"), o);
-    throw new Error("méthode inconnue (code -999 de la DLL)");
+    throw new Error("unknown method (DLL code -999)");
   }
 
   const API = {priceLookback, MT19937, canonique, LoiNormale, tiragesPont, gainsPont, gainsChivet, prixFermeBarnicha, prixFermeChivet,

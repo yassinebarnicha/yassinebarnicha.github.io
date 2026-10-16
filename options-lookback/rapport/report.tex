@@ -1,0 +1,354 @@
+% Report: floating-strike lookback options, closed form and Monte Carlo engines.
+% Build: pdflatex report.tex (twice). Figures read their data from data/*.dat, produced by the page's JavaScript engine.
+\documentclass[11pt,a4paper]{article}
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepackage{caption}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage{cleveref}
+\hypersetup{pdftitle={Floating-strike lookback options},pdfauthor={Mohammed-Yassine Barnicha}}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}[proposition]{Lemma}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\dd}{\,\mathrm{d}}
+\pgfplotsset{every axis/.append style={width=0.48\textwidth,height=5.2cm,grid=major,grid style={gray!25},scaled ticks=false,
+  tick label style={font=\footnotesize},label style={font=\footnotesize},legend style={font=\scriptsize,draw=none,fill=white,fill opacity=0.8,text opacity=1}}}
+
+\title{Floating-Strike Lookback Options\\[4pt]
+  \large Closed Form, Exact-Bridge and Time-Stepping Monte Carlo, Greeks and a Code Review}
+\author{Mohammed-Yassine Barnicha}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent We price European floating-strike lookback options under Black--Scholes with a continuous dividend, at issue and
+during their life. Two Monte Carlo engines written in C++ are studied: one draws the terminal value and the running extremum
+exactly, from the law of the Brownian bridge, in a single step; the other simulates paths on a time grid and corrects the
+discrete-monitoring bias with the Broadie--Glasserman--Kou shift. We derive the law of the running extremum, the
+Goldman--Sosin--Gatto closed form, and the scaling properties of the price: at issue the delta equals $V/S$, and the issue
+price has no curvature, while a contract already held keeps a positive gamma $g''(1)/S$, a distinction the original Greeks
+missed. We add an exact bridge on each time step, which removes the discretisation bias whatever the number of steps, quantify
+the bias of each scheme, and list the defects found in the C++ code. Everything is reproduced by the interactive page
+\url{https://yassinebarnicha.github.io/options-lookback/}, whose JavaScript engines match the C++ to $10^{-15}$.
+\end{abstract}
+
+\tableofcontents
+
+%======================================================================
+\section{Introduction}
+A floating-strike lookback call pays $S_T-\min_{[0,T]}S$: the holder buys at the lowest price of the period. The put pays
+$\max_{[0,T]}S-S_T$. Both payoffs are path-dependent but only through one running extremum, which makes them a good test bed
+for Monte Carlo methods: the exact price is known in closed form, and the error of a discretely monitored simulation can be
+measured exactly.
+
+The project contains two independent C++ implementations, wrapped in a common DLL and called from Excel/VBA:
+\begin{itemize}[nosep]
+  \item \emph{engine A} (Barnicha) draws $(S_T,\text{extremum})$ exactly in one step by the Brownian bridge;
+  \item \emph{engine B} (Chivet) simulates a time grid and applies the BGK correction to the discrete extremum.
+\end{itemize}
+This report gives the theory behind both (\cref{sec:law,sec:closed,sec:mc}), the scaling properties that determine the Greeks
+(\cref{sec:homog}), a numerical study (\cref{sec:num}) and the code review (\cref{sec:review}).
+
+%======================================================================
+\section{Contract and model}
+Under the risk-neutral measure, $S_t=S\exp(\mu t+\sigma W_t)$ with $\mu=b-\sigma^2/2$, where $b=r-q$ is the carry ($r$ rate, $q$
+continuous dividend yield). Write $X_t=\ln(S_t/S)$, a Brownian motion with drift $\mu$ and volatility $\sigma$, and
+$M_T=\max_{[0,T]}X$, $m_T=\min_{[0,T]}X$. For a contract issued in the past, let $M\ge S$ (put) or $m\le S$ (call) be the
+extremum already observed. The payoffs at $T$ (time to maturity from now) are
+\begin{equation}
+  C_T=S_T-\min\big(m,\;S\,e^{m_T}\big),\qquad P_T=\max\big(M,\;S\,e^{M_T}\big)-S_T,
+\end{equation}
+with $m=M=S$ at issue. Prices are $V=e^{-rT}\E[\,\cdot\,]$; since $\E[e^{-rT}S_T]=Se^{-qT}$,
+\begin{equation}\label{eq:decomp}
+  V^{\mathrm{put}}=e^{-rT}\E\big[\max(M,Se^{M_T})\big]-S\,e^{-qT},\qquad V^{\mathrm{call}}=S\,e^{-qT}-e^{-rT}\E\big[\min(m,Se^{m_T})\big].
+\end{equation}
+
+%======================================================================
+\section{The law of the running extremum}\label{sec:law}
+\begin{proposition}[Joint law]\label{prop:joint}
+For $y\ge\max(0,x)$,
+\begin{equation}
+  \Prob\big(M_T\ge y,\;X_T\in\mathrm dx\big)=\frac{1}{\sigma\sqrt T}\,\varphi\!\left(\frac{2y-x+\mu T}{\sigma\sqrt T}\right)e^{2\mu y/\sigma^2}\dd x .
+\end{equation}
+\end{proposition}
+\begin{proof}
+Without drift ($\mu=0$, $\sigma=1$), the reflection principle states that the path reflected after the first passage at $y$
+is again a Brownian motion, so $\Prob(M_T\ge y,W_T\in\mathrm dx)=\Prob(W_T\in\mathrm d(2y-x))$. The drift is added by the
+Girsanov density $\exp(\mu x/\sigma^2-\mu^2T/2\sigma^2)$, which depends on the end point only; combining the exponents gives
+the formula.
+\end{proof}
+Integrating in $x$ gives the marginal law
+\begin{equation}\label{eq:maxlaw}
+  \Prob(M_T\le y)=\Phi\!\left(\frac{y-\mu T}{\sigma\sqrt T}\right)-e^{2\mu y/\sigma^2}\,\Phi\!\left(\frac{-y-\mu T}{\sigma\sqrt T}\right),\qquad y\ge0,
+\end{equation}
+and symmetrically $\Prob(m_T\ge y)=\Phi\big(\frac{-y+\mu T}{\sigma\sqrt T}\big)-e^{2\mu y/\sigma^2}\Phi\big(\frac{y+\mu T}{\sigma\sqrt T}\big)$ for $y\le0$.
+Dividing the joint law by the density of $X_T$ removes the drift:
+\begin{proposition}[Brownian bridge]\label{prop:bridge}
+Conditionally on $X_0=x_0$ and $X_\tau=x_1$, for $y\ge\max(x_0,x_1)$,
+\begin{equation}\label{eq:bridge}
+  \Prob\Big(\max_{[0,\tau]}X\ge y\,\Big|\,x_0,x_1\Big)=\exp\!\left(-\frac{2(y-x_0)(y-x_1)}{\sigma^2\tau}\right),
+\end{equation}
+and the same holds for the minimum with $y\le\min(x_0,x_1)$.
+\end{proposition}
+The law does not depend on $\mu$: once both end points are known, the drift carries no information about the path.
+
+%======================================================================
+\section{The closed form}\label{sec:closed}
+\begin{proposition}[Goldman, Sosin and Gatto; general form]\label{prop:gsg}
+With $b_1=\dfrac{\ln(S/M)+(b+\sigma^2/2)T}{\sigma\sqrt T}$ and $b_2=b_1-\sigma\sqrt T$,
+\begin{equation}
+  V^{\mathrm{put}}=-S\,e^{(b-r)T}\Phi(-b_1)+M e^{-rT}\Phi(-b_2)
+   +S\,e^{-rT}\frac{\sigma^2}{2b}\left[-\Big(\frac SM\Big)^{-2b/\sigma^2}\Phi\Big(b_1-\frac{2b}{\sigma}\sqrt T\Big)+e^{bT}\Phi(b_1)\right],
+\end{equation}
+and, with $a_1=\dfrac{\ln(S/m)+(b+\sigma^2/2)T}{\sigma\sqrt T}$, $a_2=a_1-\sigma\sqrt T$,
+\begin{equation}
+  V^{\mathrm{call}}=S\,e^{(b-r)T}\Phi(a_1)-m e^{-rT}\Phi(a_2)
+   +S\,e^{-rT}\frac{\sigma^2}{2b}\left[\Big(\frac Sm\Big)^{-2b/\sigma^2}\Phi\Big(-a_1+\frac{2b}{\sigma}\sqrt T\Big)-e^{bT}\Phi(-a_1)\right].
+\end{equation}
+\end{proposition}
+\begin{proof}[Sketch]
+In \eqref{eq:decomp}, with $k=\ln(M/S)\ge0$,
+$\E[\max(M,Se^{M_T})]=M\,\Prob(M_T\le k)+S\int_k^\infty e^y\,\mathrm dF(y)$, where $F$ is \eqref{eq:maxlaw}. The first term gives
+$Me^{-rT}\Phi(-b_2)$ after discounting. In the integral, $e^y$ times the Gaussian part of $\mathrm dF$ is a Gaussian of shifted mean
+(completing the square), which produces the $\Phi(b_1)$ terms, and $e^y$ times the reflected part, $e^{(1+2\mu/\sigma^2)y}$ times a
+Gaussian, produces the power $(S/M)^{-2b/\sigma^2}$ and the factor $\sigma^2/2b$ through $1+2\mu/\sigma^2=2b/\sigma^2$.
+\end{proof}
+\begin{remark}[Zero carry]
+Each bracket vanishes when $b\to0$ and the limit is finite. The general formula is evaluated at $b=\pm10^{-6}$ and averaged when
+$|b|<10^{-6}$, an error of order $10^{-12}$; engine A codes the exact limit for $q=0$, $r\to0$; engine B divides by $2r$ and is
+undefined at $r=0$.
+\end{remark}
+On the reference case ($S=100$, $r=5\,\%$, $q=0$, $\sigma=20\,\%$, $T=1$) the put is worth $14.290568$ and the call $17.216802$.
+
+%======================================================================
+\section{Homogeneity and the Greeks}\label{sec:homog}
+\subsection{Scaling}
+The dynamics is multiplicative and the payoffs are positively homogeneous in $(S,\text{extremum})$, hence
+\begin{equation}
+  V(\lambda S,\lambda m)=\lambda\,V(S,m)\quad(\lambda>0),\qquad V(S,m)=S\,g(m/S),
+\end{equation}
+for a function $g$ depending on $(r,q,\sigma,T)$. By Euler's theorem $V=S\,\partial_SV+m\,\partial_mV$.
+
+\begin{lemma}\label{lem:neumann}
+At $m=S$, $\partial_mV=0$ (one-sided derivative).
+\end{lemma}
+\begin{proof}
+For the call, $\partial_m\min(m,Se^{m_T})=\mathbf 1\{m<Se^{m_T}\}$, so $\partial_mV=-e^{-rT}\Prob\big(\min_{[0,T]}S_t>m\big)$. As $m\uparrow S$
+this probability tends to $\Prob(m_T>0)=0$: a Brownian motion goes below its starting point immediately. The put is symmetric.
+\end{proof}
+
+\begin{proposition}[Greeks at issue]\label{prop:greeks}
+With $z=m/S$, $\Delta=\partial_SV=g(z)-z\,g'(z)$ and $\Gamma=\partial_{SS}V=z^2g''(z)/S$. At issue ($z=1$):
+\begin{enumerate}[nosep,label=(\roman*)]
+  \item $\Delta=g(1)=V/S$, the same for the issue price $S\mapsto V(S,S)$ and for the contract held (\cref{lem:neumann});
+  \item the issue price $V(S,S)=S\,g(1)$ is linear in $S$: its second derivative is $0$;
+  \item the contract held, whose extremum stays at $m$ when the spot moves, has $\Gamma=g''(1)/S>0$;
+  \item vega, rho and theta are proportional to $S$.
+\end{enumerate}
+\end{proposition}
+Point (iii) matters for hedging: right after issue the extremum is a fixed number in the contract, not a function of the spot.
+On the reference case the held gamma is $0.0312$ for the put and $0.0455$ for the call, while the issue-price gamma is zero. Both C++ engines bump the spot \emph{and} the starting extremum, so they report the
+gamma of (ii), not of (iii). The page computes (iii) by fixing the extremum (seasoned mode); \cref{fig:homog} shows both.
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{axis}[xlabel={spot $S$},ylabel={$\Delta$},legend pos=south east,yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=2}]
+  \addplot[blue,very thick] table[x=S,y=delta]{data/homogene.dat}; \addlegendentry{$\Delta$ at issue}
+  \addplot[orange,thick,dashed] table[x=S,y=VsurS]{data/homogene.dat}; \addlegendentry{$V/S$}
+  \addplot[red,thick] table[x=S,y=deltavie]{data/homogene.dat}; \addlegendentry{$\Delta$, $M=110$ held}
+\end{axis}
+\end{tikzpicture}\hfill
+\begin{tikzpicture}
+\begin{axis}[xlabel={spot $S$},ylabel={$\Gamma$},legend pos=north east,yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=3}]
+  \addplot[blue,very thick] table[x=S,y=gamma]{data/homogene.dat}; \addlegendentry{issue price $V(S,S)$}
+  \addplot[teal,thick] table[x=S,y=gamma_tenu]{data/homogene.dat}; \addlegendentry{held from issue, $g''(1)/S$}
+  \addplot[red,thick] table[x=S,y=gammavie]{data/homogene.dat}; \addlegendentry{$M=110$ held}
+\end{axis}
+\end{tikzpicture}
+\caption{Put, reference parameters. Left: at issue $\Delta=V/S=0.1429$ for every spot; with a maximum $M=110$ already observed,
+$\Delta$ varies. Right: the issue price has zero gamma, the contract held does not.}\label{fig:homog}
+\end{figure}
+
+\subsection{Monte Carlo Greeks with common random numbers}
+Both engines compute Greeks by bump and revalue on \emph{common random numbers} (CRN): the bumped prices reuse the same draws.
+For a parameter $\theta$ and a payoff $Y(\theta,\omega)$ Lipschitz in $\theta$ with constant $L(\omega)$,
+\[
+  \operatorname{Var}\Big[\tfrac{Y(\theta+h)-Y(\theta-h)}{2h}\Big]\le\E[L^2]\quad\text{(CRN)},\qquad
+  \operatorname{Var}\Big[\tfrac{Y(\theta+h)-Y'(\theta-h)}{2h}\Big]=\frac{\operatorname{Var}Y}{2h^2}\quad\text{(independent draws)},
+\]
+so CRN keeps the variance bounded as $h\to0$. At issue each path's payoff is itself homogeneous of degree one in $S$ (the
+whole path and the starting extremum scale with $S$). Hence, path by path, the bumped delta equals $Y/S$ and the bumped gamma
+is exactly zero: engine A returns $\Gamma=-1.1\cdot10^{-10}\pm1.4\cdot10^{-12}$ (rounding) and a delta whose standard error is
+that of the price divided by $S$.
+
+\paragraph{Theta conventions.} Engine A computes $(V(T-h)-V(T))/h$, a one-sided estimate of $-\partial_TV$; engine B computes
+$+\partial_TV$ by central differences. The page keeps both conventions and offers a centred version of the first.
+
+%======================================================================
+\section{The Monte Carlo engines}\label{sec:mc}
+\subsection{Engine A: exact bridge in one step}
+Draw $X_T=\mu T+\sigma\sqrt T\,Z$, $Z\sim\mathcal N(0,1)$, then the extremum by inverting \eqref{eq:bridge} with $x_0=0$,
+$x_1=X_T$ and a uniform $U$: solving $\exp(-2y(y-X_T)/\sigma^2T)=U$ for $y$,
+\begin{equation}\label{eq:inverse}
+  M_T=\tfrac12\Big(X_T+\sqrt{X_T^2-2\sigma^2T\ln U}\Big),\qquad m_T=\tfrac12\Big(X_T-\sqrt{X_T^2-2\sigma^2T\ln U'}\Big).
+\end{equation}
+The pair $(X_T,M_T)$ has exactly the law of \cref{prop:joint}: the estimator is unbiased with a single step. The antithetic
+pair $(Z,-Z)$ with the same uniforms reduces the variance by a factor of about $2$ on the reference case (\cref{fig:conv}).
+$U$ and $U'$ are drawn independently, which is correct for these payoffs (each uses one extremum) but would not give the joint
+law of $(M_T,m_T)$ needed for a payoff such as $\max-\min$.
+
+\subsection{Engine B: time stepping}
+Paths are simulated on $n$ steps of length $\Delta t=T/n$ and the extremum is read on the grid. The discrete maximum is
+smaller than the continuous one, and for a Brownian motion the gap is of order $\sqrt{\Delta t}$ (Asmussen, Glynn and Pitman
+1995):
+\begin{equation}
+  \E\Big[\max_{[0,T]}X\Big]-\E\Big[\max_{k\le n}X_{k\Delta t}\Big]=\beta\,\sigma\sqrt{\Delta t}+o(\sqrt{\Delta t}),\qquad
+  \beta=-\frac{\zeta(1/2)}{\sqrt{2\pi}}\approx0.5826.
+\end{equation}
+Broadie, Glasserman and Kou (1997, 1999) turn this into a correction: the discrete extremum is shifted,
+$\max S\leftarrow e^{\beta\sigma\sqrt{\Delta t}}\max S$ and $\min S\leftarrow e^{-\beta\sigma\sqrt{\Delta t}}\min S$, which removes the
+first-order term; the residual bias is $O(\Delta t)$. This is what the C++ does.
+
+\subsection{Added: the exact bridge on each step}
+Conditionally on the grid values, the pieces of path on different steps are independent Brownian bridges (Markov property).
+The continuous maximum is the maximum over the steps of the bridge maxima, each of which can be drawn from \eqref{eq:bridge}
+with its own uniform:
+\begin{equation}
+  \max_{[0,T]}X=\max_{k}\tfrac12\Big(X_k+X_{k+1}+\sqrt{(X_{k+1}-X_k)^2-2\sigma^2\Delta t\ln U_k}\Big).
+\end{equation}
+The scheme is then exact for continuous monitoring for any $n$; the grid only matters if the payoff needs intermediate values.
+Its cost is one uniform and one square root per step.
+
+%======================================================================
+\section{Numerical study}\label{sec:num}
+\subsection{Discretisation bias}
+\Cref{fig:bias} shows the bias of engine B against the closed form, $20\,000$ paths per point, for the put. Without correction
+the bias is $-1.25$ with $100$ steps (a $9\,\%$ underpricing) and decreases like $\sqrt{\Delta t}$. BGK overcorrects at coarse
+grids ($+2.2$ with $2$ steps, $+0.35$ with $10$) and its residual decreases like $\Delta t$; it is within the statistical error from
+about $50$ steps. The bridge per step has no visible bias at any $n$, including $n=2$.
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{semilogxaxis}[width=0.8\textwidth,height=6.2cm,xlabel={time steps $n$},ylabel={price $-$ closed form},legend pos=south east,
+  yticklabel style={/pgf/number format/fixed}]
+  \addplot+[mark=*,thick,error bars/.cd,y dir=both,y explicit] table[x=n,y=brut,y error=brut_ic]{data/biais_put.dat}; \addlegendentry{no correction}
+  \addplot+[mark=square*,thick,error bars/.cd,y dir=both,y explicit] table[x=n,y=bgk,y error=bgk_ic]{data/biais_put.dat}; \addlegendentry{BGK}
+  \addplot+[mark=triangle*,thick,error bars/.cd,y dir=both,y explicit] table[x=n,y=pont,y error=pont_ic]{data/biais_put.dat}; \addlegendentry{exact bridge per step}
+  \addplot[black,dashed,domain=2:500] {0};
+\end{semilogxaxis}
+\end{tikzpicture}
+\caption{Discretisation bias of the time-stepping engine, put, reference parameters, with $95\,\%$ confidence intervals.}\label{fig:bias}
+\end{figure}
+
+\subsection{Convergence and antithetic variates}
+\Cref{fig:conv} shows engine A against the closed form. Both estimators converge at the Monte Carlo rate $N^{-1/2}$; the
+antithetic version has a standard error $1.42$ times smaller for the same number of normal draws (variance divided by $2.0$).
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{semilogxaxis}[width=0.8\textwidth,height=6cm,xlabel={paths $N$},ylabel={put price},legend pos=north east,
+  yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=2}]
+  \addplot+[mark=*,thick,error bars/.cd,y dir=both,y explicit] table[x=N,y=simple,y error=simple_ic]{data/convergence.dat}; \addlegendentry{plain}
+  \addplot+[mark=square*,thick,error bars/.cd,y dir=both,y explicit] table[x=N,y=anti,y error=anti_ic]{data/convergence.dat}; \addlegendentry{antithetic}
+  \addplot[black,dashed,domain=1000:200000] {14.290568}; \addlegendentry{closed form}
+\end{semilogxaxis}
+\end{tikzpicture}
+\caption{Exact-bridge engine against the closed form, $95\,\%$ confidence intervals.}\label{fig:conv}
+\end{figure}
+
+\subsection{The sampler against the exact law}
+\Cref{fig:law} compares the maxima drawn by \eqref{eq:inverse} ($200\,000$ paths) with the density from \eqref{eq:maxlaw}: the
+histogram follows the exact law, including the mass near $0$ (paths that never rise much above the start).
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.72\textwidth,height=5.4cm,xlabel={$y=\ln(\max S/S)$},ylabel={density},legend pos=north east,
+  xticklabel style={/pgf/number format/fixed}]
+  \addplot[ybar interval,fill=blue!25,draw=blue!50] table[x expr=\thisrow{y}-0.0083333,y=sim]{data/extremum.dat}; \addlegendentry{simulated}
+  \addplot[red,very thick] table[x=y,y=exact]{data/extremum.dat}; \addlegendentry{exact}
+\end{axis}
+\end{tikzpicture}
+\caption{Law of $M_T$ (reference parameters): bridge sampler against \eqref{eq:maxlaw}.}\label{fig:law}
+\end{figure}
+
+\subsection{Reference values}
+\begin{table}[ht]\centering\small
+\begin{tabular}{@{}lrrr@{}}\toprule
+ & closed form & engine A & engine B, no correction\\
+ & & ($10^4$ paths) & ($10^4$ paths $\times$ $100$ steps)\\\midrule
+price & $14.2906$ & $14.2953\pm0.1357$ & $12.9073\pm0.1925$\\
+$\Delta$ & $0.142906$ & $0.142953$ & $0.129073$\\
+$\Gamma$ (issue price) & $0$ & $-1.1\cdot10^{-10}$ & $1.9\cdot10^{-11}$\\
+vega & $87.170$ & $87.184$ & $79.460$\\
+$\rho$ & $-49.379$ & $-49.371$ & $-48.900$\\\bottomrule
+\end{tabular}
+\caption{Put with the default settings of the Excel workbook ($S=100$, $r=5\,\%$, $\sigma=20\,\%$, $T=1$, seed 42), Monte Carlo
+prices with $95\,\%$ confidence intervals. Engine B with BGK gives $14.2320$; with the bridge per step it is unbiased.}
+\end{table}
+
+%======================================================================
+\section{Code review}\label{sec:review}
+\begin{enumerate}
+  \item \emph{The engine A program does not compile}: \texttt{Barnicha/app/main.cpp} has \texttt{using namespace lookback;} while the
+        namespace is \texttt{Barnicha}. It is the executable called by the Excel macros.
+  \item \emph{Engine B ignores the seed}: \texttt{getRandomSeed()} returns the clock, so two identical runs differ.
+  \item \emph{Engine B, imperfect common random numbers}: \texttt{setRandomSeed} reseeds the generator but the normal law keeps the
+        value held in reserve by the polar method, so the bumped prices do not use the same normals. This defeats the purpose of
+        CRN and adds noise to every Greek.
+  \item \emph{Engine B, standard error of $\rho$}: the estimate divides by $2hr$ (relative bump), the standard error by $2h$ only.
+  \item \emph{Engine B, closed-form gamma four times too small}: divided by $(0.0002\,S)^2$ instead of $(0.0001\,S)^2$; invisible at
+        issue, where the issue-price gamma is zero.
+  \item \emph{Engine B, $r=0$}: the relative bump on $r$ and the closed form (division by $2r$) are undefined.
+  \item \emph{Opposite theta conventions} between the two engines, one of them one-sided.
+  \item \emph{Gamma at issue is not the hedging gamma}: both engines bump the starting extremum with the spot (\cref{prop:greeks}).
+  \item \emph{Independent extremum draws} in engine A: fine for these payoffs, wrong for a payoff using both extrema.
+  \item \emph{\texttt{out\_size} is never set} by the exported functions: the caller must know that there are 48 outputs.
+\end{enumerate}
+The JavaScript port fixes 2--6 (as options where the original behaviour is kept for comparison) and adds the dividend, the
+seasoned extremum, the bridge per step, antithetic variates, a centred theta and adjustable bumps.
+
+\section{Validation of the port}
+The generator \texttt{std::mt19937} and libstdc++'s \texttt{generate\_canonical}, uniform and normal (polar Marsaglia)
+distributions are reproduced bit for bit. With the same seed, engine A returns the prices of the C++ program compiled with g++
+to $10^{-15}$ and engine B those of the C++ simulator (with and without BGK) to $10^{-12}$; the closed-form Greeks match the Excel
+workbook to $10^{-10}$. With a dividend or a seasoned extremum, the Monte Carlo recovers the general closed form within its
+confidence interval.
+
+\section{Conclusion}
+The exact bridge makes the lookback a one-step simulation: unbiased, cheap, and easily extended to any number of monitoring
+steps by drawing one bridge extremum per step. Time stepping with BGK is a good approximation from about fifty steps but
+overcorrects on coarse grids, while uncorrected discrete monitoring underprices by several percent. The scaling of the price
+explains the Greeks: the delta at issue is $V/S$, and the gamma reported at issue is the curvature of the issue price, which is
+zero, while the gamma of a contract held is $g''(1)/S$. The review found ten defects in the C++ code, the most important being
+the uncompilable engine A program and the broken common random numbers of engine B.
+
+\begin{thebibliography}{99}\small
+\bibitem{agp} S.~Asmussen, P.~Glynn and J.~Pitman. Discretization error in simulation of one-dimensional reflecting Brownian
+  motion. \emph{Annals of Applied Probability}, 5(4):875--896, 1995.
+\bibitem{bgk97} M.~Broadie, P.~Glasserman and S.~Kou. A continuity correction for discrete barrier options.
+  \emph{Mathematical Finance}, 7(4):325--349, 1997.
+\bibitem{bgk99} M.~Broadie, P.~Glasserman and S.~Kou. Connecting discrete and continuous path-dependent options.
+  \emph{Finance and Stochastics}, 3:55--82, 1999.
+\bibitem{cv} P.~Glasserman. \emph{Monte Carlo Methods in Financial Engineering}. Springer, 2003.
+\bibitem{gsg} M.~Goldman, H.~Sosin and M.~Gatto. Path dependent options: buy at the low, sell at the high.
+  \emph{Journal of Finance}, 34(5):1111--1127, 1979.
+\bibitem{haug} E.~G.~Haug. \emph{The Complete Guide to Option Pricing Formulas}. McGraw-Hill, 2nd ed., 2007.
+\bibitem{shreve} S.~Shreve. \emph{Stochastic Calculus for Finance II}. Springer, 2004.
+\end{thebibliography}
+\end{document}

@@ -1,372 +1,194 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mohammed-Yassine Barnicha — Finance quantitative</title>
-<meta name="description" content="Projets de Mohammed-Yassine Barnicha : calibration d'options Bitcoin dans le navigateur, deep optimal stopping, swaptions bermudéennes sous HJM, options lookback en C++, EDP de Black-Scholes, apprentissage profond.">
-<meta property="og:title" content="Mohammed-Yassine Barnicha — Finance quantitative">
-<meta property="og:description" content="Pricing, calibration et méthodes numériques : applications et code source.">
+<title>Mohammed-Yassine Barnicha — Quantitative finance</title>
+<meta name="description" content="Projects of Mohammed-Yassine Barnicha: Bitcoin option calibration in the browser, Bermudan swaptions under HJM, lookback options in C++, deep optimal stopping, Black-Scholes PDE, deep learning.">
+<meta property="og:title" content="Mohammed-Yassine Barnicha — Quantitative finance">
+<meta property="og:description" content="Pricing, calibration and numerical methods: online applications, reports and source code.">
 <meta property="og:image" content="https://yassinebarnicha.github.io/img/calibration.webp">
 <meta name="theme-color" content="#080b12">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23080b12'/%3E%3Cpath d='M7 22 13 10l5 12 7-13' stroke='%2391b9ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 <style>
-/* Même langage visuel que l'application de calibration : fond neutre, angles droits, chiffres en chasse fixe.
-   Aucune police ni bibliothèque externe : la page reste autonome. */
+/* Dark "midnight glass" theme, shared with the project pages (kit/style.css). No external font or library. */
 :root{
-  color-scheme:light;
-  --ground:#f4f4f4;--panel:#fff;--sunk:#e8e8e8;--ink:#161616;--ink2:#525252;--line:#c6c6c6;
-  --accent:#0f62fe;--accent-hover:#0050e6;--accent-ink:#fff;--tag:#edf5ff;--tag-ink:#0043ce;
-  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  color-scheme:dark;
+  --ground:#080b12;--panel:#111827;--sunk:#182235;--ink:#eef3ff;--ink2:#a8b4ca;--line:#29354a;
+  --accent:#91b9ff;--accent-hover:#c0d4ff;--accent-ink:#10182a;--tag:#1a2942;--tag-ink:#c4d8ff;
+  --glass:linear-gradient(145deg,rgb(255 255 255 / 7%),rgb(255 255 255 / 2%));
+  --edge:rgb(255 255 255 / 10%);
+  --sans:Arial,"Helvetica Neue",sans-serif;
   --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,"Liberation Mono",monospace;
 }
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){color-scheme:dark;
-    --ground:#161616;--panel:#262626;--sunk:#393939;--ink:#f4f4f4;--ink2:#c6c6c6;--line:#525252;
-    --accent:#4589ff;--accent-hover:#78a9ff;--accent-ink:#161616;--tag:#002d9c;--tag-ink:#d0e2ff}
-}
-:root[data-theme="dark"]{color-scheme:dark;
-  --ground:#161616;--panel:#262626;--sunk:#393939;--ink:#f4f4f4;--ink2:#c6c6c6;--line:#525252;
-  --accent:#4589ff;--accent-hover:#78a9ff;--accent-ink:#161616;--tag:#002d9c;--tag-ink:#d0e2ff}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-padding-top:64px}
-body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.6 var(--sans);-webkit-text-size-adjust:100%}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.7 var(--sans);letter-spacing:.005em;-webkit-text-size-adjust:100%}
 a{color:var(--accent)}
 a:hover{color:var(--accent-hover)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:focus-visible{outline:2px solid #a4c4ff;outline-offset:3px}
 img{max-width:100%;height:auto;display:block}
-.page{max-width:1180px;margin:0 auto;padding:0 24px}
+.page{max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,76px)}
 code,.mono{font-family:var(--mono);font-size:.9em}
 
-/* barre du haut */
-.barre{position:sticky;top:0;z-index:10;background:#161616;color:#fff;border-bottom:2px solid var(--accent)}
-.barre .page{display:flex;align-items:center;gap:16px;min-height:52px}
-.mono-nom{font:600 13px var(--mono);padding-right:16px;border-right:1px solid #525252}
-.barre .nom{font-weight:600;font-size:14px;white-space:nowrap}
+/* top bar */
+.barre{position:sticky;top:0;z-index:10;color:var(--ink);background:rgb(8 11 18 / 76%);border-bottom:1px solid rgb(255 255 255 / 8%);
+  backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%)}
+.barre .page{display:flex;align-items:center;gap:16px;min-height:68px}
+.mono-nom{font:600 13px var(--mono);padding-right:16px;border-right:1px solid rgb(255 255 255 / 13%);color:var(--accent)}
+.barre .nom{font-weight:550;font-size:14px;white-space:nowrap;letter-spacing:.01em}
 .barre nav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
-.barre nav a{color:#c6c6c6;text-decoration:none;font-size:13px;padding:6px 10px}
-.barre nav a:hover{color:#fff;background:#393939}
+.barre nav a{color:var(--ink2);text-decoration:none;font-size:13px;padding:8px 13px;border-radius:999px;
+  transition:color .24s ease,background .24s ease,transform .3s cubic-bezier(.2,.8,.2,1)}
+.barre nav a:hover{color:var(--ink);background:rgb(255 255 255 / 8%);transform:translateY(-1px)}
 
-/* en-tête */
-.entete{padding:56px 0 40px;border-bottom:1px solid var(--line)}
-.surtitre{font:12px var(--mono);color:var(--ink2);text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px}
-h1{font-weight:400;font-size:clamp(32px,5vw,52px);line-height:1.1;letter-spacing:-.03em;margin:0 0 16px}
-.chapeau{font-size:clamp(16px,1.8vw,19px);color:var(--ink2);max-width:72ch;margin:0 0 28px}
-.chapeau b{color:var(--ink);font-weight:600}
-.boutons{display:flex;flex-wrap:wrap;gap:12px}
-.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 20px;border:1px solid var(--accent);
-  text-decoration:none;font-weight:600;font-size:14px}
-.btn.plein{background:var(--accent);color:var(--accent-ink)}
-.btn.plein:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:var(--accent-ink)}
-.btn.creux{color:var(--accent);background:transparent}
-.btn.creux:hover{background:var(--tag)}
-.chiffres{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:40px}
-.chiffres div{background:var(--panel);padding:16px 18px}
-.chiffres b{display:block;font:600 16px/1.3 var(--sans);margin-bottom:4px}
-.chiffres span{font-size:12.5px;color:var(--ink2)}
+/* header */
+.entete{position:relative;isolation:isolate;overflow:hidden;padding:clamp(62px,10vw,128px) 0 clamp(50px,7vw,88px);
+  background:linear-gradient(135deg,#0b1020 0%,#10192b 52%,#101522 100%);border:1px solid rgb(255 255 255 / 8%);border-top:0;border-radius:0 0 34px 34px}
+.entete::before{content:"";position:absolute;z-index:-1;top:-54%;right:-12%;width:min(75vw,880px);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle at 42% 42%,rgb(73 127 255 / 35%),transparent 50%),radial-gradient(circle at 65% 58%,rgb(163 124 255 / 24%),transparent 48%);
+  filter:blur(30px);pointer-events:none;animation:ambient-float 16s ease-in-out infinite alternate}
+.surtitre{font:11px var(--mono);color:var(--accent);text-transform:uppercase;letter-spacing:.12em;margin:0 0 12px}
+.entete .surtitre{display:inline-flex;align-items:center;gap:10px;padding:8px 13px;border:1px solid rgb(255 255 255 / 13%);border-radius:999px;
+  background:rgb(255 255 255 / 5%);color:#bfd3ff;letter-spacing:.11em;backdrop-filter:blur(12px)}
+.entete .surtitre::before{content:"";width:7px;height:7px;border-radius:50%;background:#a5f0ce;box-shadow:0 0 14px rgb(165 240 206 / 75%)}
+h1,h2{font-family:var(--sans);font-weight:620;letter-spacing:-.065em}
+h1{max-width:17ch;margin:22px 0 24px;font-size:clamp(48px,7.8vw,96px);line-height:.96}
+.chapeau{font-size:clamp(16px,1.45vw,19px);line-height:1.75;color:#b5c0d2;max-width:68ch;margin:0 0 28px}
+.chapeau b{color:#c4d8ff;font-weight:650}
+.boutons{display:flex;flex-wrap:wrap;gap:10px}
+.btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 21px;border:1px solid transparent;
+  border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;
+  transition:transform .36s cubic-bezier(.2,.8,.2,1.25),background .24s ease,border-color .24s ease,box-shadow .3s ease}
+.btn:active{transform:scale(.96)}
+.btn.plein{background:linear-gradient(125deg,#93baff,#b2a4ff);color:#10182a;box-shadow:0 8px 24px rgb(106 144 255 / 20%)}
+.btn.plein:hover{background:linear-gradient(125deg,#b8d0ff,#d0c3ff);color:#10182a;box-shadow:0 12px 32px rgb(106 144 255 / 32%)}
+.btn.plein::before{content:"";position:absolute;inset:-40% auto -40% -45%;width:35%;transform:translateX(-180%) skewX(-20deg);
+  background:linear-gradient(90deg,transparent,rgb(255 255 255 / 42%),transparent);pointer-events:none}
+.btn.creux{border-color:rgb(255 255 255 / 15%);background:rgb(255 255 255 / 5%);color:var(--ink);backdrop-filter:blur(14px)}
+.btn.creux:hover{border-color:rgb(255 255 255 / 28%);background:rgb(255 255 255 / 10%)}
 
 /* sections */
-section{padding:48px 0;border-bottom:1px solid var(--line)}
-h2{font-weight:400;font-size:clamp(24px,3vw,32px);letter-spacing:-.02em;margin:0 0 8px}
-.intro{color:var(--ink2);max-width:75ch;margin:0 0 28px}
-h3{font-size:17px;margin:0 0 6px;letter-spacing:-.01em}
+section{padding:clamp(54px,7vw,88px) 0;border-bottom:1px solid rgb(255 255 255 / 9%)}
+h2{font-size:clamp(30px,4.2vw,48px);line-height:1.08;letter-spacing:-.055em;margin:0 0 10px}
+.intro{color:var(--ink2);max-width:72ch;margin:0 0 32px;font-size:15px;line-height:1.75}
+h3{font-size:17px;margin:0 0 6px;letter-spacing:-.025em;line-height:1.35}
 .etiquettes{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:0;list-style:none}
-.etiquettes li{font:12px var(--mono);background:var(--tag);color:var(--tag-ink);padding:2px 8px}
+.etiquettes li{font:12px var(--mono);background:var(--tag);color:var(--tag-ink);padding:5px 10px;border-radius:999px}
 
-/* parcours */
+/* background */
 .parcours{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
 .parcours h3.col{font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink2);margin:0 0 14px}
 .etape{border-left:2px solid var(--line);padding:0 0 18px 16px;position:relative}
-.etape::before{content:"";position:absolute;left:-6px;top:4px;width:10px;height:10px;background:var(--accent)}
+.etape::before{content:"";position:absolute;left:-6px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--accent);
+  box-shadow:0 0 0 5px var(--ground),0 0 18px rgb(145 185 255 / 35%)}
 .etape .quand{font:12px var(--mono);color:var(--ink2)}
 .etape h4{margin:2px 0 2px;font-size:16px}
-.etape .ou{font-size:13.5px;color:var(--ink2);margin:0 0 6px}
-.etape p,.etape li{font-size:14px;color:var(--ink2);margin:0}
+.etape .ou,.etape p,.etape li{color:var(--ink2)}
+.etape .ou{font-size:13.5px;margin:0 0 6px}
+.etape p,.etape li{font-size:14px;margin:0}
 .etape ul{margin:6px 0 0;padding-left:18px}
 .etape li{margin-bottom:4px}
 .etape b{color:var(--ink)}
-.competences{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:12px}
-.competences div{background:var(--panel);padding:14px 16px;font-size:14px;color:var(--ink2)}
-.competences b{display:block;font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ink);margin-bottom:6px}
-@media (max-width:900px){.parcours,.competences{grid-template-columns:minmax(0,1fr)}}
+.competences{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.competences div{border:1px solid rgb(255 255 255 / 9%);border-radius:18px;background:var(--glass);padding:14px 16px;font-size:14px;color:var(--ink2)}
+.competences b{display:block;font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin-bottom:6px}
 
-/* applications en ligne */
-.apps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.app{background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;text-decoration:none;color:var(--ink)}
-.app:hover{border-color:var(--accent)}
-.app:hover .ouvrir{background:var(--accent-hover)}
-.app img{width:100%;aspect-ratio:900/579;object-fit:cover;object-position:top;border-bottom:1px solid var(--line)}
-.app .corps{padding:16px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
-.app h3{margin:0;font-size:17px}
+/* online applications */
+.apps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.app,.carte,.cadre{border:1px solid var(--edge);border-radius:22px;background:var(--glass);box-shadow:inset 0 1px rgb(255 255 255 / 5%)}
+.app{position:relative;isolation:isolate;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:var(--ink);
+  transition:transform .42s cubic-bezier(.2,.8,.2,1),border-color .3s ease,box-shadow .35s ease}
+.app::after{content:"";position:absolute;z-index:2;inset:-70% -40%;transform:translateX(-70%) rotate(12deg);
+  background:linear-gradient(105deg,transparent 42%,rgb(255 255 255 / 8%) 50%,transparent 58%);opacity:0;pointer-events:none}
+.app img{width:100%;aspect-ratio:900/579;object-fit:cover;object-position:top;border-bottom:1px solid var(--edge);transition:transform .65s cubic-bezier(.2,.7,.2,1)}
+.app .corps{padding:20px 21px 22px;display:flex;flex-direction:column;gap:10px;flex:1}
+.app h3{margin:0}
 .app p{margin:0;font-size:14px;color:var(--ink2)}
-.app .ouvrir{margin-top:auto;align-self:flex-start;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:14px;padding:10px 16px}
-@media (max-width:900px){.apps{grid-template-columns:minmax(0,1fr)}}
+.app .ouvrir{margin-top:auto;align-self:flex-start;border-radius:999px;background:rgb(145 185 255 / 12%);color:#c4d8ff;font-weight:600;font-size:13px;
+  padding:8px 14px;transition:background .24s ease,color .24s ease,transform .3s ease}
 
-/* projet vedette */
-.vedette{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;align-items:start}
-.cadre{background:var(--panel);border:1px solid var(--line);padding:6px}
-.cadre figcaption{font-size:12px;color:var(--ink2);padding:8px 4px 2px}
+/* main project */
+.vedette{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:clamp(24px,4vw,54px);align-items:center}
+.cadre{padding:8px;overflow:hidden}
+.cadre img{border-radius:15px}
+.cadre figcaption{font-size:12px;color:var(--ink2);padding:11px 8px 5px;line-height:1.5}
 figure{margin:0}
 .vedette ul.points{margin:0 0 20px;padding-left:18px}
-.vedette ul.points li{margin-bottom:6px}
-.galerie{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:24px}
+.vedette ul.points li{margin-bottom:6px;color:var(--ink2)}
+.vedette ul.points b{color:var(--ink)}
+.galerie{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:24px}
 .galerie a{display:block;text-decoration:none;color:var(--ink2)}
-.galerie a:hover .cadre{border-color:var(--accent)}
-.galerie figcaption{font-size:12px}
+.galerie .cadre{height:100%}
+.galerie img{aspect-ratio:1.5;object-fit:cover}
+.galerie a:hover .cadre{border-color:rgb(145 185 255 / 48%)}
 .colonnes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:36px}
 .colonnes h3{font-size:15px}
 .colonnes p,.colonnes li{font-size:14px;color:var(--ink2)}
 .colonnes ul{margin:0;padding-left:18px}
-.onglets-app{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:16px 0 0;padding:0;list-style:none}
-.onglets-app li{background:var(--panel);padding:12px 14px;font-size:13.5px;color:var(--ink2)}
+.onglets-app{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin:16px 0 0;padding:0;list-style:none}
+.onglets-app li{border:1px solid rgb(255 255 255 / 8%);border-radius:12px;background:rgb(255 255 255 / 4%);padding:12px 14px;font-size:13.5px;color:var(--ink2)}
 .onglets-app b{color:var(--ink);font-weight:600}
 .onglets-app .num{font:12px var(--mono);color:var(--accent);margin-right:6px}
 details.plus{margin-top:28px}
 details.plus summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
 
-/* grille de projets */
+/* project grid */
 .grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
-.carte{background:var(--panel);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column}
-.carte:hover{border-color:var(--ink2)}
-.carte .langue{font:12px var(--mono);color:var(--ink2);margin:0 0 8px}
-.carte p{margin:0 0 10px;font-size:14px}
+.carte{padding:22px;display:flex;flex-direction:column;transition:transform .38s cubic-bezier(.2,.8,.2,1),border-color .3s ease,box-shadow .35s ease}
+.carte .langue{font:12px var(--mono);color:#b6cbf4;letter-spacing:.05em;margin:0 0 8px}
+.carte p{margin:0 0 10px;font-size:14px;color:var(--ink2)}
 .carte ul{margin:0 0 14px;padding-left:18px;font-size:13.5px;color:var(--ink2)}
 .carte ul li{margin-bottom:3px}
 .carte .liens{margin-top:auto;display:flex;flex-wrap:wrap;gap:16px;font-size:14px;font-weight:600}
-.carte .liens a{text-decoration:none}
-.carte .liens a:hover{text-decoration:underline}
+.carte .liens a{text-decoration:none;color:#bcd2ff;transition:color .2s ease}
+.carte .liens a:hover{text-decoration:underline;text-underline-offset:4px;color:#fff}
 
-/* méthodes */
-.methodes{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
-.methodes div{background:var(--panel);padding:18px}
-.methodes h3{font-size:14px;text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);font-weight:500;color:var(--ink2);margin-bottom:10px}
+/* methods */
+.methodes{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.methodes div{border:1px solid rgb(255 255 255 / 9%);border-radius:18px;background:var(--glass);padding:18px}
+.methodes h3{font:500 14px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:#c1d5ff;margin-bottom:10px}
 .methodes ul{margin:0;padding:0;list-style:none;font-size:14px}
-.methodes li{padding:3px 0;border-bottom:1px solid var(--sunk)}
+.methodes li{padding:3px 0;border-bottom:1px solid rgb(255 255 255 / 8%)}
 .methodes li:last-child{border-bottom:0}
 .methodes .ou{color:var(--ink2);font-size:12.5px}
 
 footer{padding:32px 0 48px;color:var(--ink2);font-size:13px}
 footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-between}
 
-@media (max-width:900px){
-  .vedette{grid-template-columns:minmax(0,1fr)}
-  .colonnes{grid-template-columns:minmax(0,1fr)}
-  .galerie{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .chiffres{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media (max-width:600px){
-  .page{padding:0 16px}
-  .barre .nom{display:none}
-  .barre nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-width:0}
-  .barre nav::-webkit-scrollbar{display:none}
-  .barre nav a{padding:6px 7px;font-size:12.5px;white-space:nowrap}
-  .entete{padding:36px 0 32px}
-  section{padding:36px 0}
-  .grille{grid-template-columns:minmax(0,1fr)}
-  .btn{flex:1 1 auto;justify-content:center}
-}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
-
-/* Editorial portfolio theme */
-:root{
-  --ground:#f4f0e8;--panel:#fbf9f4;--sunk:#ede7dc;--ink:#20231f;--ink2:#64665f;--line:#d8d1c5;
-  --accent:#315c4e;--accent-hover:#24483d;--accent-ink:#fbf9f4;--tag:#e7eee8;--tag-ink:#315c4e;
-  --display:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --ground:#1e211e;--panel:#272b27;--sunk:#30362f;--ink:#f1eee6;--ink2:#bbbcb3;--line:#444a42;
-    --accent:#a8c4ae;--accent-hover:#c3d8c5;--accent-ink:#20231f;--tag:#303d33;--tag-ink:#c7ddca;
-  }
-}
-:root[data-theme="dark"]{
-  --ground:#1e211e;--panel:#272b27;--sunk:#30362f;--ink:#f1eee6;--ink2:#bbbcb3;--line:#444a42;
-  --accent:#a8c4ae;--accent-hover:#c3d8c5;--accent-ink:#20231f;--tag:#303d33;--tag-ink:#c7ddca;
-}
-body{font-size:15px;line-height:1.68;letter-spacing:.005em}
-.page{max-width:1240px;padding-inline:clamp(20px,5vw,72px)}
-.barre{background:var(--ground);color:var(--ink);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
-.barre .page{min-height:64px}
-.mono-nom{color:var(--accent);border-color:var(--line);letter-spacing:.08em}
-.barre .nom{font-weight:550;letter-spacing:.01em}
-.barre nav a{color:var(--ink2);padding:8px 11px;transition:color .18s ease,background .18s ease}
-.barre nav a:hover{color:var(--ink);background:var(--sunk)}
-.entete{padding:clamp(58px,9vw,112px) 0 clamp(42px,6vw,72px);background:var(--panel);border-bottom:1px solid var(--line)}
-.surtitre{font-size:11px;letter-spacing:.12em;color:var(--accent)}
-.entete .surtitre{display:flex;align-items:center;gap:10px}
-.entete .surtitre::before{content:"";width:24px;height:1px;background:var(--accent)}
-h1,h2{font-family:var(--display);font-weight:400;letter-spacing:-.035em}
-h1{font-size:clamp(46px,7vw,76px);line-height:.98;max-width:none;margin:0 0 24px}
-.chapeau{max-width:70ch;font-size:clamp(16px,1.45vw,19px);line-height:1.75}
-.chapeau b{font-weight:650;color:var(--accent)}
-.boutons{gap:9px}
-.btn{min-height:46px;padding:0 18px;border-radius:2px;transition:transform .18s ease,background .18s ease,border-color .18s ease}
-.btn:hover{transform:translateY(-1px)}
-.btn.plein{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.plein:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
-.btn.creux{color:var(--ink);border-color:var(--line)}
-.btn.creux:hover{background:var(--sunk);border-color:var(--line)}
-.chiffres{gap:0;background:transparent;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-top:48px}
-.chiffres div{background:transparent;padding:18px 16px}
-.chiffres b{font-family:var(--display);font-size:20px;font-weight:500;letter-spacing:-.02em}
-section{padding:clamp(52px,7vw,84px) 0;border-color:var(--line)}
-h2{font-size:clamp(30px,4vw,44px);line-height:1.1;margin-bottom:10px}
-.intro{font-size:15px;line-height:1.75;margin-bottom:32px}
-h3{font-size:17px;line-height:1.35}
-.apps{gap:18px}
-.app,.carte,.cadre{background:var(--panel);border-color:var(--line);border-radius:3px}
-.app{overflow:hidden;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
-.app:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 12px 28px rgb(32 35 31 / 8%)}
-.app img{border-color:var(--line);transition:transform .35s ease}
-.app:hover img{transform:scale(1.025)}
-.app .corps{padding:19px 20px 21px;gap:10px}
-.app .ouvrir{background:transparent;color:var(--accent);padding:8px 0 0;font-size:13px}
-.app:hover .ouvrir{background:transparent;color:var(--accent-hover)}
-.vedette{gap:clamp(24px,4vw,54px);align-items:center}
-.cadre{padding:7px}
-.cadre figcaption{padding:10px 6px 4px;line-height:1.5}
-.galerie{gap:14px}
-.galerie .cadre{height:100%}
-.galerie img{aspect-ratio:1.5;object-fit:cover}
-.etiquettes li{border-radius:2px}
-.etape{border-color:var(--line)}
-.etape::before{border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--ground)}
-.competences{background:var(--line);gap:1px}
-.competences div{background:var(--panel);line-height:1.65}
-.grille{gap:16px}
-.carte{padding:22px;transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
-.carte:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 10px 22px rgb(32 35 31 / 6%)}
-.carte .langue{font-size:11px;letter-spacing:.04em;color:var(--accent)}
-.carte .liens a{text-underline-offset:3px}
-.methodes{background:var(--line)}
-.methodes div{background:var(--panel)}
-.methodes h3{color:var(--accent)}
-footer{border-top:1px solid var(--line)}
-:focus-visible{outline-color:var(--accent)}
-@media(max-width:600px){
-  .page{padding-inline:18px}
-  .entete{padding:52px 0 38px}
-  h1{font-size:clamp(42px,13vw,64px)}
-  .barre .page{gap:10px}
-  .barre nav a{padding-inline:8px}
-  .chiffres div{padding:14px 12px}
-  .galerie{gap:10px}
-}
-@keyframes settle-in{
-  from{opacity:0;transform:translateY(12px)}
-  to{opacity:1;transform:translateY(0)}
-}
-.entete .surtitre{animation:settle-in .55s cubic-bezier(.2,.7,.2,1) both}
-.entete h1{animation:settle-in .65s .06s cubic-bezier(.2,.7,.2,1) both}
-.entete .chapeau{animation:settle-in .65s .12s cubic-bezier(.2,.7,.2,1) both}
-.entete .boutons{animation:settle-in .65s .18s cubic-bezier(.2,.7,.2,1) both}
-@media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-delay:0ms!important}
-}
-
-/* Midnight glass motion system */
-:root{
-  color-scheme:dark;
-  --ground:#080b12;--panel:#111827;--sunk:#182235;--ink:#eef3ff;--ink2:#a8b4ca;--line:#29354a;
-  --accent:#91b9ff;--accent-hover:#c0d4ff;--accent-ink:#10182a;--tag:#1a2942;--tag-ink:#c4d8ff;
-  --sans:Arial,"Helvetica Neue",sans-serif;--display:var(--sans);
-}
-body{background:var(--ground);color:var(--ink);font-size:15px;line-height:1.7;letter-spacing:.005em}
-.page{max-width:1320px;padding-inline:clamp(20px,5vw,76px)}
-.barre{background:rgb(8 11 18 / 76%);color:var(--ink);border-bottom:1px solid rgb(255 255 255 / 8%);backdrop-filter:blur(22px) saturate(150%)}
-.barre .page{min-height:68px}
-.mono-nom{color:var(--accent);border-color:rgb(255 255 255 / 13%)}
-.barre .nom{font-weight:550;letter-spacing:.01em}
-.barre nav a{color:var(--ink2);border-radius:999px;padding:8px 13px;transition:color .24s ease,background .24s ease,transform .3s cubic-bezier(.2,.8,.2,1)}
-.barre nav a:hover{color:var(--ink);background:rgb(255 255 255 / 8%);transform:translateY(-1px)}
-.entete{position:relative;isolation:isolate;overflow:hidden;padding:clamp(62px,10vw,128px) 0 clamp(50px,7vw,88px);background:linear-gradient(135deg,#0b1020 0%,#10192b 52%,#101522 100%);border:1px solid rgb(255 255 255 / 8%);border-radius:0 0 34px 34px}
-.entete::before{content:"";position:absolute;z-index:-1;top:-54%;right:-12%;width:min(75vw,880px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 42% 42%,rgb(73 127 255 / 35%),transparent 50%),radial-gradient(circle at 65% 58%,rgb(163 124 255 / 24%),transparent 48%);filter:blur(30px);pointer-events:none;animation:ambient-float 16s ease-in-out infinite alternate}
-.entete .page{position:relative;z-index:1}
-.entete .surtitre{display:inline-flex;align-items:center;gap:10px;padding:8px 13px;border:1px solid rgb(255 255 255 / 13%);border-radius:999px;background:rgb(255 255 255 / 5%);color:#bfd3ff;font-size:11px;letter-spacing:.11em;backdrop-filter:blur(12px)}
-.entete .surtitre::before{content:"";width:7px;height:7px;border-radius:50%;background:#a5f0ce;box-shadow:0 0 14px rgb(165 240 206 / 75%)}
-h1,h2{font-family:var(--sans);font-weight:620;letter-spacing:-.065em}
-h1{max-width:17ch;margin:22px 0 24px;font-size:clamp(48px,7.8vw,96px);line-height:.96}
-.chapeau{max-width:68ch;font-size:clamp(16px,1.45vw,19px);line-height:1.75;color:#b5c0d2}
-.chapeau b{font-weight:650;color:#c4d8ff}
-.boutons{gap:10px}
-.btn{min-height:48px;padding:0 21px;border-radius:999px;transition:transform .36s cubic-bezier(.2,.8,.2,1.25),background .24s ease,border-color .24s ease,box-shadow .3s ease}
-.btn:active{transform:scale(.96)}
-.btn.plein{border-color:transparent;background:linear-gradient(125deg,#93baff,#b2a4ff);color:#10182a;box-shadow:0 8px 24px rgb(106 144 255 / 20%)}
-.btn.plein:hover{background:linear-gradient(125deg,#b8d0ff,#d0c3ff);box-shadow:0 12px 32px rgb(106 144 255 / 32%)}
-.btn.creux{border-color:rgb(255 255 255 / 15%);background:rgb(255 255 255 / 5%);color:var(--ink);backdrop-filter:blur(14px)}
-.btn.creux:hover{border-color:rgb(255 255 255 / 28%);background:rgb(255 255 255 / 10%)}
-.chiffres{gap:10px;background:transparent;border:0;margin-top:44px}
-.chiffres div{border:1px solid rgb(255 255 255 / 9%);border-radius:18px;background:linear-gradient(145deg,rgb(255 255 255 / 8%),rgb(255 255 255 / 3%));padding:17px 19px}
-.chiffres b{font-size:17px;font-weight:600;letter-spacing:-.025em}
-.chiffres span{color:var(--ink2)}
-section{padding:clamp(54px,7vw,88px) 0;border-color:rgb(255 255 255 / 9%)}
-h2{font-size:clamp(30px,4.2vw,48px);line-height:1.08;letter-spacing:-.055em}
-.intro{max-width:72ch;font-size:15px;line-height:1.75;color:var(--ink2)}
-.apps{gap:18px}
-.app,.carte,.cadre{border:1px solid rgb(255 255 255 / 10%);border-radius:22px;background:linear-gradient(145deg,rgb(255 255 255 / 7%),rgb(255 255 255 / 2%));box-shadow:inset 0 1px rgb(255 255 255 / 5%)}
-.app{overflow:hidden;transition:transform .42s cubic-bezier(.2,.8,.2,1),border-color .3s ease,box-shadow .35s ease}
-.app img{border-color:rgb(255 255 255 / 10%);transition:transform .65s cubic-bezier(.2,.7,.2,1)}
-.app .corps{padding:20px 21px 22px;gap:10px}
-.app h3,.carte h3{letter-spacing:-.025em}
-.app p,.carte p,.carte li{color:var(--ink2)}
-.app .ouvrir{margin-top:auto;align-self:flex-start;border-radius:999px;background:rgb(145 185 255 / 12%);color:#c4d8ff;font-size:13px;padding:8px 14px;transition:background .24s ease,color .24s ease,transform .3s ease}
-.app:hover .ouvrir{background:rgb(145 185 255 / 22%);color:#e2ecff;transform:translateX(3px)}
-.vedette{gap:clamp(24px,4vw,54px);align-items:center}
-.cadre{padding:8px;overflow:hidden}
-.cadre figcaption{padding:11px 8px 5px;color:var(--ink2)}
-.galerie{gap:14px}
-.galerie .cadre{height:100%}
-.galerie img{aspect-ratio:1.5;object-fit:cover;border-radius:15px}
-.etiquettes li{padding:5px 10px;border-radius:999px;background:var(--tag);color:var(--tag-ink)}
-.etape{border-color:var(--line)}
-.etape::before{border-radius:50%;background:var(--accent);box-shadow:0 0 0 5px var(--ground),0 0 18px rgb(145 185 255 / 35%)}
-.etape .ou,.etape p,.etape li{color:var(--ink2)}
-.competences{gap:10px;background:transparent;border:0}
-.competences div{border:1px solid rgb(255 255 255 / 9%);border-radius:18px;background:linear-gradient(145deg,rgb(255 255 255 / 6%),rgb(255 255 255 / 2%));color:var(--ink2)}
-.competences b{color:var(--accent)}
-.grille{gap:16px}
-.carte{padding:22px;transition:transform .38s cubic-bezier(.2,.8,.2,1),border-color .3s ease,box-shadow .35s ease}
-.carte .langue{color:#b6cbf4;letter-spacing:.05em}
-.carte .liens a{color:#bcd2ff;text-underline-offset:4px;transition:color .2s ease}
-.carte .liens a:hover{color:#fff}
-.methodes{gap:10px;background:transparent;border:0}
-.methodes div{border:1px solid rgb(255 255 255 / 9%);border-radius:18px;background:linear-gradient(145deg,rgb(255 255 255 / 6%),rgb(255 255 255 / 2%))}
-.methodes h3{color:#c1d5ff}
-.methodes li{border-color:rgb(255 255 255 / 8%)}
-.methodes .ou{color:var(--ink2)}
-.onglets-app{gap:8px;background:transparent;border:0}
-.onglets-app li{border:1px solid rgb(255 255 255 / 8%);border-radius:12px;background:rgb(255 255 255 / 4%);color:var(--ink2)}
-.onglets-app b{color:var(--ink)}
-footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
-:focus-visible{outline-color:#a4c4ff;outline-offset:3px}
-.entete .surtitre,.entete h1,.entete .chapeau,.entete .boutons{animation:none}
-.btn{position:relative;overflow:hidden}
-.btn.plein::before{content:"";position:absolute;inset:-40% auto -40% -45%;width:35%;transform:translateX(-180%) skewX(-20deg);background:linear-gradient(90deg,transparent,rgb(255 255 255 / 42%),transparent);pointer-events:none}
-.app{position:relative;isolation:isolate}
-.app::after{content:"";position:absolute;z-index:2;inset:-70% -40%;transform:translateX(-70%) rotate(12deg);background:linear-gradient(105deg,transparent 42%,rgb(255 255 255 / 8%) 50%,transparent 58%);opacity:0;pointer-events:none}
-@media(hover:hover){
+@media (hover:hover){
   .btn:hover{transform:translateY(-2px) scale(1.015)}
   .btn.plein:hover::before{animation:button-glint .72s cubic-bezier(.2,.7,.2,1) both}
-  .app:hover,.carte:hover{transform:translateY(-5px) scale(1.008);border-color:rgb(145 185 255 / 48%);box-shadow:0 24px 54px rgb(0 0 0 / 24%),inset 0 1px rgb(255 255 255 / 10%)}
+  .app:hover,.carte:hover{transform:translateY(-5px) scale(1.008);border-color:rgb(145 185 255 / 48%);
+    box-shadow:0 24px 54px rgb(0 0 0 / 24%),inset 0 1px rgb(255 255 255 / 10%)}
   .app:hover img{transform:scale(1.035)}
   .app:hover::after{animation:card-sheen .9s ease both}
+  .app:hover .ouvrir{background:rgb(145 185 255 / 22%);color:#e2ecff;transform:translateX(3px)}
 }
 @keyframes button-glint{0%{transform:translateX(-180%) skewX(-20deg);opacity:0}20%{opacity:.8}100%{transform:translateX(550%) skewX(-20deg);opacity:0}}
 @keyframes card-sheen{0%{transform:translateX(-70%) rotate(12deg);opacity:0}18%{opacity:1}100%{transform:translateX(70%) rotate(12deg);opacity:0}}
 @keyframes ambient-float{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-5%,5%,0) scale(1.08)}}
-@media(max-width:600px){
-  .page{padding-inline:18px}
+@media (max-width:900px){
+  .parcours,.competences,.apps,.vedette,.colonnes{grid-template-columns:minmax(0,1fr)}
+  .galerie{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:600px){
+  .page{padding:0 18px}
   .barre .page{gap:10px;min-height:60px}
-  .barre nav a{padding:7px 10px}
+  .barre .nom{display:none}
+  .barre nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;min-width:0}
+  .barre nav::-webkit-scrollbar{display:none}
+  .barre nav a{padding:7px 10px;font-size:12.5px;white-space:nowrap}
   .entete{padding:58px 0 42px;border-radius:0 0 24px 24px}
   .entete::before{top:-15%;right:-48%;width:125vw;opacity:.75}
   h1{font-size:clamp(46px,13vw,64px);max-width:15ch;line-height:.98}
-  .chiffres{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .chiffres div{padding:14px;border-radius:15px}
+  section{padding:36px 0}
+  .grille{grid-template-columns:minmax(0,1fr)}
+  .btn{flex:1 1 auto;justify-content:center}
   .app,.carte,.cadre{border-radius:18px}
   .galerie{gap:10px}
 }
-@media(prefers-reduced-motion:reduce){
+@media (prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
 </style>
@@ -378,12 +200,12 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
     <span class="mono-nom" aria-hidden="true">MYB</span>
     <span class="nom">Mohammed-Yassine Barnicha</span>
     <nav aria-label="Sections">
-      <a href="#parcours">Parcours</a>
-      <a href="#applications">Applications</a>
+      <a href="#parcours">Background</a>
+      <a href="#applications">Apps</a>
       <a href="#calibration">BTC</a>
       <a href="#finance">Finance</a>
-      <a href="#data">Data &amp; IA</a>
-      <a href="#methodes">Méthodes</a>
+      <a href="#data">Data &amp; AI</a>
+      <a href="#methodes">Methods</a>
     </nav>
   </div>
 </div>
@@ -391,19 +213,19 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
 <main>
 <header class="entete">
   <div class="page">
-    <p class="surtitre">Mathématiques appliquées · finance quantitative · machine learning</p>
+    <p class="surtitre">Applied mathematics · quantitative finance · machine learning</p>
     <h1>Mohammed-Yassine Barnicha</h1>
-    <p class="chapeau">Élève ingénieur à l'ENSIIE en mathématiques appliquées et informatique, j'ai suivi le M2QF de Paris-Saclay et je
-      poursuis le Master Mathématiques de la finance et des données (ex-DEA Lamberton) à l'Université Gustave Eiffel.
-      Je cherche un <b>CDI ou un stage</b> en recherche quantitative, développement quantitatif, ingénierie financière ou
-      machine learning.</p>
-    <p class="chapeau" style="margin-top:-12px">Cette page rassemble mes projets de pricing et de calibration de dérivés, avec leur code&nbsp;;
-      certains peuvent être utilisés directement en ligne.</p>
+    <p class="chapeau">Engineering student in applied mathematics and computer science at ENSIIE, I took the M2QF master's at
+      Paris-Saclay and am now in the Master in Mathematics of Finance and Data (formerly DEA Lamberton) at Université Gustave Eiffel.
+      I am looking for a <b>permanent position or an internship</b> in quantitative research, quantitative development, financial
+      engineering or machine learning.</p>
+    <p class="chapeau" style="margin-top:-12px">This page gathers my derivative pricing and calibration projects, with their code and
+      reports; some of them can be used directly online.</p>
     <div class="boutons">
-      <a class="btn plein" href="calibration-btc-svjd/">Calibration d'options BTC</a>
-      <a class="btn plein" href="swaptions-hjm/">Swaptions bermudéennes HJM</a>
-      <a class="btn plein" href="options-lookback/">Options lookback</a>
-      <a class="btn creux" href="#parcours">Parcours</a>
+      <a class="btn plein" href="calibration-btc-svjd/">BTC option calibration</a>
+      <a class="btn plein" href="swaptions-hjm/">HJM Bermudan swaptions</a>
+      <a class="btn plein" href="options-lookback/">Lookback options</a>
+      <a class="btn creux" href="#parcours">Background</a>
       <a class="btn creux" href="https://www.linkedin.com/in/mohammed-yassine-barnicha-855587280/">LinkedIn</a>
       <a class="btn creux" href="https://github.com/yassinebarnicha">GitHub</a>
     </div>
@@ -412,117 +234,114 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
 
 <section id="parcours">
   <div class="page">
-    <p class="surtitre">Parcours</p>
-    <h2>Formation et expériences</h2>
+    <p class="surtitre">Background</p>
+    <h2>Education and experience</h2>
     <div class="parcours">
       <div>
-        <h3 class="col">Formation</h3>
+        <h3 class="col">Education</h3>
         <div class="etape"><span class="quand">2026–2027</span><h4>Université Gustave Eiffel</h4>
-          <p class="ou">Master Mathématiques de la finance et des données (ex-DEA Lamberton), Champs-sur-Marne</p>
-          <p>Calcul stochastique, Monte-Carlo, pricing et calibration de dérivés, volatilité stochastique et locale, modèles à sauts,
-            mesures de risque, finance haute fréquence, apprentissage statistique ; environnement de recherche MathRisk (UGE–Inria)
-            et ENPC/CERMICS.</p></div>
+          <p class="ou">Master in Mathematics of Finance and Data (formerly DEA Lamberton), Champs-sur-Marne</p>
+          <p>Stochastic calculus, Monte Carlo, derivative pricing and calibration, stochastic and local volatility, jump models, risk
+            measures, high-frequency finance, statistical learning; research environment of MathRisk (UGE–Inria) and ENPC/CERMICS.</p></div>
         <div class="etape"><span class="quand">2025–2026</span><h4>Université Paris-Saclay</h4>
-          <p class="ou">M2 Finance quantitative (M2QF)</p>
-          <p>Pricing de dérivés et méthodes numériques : options lookback en C++, swaptions bermudéennes sous HJM, modèles à
-            signatures.</p></div>
+          <p class="ou">Master's in Quantitative Finance (M2QF)</p>
+          <p>Derivative pricing and numerical methods: lookback options in C++, Bermudan swaptions under HJM, signature models.</p></div>
         <div class="etape"><span class="quand">2022–2026</span><h4>ENSIIE</h4>
-          <p class="ou">Diplôme d'ingénieur en mathématiques appliquées et informatique, Évry</p>
-          <p>Probabilités, statistique et séries temporelles, optimisation, machine learning, calcul scientifique (C++/Python).
-            Calcul stochastique : 20/20 ; modèles de finance en temps discret : 19,5/20.</p></div>
+          <p class="ou">Engineering degree in applied mathematics and computer science, Évry</p>
+          <p>Probability, statistics and time series, optimisation, machine learning, scientific computing (C++/Python).
+            Stochastic calculus: 20/20; discrete-time finance models: 19.5/20.</p></div>
         <div class="etape"><span class="quand">2020–2022</span><h4>Classes préparatoires MPSI–MP</h4>
-          <p class="ou">Maroc</p>
-          <p>Deux ans de mathématiques et de physique intensives ; admis aux concours Centrale–SupOptique, Mines-Télécom et CCINP.</p></div>
+          <p class="ou">Morocco</p>
+          <p>Two years of intensive mathematics and physics; admitted to the Centrale–SupOptique, Mines-Télécom and CCINP entrance exams.</p></div>
       </div>
       <div>
-        <h3 class="col">Expériences</h3>
-        <div class="etape"><span class="quand">avril – octobre 2026</span><h4>Natixis CIB</h4>
-          <p class="ou">Stagiaire en recherche quantitative : pricing et calibration d'options vanilles BTC, Paris</p>
+        <h3 class="col">Experience</h3>
+        <div class="etape"><span class="quand">April – October 2026</span><h4>Natixis CIB</h4>
+          <p class="ou">Quantitative research intern: pricing and calibration of vanilla BTC options, Paris</p>
           <ul>
-            <li>Calibration quotidienne d'un modèle de Bates à 8 paramètres (volatilité stochastique et sauts) sur 6 maturités Deribit,
-              options hors de la monnaie à plus de 10 jours : 26,7 bp de RMSE et 21,1 bp de MAE en volatilité implicite.</li>
-            <li>Surrogate neuronal du pricer de Bates : calibration de toute la surface ramenée d'environ 10 min à 28 s
-              face au COS vectorisé et parallélisé ; PIDE de Bates validée par IMEX-ADI, PROJ et un solveur neuronal à contraintes dures.</li>
+            <li>Daily calibration of an 8-parameter Bates model (stochastic volatility and jumps) to 6 Deribit maturities,
+              out-of-the-money options beyond 10 days: 26.7 bp RMSE and 21.1 bp MAE in implied volatility.</li>
+            <li>Neural surrogate of the Bates pricer: full-surface calibration down from about 10 min to 28 s against the vectorised
+              and parallel COS; Bates PIDE validated with IMEX-ADI, PROJ and a hard-constrained neural solver.</li>
           </ul></div>
-        <div class="etape"><span class="quand">mai – septembre 2025</span><h4>Thales CortAIx Labs</h4>
-          <p class="ou">Stagiaire en recherche, deep learning (LLM), Palaiseau</p>
+        <div class="etape"><span class="quand">May – September 2025</span><h4>Thales CortAIx Labs</h4>
+          <p class="ou">Research intern, deep learning (LLMs), Palaiseau</p>
           <ul>
-            <li>Détecteur d'injection de prompt indirecte sur Phi-3.5, à partir des scores d'attention et du flux résiduel : classifieurs
-              MLP et forêts aléatoires sur les 32 couches, tests croisés entre jeux de données ; 97,1 % de précision, ROC-AUC 99,94 %,
-              F1 ≈ 97 %.</li>
+            <li>Indirect prompt-injection detector on Phi-3.5, from attention scores and the residual stream: MLP and random-forest
+              classifiers over the 32 layers, cross-dataset tests; 97.1 % accuracy, 99.94 % ROC-AUC, F1 ≈ 97 %.</li>
           </ul></div>
-        <div class="etape"><span class="quand">juin – août 2023</span><h4>Conservatoire national des arts et métiers (CNAM)</h4>
-          <p class="ou">Stagiaire en recherche, modélisation statistique, Paris</p>
+        <div class="etape"><span class="quand">June – August 2023</span><h4>Conservatoire national des arts et métiers (CNAM)</h4>
+          <p class="ou">Research intern, statistical modelling, Paris</p>
           <ul>
-            <li>Inférence par vraisemblance sur des séries temporelles (maximum de vraisemblance, mélanges, adéquation), diagnostics et
-              sensibilité ; résultats restitués dans une petite application Flask.</li>
+            <li>Likelihood-based inference on time series (maximum likelihood, mixtures, goodness of fit), diagnostics and sensitivity
+              analysis; results delivered through a small Flask application.</li>
           </ul></div>
       </div>
     </div>
     <div class="competences">
-      <div><b>Programmation</b>Python (NumPy, pandas, scikit-learn, PyTorch), C++17 moderne (CMake, bibliothèques partagées), Excel/VBA
-        (interfaçage DLL/XLL), JavaScript, Flask.</div>
-      <div><b>Quant et maths</b>Calcul stochastique, Monte-Carlo, méthodes EDP, modèles de taux, dérivés, validation numérique et tests.</div>
-      <div><b>Langues</b>Français (professionnel), anglais (C1, Linguaskill), arabe (langue maternelle), espagnol (notions).</div>
+      <div><b>Programming</b>Python (NumPy, pandas, scikit-learn, PyTorch), modern C++17 (CMake, shared libraries), Excel/VBA
+        (DLL/XLL interfacing), JavaScript, Flask.</div>
+      <div><b>Quant and maths</b>Stochastic calculus, Monte Carlo, PDE methods, interest-rate models, derivatives, numerical validation
+        and testing.</div>
+      <div><b>Languages</b>French (professional), English (C1, Linguaskill), Arabic (native), Spanish (basic).</div>
     </div>
   </div>
 </section>
 
 <section id="applications">
   <div class="page">
-    <p class="surtitre">Applications en ligne</p>
-    <h2>Trois projets utilisables en ligne</h2>
-    <p class="intro">Chaque application tourne entièrement dans le navigateur, sans installation ; toutes les entrées sont modifiables
-      et le code d'origine du projet est consultable dans l'onglet « Code source ».</p>
+    <p class="surtitre">Online applications</p>
+    <h2>Three projects you can use online</h2>
+    <p class="intro">Each application runs entirely in the browser, with nothing to install; every input can be changed, the original
+      code of the project is in the "Source code" tab, and each one comes with a report (PDF) on its theory.</p>
     <div class="apps">
       <a class="app" href="calibration-btc-svjd/">
-        <img src="img/calibration.webp" width="900" height="570" loading="lazy" alt="Calibration du modèle de Bates sur les smiles Deribit">
-        <div class="corps"><h3>Calibration d'options Bitcoin</h3>
-          <p>28 modèles à sauts et volatilité stochastique calibrés en direct sur Deribit : grecques, surface de volatilité 3D, GEX, exotiques.</p>
-          <span class="ouvrir">Ouvrir</span></div></a>
+        <img src="img/calibration.webp" width="900" height="570" loading="lazy" alt="Bates model calibrated to the Deribit smiles">
+        <div class="corps"><h3>Bitcoin option calibration</h3>
+          <p>28 jump and stochastic-volatility models calibrated live to Deribit: Greeks, 3-D volatility surface, GEX, exotics.</p>
+          <span class="ouvrir">Open</span></div></a>
       <a class="app" href="swaptions-hjm/">
-        <img src="img/hjm.webp" width="900" height="579" loading="lazy" alt="Pricer de swaptions bermudéennes sous HJM">
-        <div class="corps"><h3>Swaptions bermudéennes sous HJM</h3>
-          <p>Calibration par bootstrap, EDP et Longstaff-Schwartz ; effet du retour à la moyenne après recalibration ; erreur de signe
-            trouvée et corrigée dans le modèle.</p>
-          <span class="ouvrir">Ouvrir</span></div></a>
+        <img src="img/hjm.webp" width="900" height="579" loading="lazy" alt="Bermudan swaption pricer under HJM">
+        <div class="corps"><h3>Bermudan swaptions under HJM</h3>
+          <p>Bootstrap calibration, PDE and Longstaff-Schwartz; effect of mean reversion after recalibration; a sign error found and
+            fixed in the model.</p>
+          <span class="ouvrir">Open</span></div></a>
       <a class="app" href="options-lookback/">
-        <img src="img/lookback.webp" width="900" height="579" loading="lazy" alt="Pricer d'options lookback">
-        <div class="corps"><h3>Options lookback</h3>
-          <p>Les deux moteurs C++ (pont brownien exact, schéma en temps avec BGK) en JavaScript ; Δ constant à l'émission ; option en
-            cours de vie.</p>
-          <span class="ouvrir">Ouvrir</span></div></a>
+        <img src="img/lookback.webp" width="900" height="579" loading="lazy" alt="Lookback option pricer">
+        <div class="corps"><h3>Lookback options</h3>
+          <p>Both C++ engines (exact Brownian bridge, time stepping with BGK) in JavaScript; constant Δ at issue; seasoned options.</p>
+          <span class="ouvrir">Open</span></div></a>
     </div>
   </div>
 </section>
 
 <section id="calibration">
   <div class="page">
-    <p class="surtitre">Projet principal · application en ligne</p>
-    <h2>Calibration d'options Bitcoin dans le navigateur</h2>
-    <p class="intro">Pricer, calibrer et analyser les options BTC de Deribit avec des modèles à sauts et à volatilité
-      stochastique, sans serveur de calcul ni installation : tout tourne dans le navigateur du visiteur, sur ordinateur
-      comme sur téléphone.</p>
+    <p class="surtitre">Main project · online application</p>
+    <h2>Bitcoin option calibration in the browser</h2>
+    <p class="intro">Price, calibrate and analyse Deribit BTC options with jump and stochastic-volatility models, with no computing
+      server and nothing to install: everything runs in the visitor's browser, on a computer or a phone.</p>
 
     <div class="vedette">
       <figure class="cadre">
         <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/"><img src="img/calibration.webp" width="1200" height="760"
-          alt="Smiles de volatilité implicite du marché et du modèle de Bates calibré, une courbe par échéance"></a>
-        <figcaption>Le modèle de Bates calibré sur les smiles Deribit : marché (points) et modèle (courbe), par échéance.</figcaption>
+          alt="Market and calibrated Bates implied-volatility smiles, one curve per maturity"></a>
+        <figcaption>The Bates model calibrated to the Deribit smiles: market (dots) and model (line), by maturity.</figcaption>
       </figure>
       <div>
         <ul class="etiquettes"><li>JavaScript</li><li>Python</li><li>COS / PROJ</li><li>GitHub Actions</li></ul>
         <ul class="points">
-          <li><b>Calibration interactive</b> : chaque curseur reprice toute la chaîne du jour en quelques millisecondes ;
-            cinq optimiseurs (Nelder–Mead classique et adaptatif, évolution différentielle, hybride).</li>
-          <li><b>Modèles composables</b> : Black-Scholes, Heston, double Heston ou Heston à sauts de variance, combinés
-            avec des sauts Merton, bi-log-normaux, Kou, CGMY, Variance Gamma ou NIG.</li>
-          <li><b>Analyse</b> : grecques du modèle contre Black-76, surface de volatilité en 3D, gamma exposure (GEX).</li>
-          <li><b>Pricer libre</b> : options saisies à la main ou fichier CSV ; exotiques par Monte-Carlo (asiatiques,
-            barrières, lookbacks, américaines par Longstaff-Schwartz, payoff en formule libre).</li>
+          <li><b>Interactive calibration</b>: every slider reprices the whole chain of the day in a few milliseconds; five optimisers
+            (classic and adaptive Nelder–Mead, differential evolution, hybrids).</li>
+          <li><b>Composable models</b>: Black-Scholes, Heston, double Heston or Heston with variance jumps, combined with Merton,
+            bi-lognormal, Kou, CGMY, Variance Gamma or NIG jumps.</li>
+          <li><b>Analysis</b>: model Greeks against Black-76, 3-D volatility surface, gamma exposure (GEX).</li>
+          <li><b>Free pricer</b>: options typed in or from a CSV file; exotics by Monte Carlo (Asian, barrier, lookback, American by
+            Longstaff-Schwartz, free-formula payoff).</li>
         </ul>
         <div class="boutons">
-          <a class="btn plein" href="https://yassinebarnicha.github.io/calibration-btc-svjd/">Démo</a>
+          <a class="btn plein" href="https://yassinebarnicha.github.io/calibration-btc-svjd/">Demo</a>
+          <a class="btn creux" href="https://yassinebarnicha.github.io/calibration-btc-svjd/REPORT.pdf">Report</a>
           <a class="btn creux" href="https://github.com/yassinebarnicha/calibration-btc-svjd">Code</a>
           <a class="btn creux" href="https://github.com/yassinebarnicha/calibration-btc-svjd/blob/main/docs/GUIDE.md">Guide</a>
         </div>
@@ -530,59 +349,58 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
     </div>
 
     <div class="galerie">
-      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/#Surface%20de%20vol"><figure class="cadre">
-        <img src="img/surface.webp" width="900" height="570" loading="lazy" alt="Surface de volatilité implicite en 3D, modèle et points de marché">
-        <figcaption>Surface de vol 3D</figcaption></figure></a>
-      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/#GEX"><figure class="cadre">
-        <img src="img/gex.webp" width="900" height="570" loading="lazy" alt="Gamma exposure par strike et niveau de bascule">
-        <figcaption>Gamma exposure (GEX)</figcaption></figure></a>
-      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/#Grecques"><figure class="cadre">
-        <img src="img/grecques.webp" width="900" height="570" loading="lazy" alt="Grecques du modèle comparées à Black-76, par strike">
-        <figcaption>Grecques modèle / Black-76</figcaption></figure></a>
       <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/"><figure class="cadre">
-        <img src="img/mobile.webp" width="900" height="645" loading="lazy" alt="Version téléphone : page, volet des onglets, volet des réglages">
-        <figcaption>Sur téléphone</figcaption></figure></a>
+        <img src="img/surface.webp" width="900" height="570" loading="lazy" alt="3-D implied volatility surface, model and market points">
+        <figcaption>3-D volatility surface</figcaption></figure></a>
+      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/"><figure class="cadre">
+        <img src="img/gex.webp" width="900" height="570" loading="lazy" alt="Gamma exposure by strike and flip level">
+        <figcaption>Gamma exposure (GEX)</figcaption></figure></a>
+      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/"><figure class="cadre">
+        <img src="img/grecques.webp" width="900" height="570" loading="lazy" alt="Model Greeks against Black-76, by strike">
+        <figcaption>Model Greeks against Black-76</figcaption></figure></a>
+      <a href="https://yassinebarnicha.github.io/calibration-btc-svjd/"><figure class="cadre">
+        <img src="img/mobile.webp" width="900" height="634" loading="lazy" alt="Phone version: page, tab panel, settings panel">
+        <figcaption>On a phone</figcaption></figure></a>
     </div>
 
     <div class="colonnes">
       <div>
-        <h3>Les mathématiques</h3>
-        <p>Chaque modèle est défini par sa fonction caractéristique : un bloc de variance multiplié par une loi de sauts
-          compensée. Les prix viennent de la méthode <b>COS</b> (Fang–Oosterlee) ou de <b>PROJ</b> (Kirkby), puis sont
-          inversés en volatilités implicites. La perte compare modèle et marché en volatilité ou en prix, avec des
-          pondérations au choix.</p>
+        <h3>The mathematics</h3>
+        <p>Each model is defined by its characteristic function: a variance block times a compensated jump law. Prices come from the
+          <b>COS</b> method (Fang–Oosterlee) or from <b>PROJ</b> (Kirkby) and are inverted into implied volatilities. The loss compares
+          model and market in volatility or in price, with a choice of weights.</p>
       </div>
       <div>
-        <h3>L'ingénierie</h3>
-        <p>Un site <b>100 % statique</b> : la page embarque ses pricers, chaque jour de données est un fichier chargé à la
-          demande. Une <b>GitHub Action</b> télécharge chaque matin la chaîne Deribit (API publique) et republie le site.
-          L'optimisation tourne par tranches de 12 ms pour que l'écran reste fluide.</p>
+        <h3>The engineering</h3>
+        <p>A <b>fully static</b> site: the page carries its pricers and each day of data is a file loaded on demand. A <b>GitHub
+          Action</b> downloads the Deribit chain every morning (public API) and republishes the site. The optimisation runs in
+          12 ms slices so that the screen stays fluid.</p>
       </div>
       <div>
-        <h3>La validation</h3>
+        <h3>The validation</h3>
         <ul>
-          <li>Parité call–put et martingalité vérifiées sur les 28 modèles.</li>
-          <li>Pricer JavaScript égal au pricer Python de référence à 6·10⁻⁶ $ près.</li>
-          <li>Monte-Carlo contrôlé contre le prix de Fourier (moins de 2 erreurs standard).</li>
-          <li>Temps à l'échéance compté à l'heure près.</li>
+          <li>Put–call parity and the martingale property checked on all 28 models.</li>
+          <li>JavaScript pricer equal to the Python reference pricer to within 6·10⁻⁶ $.</li>
+          <li>Monte Carlo checked against the Fourier price (within 2 standard errors).</li>
+          <li>Time to expiry counted to the hour.</li>
         </ul>
       </div>
     </div>
 
     <details class="plus">
-      <summary>Les onze onglets de l'application, un par un</summary>
+      <summary>The application's eleven tabs, one by one</summary>
       <ol class="onglets-app">
-        <li><span class="num">01</span><b>Futures</b> — la trajectoire de chaque future depuis son émission.</li>
-        <li><span class="num">02</span><b>Échéances</b> — le choix des maturités à calibrer.</li>
-        <li><span class="num">03</span><b>Cible et filtres</b> — le prix visé (mid, bid, ask), les spreads, la moneyness.</li>
-        <li><span class="num">04</span><b>Pricer</b> — COS ou PROJ, options à la main, CSV, exotiques par Monte-Carlo.</li>
-        <li><span class="num">05</span><b>Modèle</b> — variance × sauts, avec la dynamique écrite en clair.</li>
-        <li><span class="num">06</span><b>Paramètres et optimiseur</b> — curseurs, bornes, contrainte de Feller, cinq optimiseurs.</li>
-        <li><span class="num">07</span><b>Perte</b> — la mesure et la pondération de l'erreur.</li>
-        <li><span class="num">08</span><b>Grecques</b> — Δ, Γ, Vega, Θ du modèle contre Black-76.</li>
-        <li><span class="num">09</span><b>Surface de vol</b> — en 3D, avec l'extrapolation du modèle.</li>
-        <li><span class="num">10</span><b>GEX</b> — exposition gamma par strike, niveau de bascule, call / put walls.</li>
-        <li><span class="num">11</span><b>Réglages</b> — enregistrer, comparer et exporter les jeux de paramètres.</li>
+        <li><span class="num">01</span><b>Futures</b> — the path of each future since its listing.</li>
+        <li><span class="num">02</span><b>Maturities</b> — the choice of the expiries to calibrate.</li>
+        <li><span class="num">03</span><b>Target and filters</b> — the target price (mark, mid), spreads, moneyness.</li>
+        <li><span class="num">04</span><b>Pricer</b> — COS or PROJ, options typed in, CSV, exotics by Monte Carlo.</li>
+        <li><span class="num">05</span><b>Model</b> — variance × jumps, with the dynamics written out.</li>
+        <li><span class="num">06</span><b>Parameters and optimiser</b> — sliders, bounds, Feller condition, five optimisers.</li>
+        <li><span class="num">07</span><b>Loss</b> — how the error is measured and weighted.</li>
+        <li><span class="num">08</span><b>Greeks</b> — the model's Δ, Γ, Vega, Θ against Black-76.</li>
+        <li><span class="num">09</span><b>Vol surface</b> — in 3-D, with the model's extrapolation.</li>
+        <li><span class="num">10</span><b>GEX</b> — gamma exposure by strike, flip level, call and put walls.</li>
+        <li><span class="num">11</span><b>Settings</b> — save, compare and export parameter sets.</li>
       </ol>
     </details>
   </div>
@@ -590,58 +408,56 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
 
 <section id="finance">
   <div class="page">
-    <p class="surtitre">Finance quantitative</p>
-    <h2>Pricing de dérivés et méthodes numériques</h2>
-    <p class="intro">Options exotiques, exercice anticipé et taux : chaque projet implémente une méthode de pricing et la
-      contrôle contre une référence (formule fermée, autre méthode ou valeurs publiées).</p>
+    <p class="surtitre">Quantitative finance</p>
+    <h2>Derivative pricing and numerical methods</h2>
+    <p class="intro">Exotic options, early exercise and interest rates: each project implements a pricing method and checks it against a
+      reference (closed form, another method or published values).</p>
     <div class="grille">
 
       <article class="carte">
         <p class="langue">Python · PyTorch</p>
-        <h3>Deep Optimal Stopping</h3>
-        <p>Pricing d'options bermudéennes en grande dimension par réseaux de neurones, d'après Becker, Cheridito et
-          Jentzen (2019).</p>
+        <h3>Deep optimal stopping</h3>
+        <p>Pricing high-dimensional Bermudan options with neural networks, after Becker, Cheridito and Jentzen (2019).</p>
         <ul>
-          <li>Un réseau par date d'exercice apprend la règle d'arrêt.</li>
-          <li>Borne basse (politique apprise) et borne haute (dual), avec intervalle de confiance à 95 %.</li>
-          <li>Max-call bermudéen comparé à Longstaff-Schwartz ; convertible callable sur plusieurs actifs.</li>
+          <li>One network per exercise date learns the stopping rule.</li>
+          <li>Lower bound (learnt policy) and upper bound (dual), with a 95 % confidence interval.</li>
+          <li>Bermudan max-call compared with Longstaff-Schwartz; multi-asset callable convertible.</li>
         </ul>
         <div class="liens"><a href="https://github.com/yassinebarnicha/Deep-Optimal-Stopping-">Code →</a></div>
       </article>
 
       <article class="carte">
-        <p class="langue">Python</p>
-        <h3>Swaptions bermudéennes sous HJM</h3>
-        <p>Modèle HJM à un facteur avec retour à la moyenne et volatilité constante par morceaux, utilisable en ligne.</p>
+        <p class="langue">Python · JavaScript</p>
+        <h3>Bermudan swaptions under HJM</h3>
+        <p>One-factor HJM model with mean reversion and piecewise-constant volatility, usable online.</p>
         <ul>
-          <li>Calibration en direct par bootstrap sur des swaptions coterminales (volatilités normales de Bachelier).</li>
-          <li>Bermudéenne pricée par EDP (implicite ou Crank–Nicolson), contrôlée par Longstaff-Schwartz.</li>
-          <li>Revue du modèle : erreur de signe trouvée et corrigée dans la formule des zéro-coupons, contrôle de martingale.</li>
+          <li>Live calibration by bootstrap to co-terminal swaptions (Bachelier normal volatilities).</li>
+          <li>Bermudan priced by PDE (implicit or Crank–Nicolson), checked by Longstaff-Schwartz.</li>
+          <li>Model review: sign error found and fixed in the bond formula, martingale test.</li>
         </ul>
-        <div class="liens"><a href="swaptions-hjm/">Ouvrir l'application</a><a href="swaptions-hjm/#code">Code →</a></div>
+        <div class="liens"><a href="swaptions-hjm/">Open the application</a><a href="swaptions-hjm/rapport/report.pdf">Report (PDF)</a><a href="swaptions-hjm/#code">Code →</a></div>
       </article>
 
       <article class="carte">
-        <p class="langue">C++ · DLL · Excel</p>
-        <h3>Options lookback à strike flottant</h3>
-        <p>Bibliothèque C++ unifiée, réalisée en binôme, pour les lookbacks européens sous Black-Scholes, utilisable en ligne.</p>
+        <p class="langue">C++ · DLL · Excel · JavaScript</p>
+        <h3>Floating-strike lookback options</h3>
+        <p>Unified C++ library, written with a partner, for European lookbacks under Black-Scholes, usable online.</p>
         <ul>
-          <li>Moteur exact en un pas : l'extremum est tiré du pont brownien, sans biais de discrétisation.</li>
-          <li>Moteur à pas de temps avec correction BGK, ou pont exact par pas (ajouté, sans biais).</li>
-          <li>Grecques à nombres aléatoires communs ; dividende et option en cours de vie ajoutés.</li>
+          <li>Exact one-step engine: the extremum is drawn from the Brownian bridge, with no discretisation bias.</li>
+          <li>Time-stepping engine with the BGK correction, or an exact bridge per step (added, unbiased).</li>
+          <li>Greeks on common random numbers; dividend and seasoned options added.</li>
         </ul>
-        <div class="liens"><a href="options-lookback/">Ouvrir l'application</a><a href="options-lookback/#code">Code →</a></div>
+        <div class="liens"><a href="options-lookback/">Open the application</a><a href="options-lookback/rapport/report.pdf">Report (PDF)</a><a href="options-lookback/#code">Code →</a></div>
       </article>
 
       <article class="carte">
-        <p class="langue">Python · réseau de neurones</p>
-        <h3>Surrogate neuronal du modèle de Bates</h3>
-        <p>Un réseau qui approxime le prix Bates en une seule évaluation, pour tout jeu de paramètres d'une boîte
-          réaliste.</p>
+        <p class="langue">Python · neural network</p>
+        <h3>Neural surrogate of the Bates model</h3>
+        <p>A network that approximates the Bates price in a single evaluation, for any parameter set in a realistic box.</p>
         <ul>
-          <li>Entraîné sur des prix COS (le professeur), sur les futures BTC.</li>
-          <li>Sert à accélérer la boucle de calibration par évolution différentielle.</li>
-          <li>Les paramètres finaux sont toujours revérifiés avec COS.</li>
+          <li>Trained on COS prices (the teacher), on BTC futures.</li>
+          <li>Speeds up the differential-evolution calibration loop.</li>
+          <li>The final parameters are always rechecked with COS.</li>
         </ul>
         <div class="liens"><a href="https://github.com/yassinebarnicha/DEEP_LEARNING/blob/main/amortized_bates_surrogate_colab.ipynb">Notebook →</a></div>
       </article>
@@ -649,22 +465,22 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
       <article class="carte">
         <p class="langue">Python</p>
         <h3>Longstaff-Schwartz</h3>
-        <p>L'algorithme de régression Monte-Carlo pour l'exercice américain.</p>
+        <p>The regression Monte Carlo algorithm for American exercise.</p>
         <ul>
-          <li>Put américain : trajectoires dans la monnaie, régression de la valeur de continuation.</li>
-          <li>Extension aux diffusions à sauts et comparaison avec le cas sans sauts.</li>
+          <li>American put: in-the-money paths, regression of the continuation value.</li>
+          <li>Extension to jump diffusions and comparison with the no-jump case.</li>
         </ul>
         <div class="liens"><a href="https://github.com/yassinebarnicha/Longstaff-schwartz">Code →</a></div>
       </article>
 
       <article class="carte">
         <p class="langue">C++ · SDL2</p>
-        <h3>EDP de Black-Scholes</h3>
-        <p>Résolution par différences finies de l'équation de Black-Scholes pour les calls et les puts.</p>
+        <h3>Black-Scholes PDE</h3>
+        <p>Finite-difference solution of the Black-Scholes equation for calls and puts.</p>
         <ul>
-          <li>θ-schéma : explicite, implicite ou Crank–Nicolson, systèmes tridiagonaux.</li>
-          <li>Forme complète et forme réduite de l'équation comparées.</li>
-          <li>Solutions et écarts tracés dans une fenêtre graphique.</li>
+          <li>θ-scheme: explicit, implicit or Crank–Nicolson, tridiagonal systems.</li>
+          <li>Full and reduced forms of the equation compared.</li>
+          <li>Solutions and errors drawn in a graphics window.</li>
         </ul>
         <div class="liens"><a href="https://github.com/yassinebarnicha/Black-Scholes-PDE-solving">Code →</a></div>
       </article>
@@ -675,43 +491,42 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
 
 <section id="data">
   <div class="page">
-    <p class="surtitre">Data science et IA</p>
-    <h2>Apprentissage automatique, séries temporelles, sécurité des LLM</h2>
-    <p class="intro">Projets d'apprentissage et de recherche : modèles profonds, statistiques appliquées et attaques sur
-      les systèmes à base de modèles de langage.</p>
+    <p class="surtitre">Data science and AI</p>
+    <h2>Machine learning, time series, LLM security</h2>
+    <p class="intro">Learning and research projects: deep models, applied statistics and attacks on systems built on language models.</p>
     <div class="grille">
 
       <article class="carte">
         <p class="langue">Python · TensorFlow / Keras</p>
-        <h3>Apprentissage profond</h3>
-        <p>Trois architectures sur trois problèmes réels.</p>
+        <h3>Deep learning</h3>
+        <p>Three architectures on three real problems.</p>
         <ul>
-          <li>MLP : résistance du béton (régression, comparaison de modèles).</li>
-          <li>LSTM et CNN 1D : consommation électrique d'un foyer, série minute par minute.</li>
-          <li>GAN convolutionnel : génération d'images Fashion-MNIST.</li>
+          <li>MLP: concrete strength (regression, model comparison).</li>
+          <li>LSTM and 1-D CNN: household power consumption, minute by minute.</li>
+          <li>Convolutional GAN: Fashion-MNIST image generation.</li>
         </ul>
         <div class="liens"><a href="https://github.com/yassinebarnicha/DEEP_LEARNING">Code →</a></div>
       </article>
 
       <article class="carte">
-        <p class="langue">Python · statistiques</p>
-        <h3>Ruptures dans les séries temporelles</h3>
-        <p>Régularité mensuelle des TER, région par région.</p>
+        <p class="langue">Python · statistics</p>
+        <h3>Change points in time series</h3>
+        <p>Monthly punctuality of regional trains (TER), region by region.</p>
         <ul>
-          <li>Détection des points de rupture.</li>
-          <li>Estimation des paramètres de lois normales asymétriques.</li>
-          <li>Trains programmés et annulés, avec rapport.</li>
+          <li>Change-point detection.</li>
+          <li>Parameter estimation of skew-normal laws.</li>
+          <li>Scheduled and cancelled trains, with a report.</li>
         </ul>
         <div class="liens"><a href="https://github.com/yassinebarnicha/Time-Series-Analysis-">Code →</a></div>
       </article>
 
       <article class="carte">
         <p class="langue">Python · Mistral API · RAG</p>
-        <h3>ComPromptMized : ver par injection de prompt</h3>
-        <p>Reproduction de l'attaque Morris II sur un assistant e-mail à base de RAG.</p>
+        <h3>ComPromptMized: a prompt-injection worm</h3>
+        <p>Reproduction of the Morris II attack on a RAG-based e-mail assistant.</p>
         <ul>
-          <li>Un prompt auto-réplicant, retrouvé par la recherche vectorielle, détourne le modèle.</li>
-          <li>Montre pourquoi un contexte non filtré rend un système RAG vulnérable.</li>
+          <li>A self-replicating prompt, retrieved by the vector search, hijacks the model.</li>
+          <li>Shows why unfiltered context makes a RAG system vulnerable.</li>
         </ul>
         <div class="liens"><a href="https://github.com/yassinebarnicha/ComPromptMized">Code →</a></div>
       </article>
@@ -719,19 +534,18 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
       <article class="carte">
         <p class="langue">Python · scikit-learn</p>
         <h3>Spaceship Titanic (Kaggle)</h3>
-        <p>Classification : quels passagers ont été transportés ?</p>
+        <p>Classification: which passengers were transported?</p>
         <ul>
-          <li>Ingénierie de variables (cabine, groupe, âge) et tests du χ².</li>
-          <li>Ridge, arbres, forêts aléatoires, gradient boosting, SVM comparés.</li>
+          <li>Feature engineering (cabin, group, age) and χ² tests.</li>
+          <li>Ridge, trees, random forests, gradient boosting and SVM compared.</li>
         </ul>
         <div class="liens"><a href="https://github.com/yassinebarnicha/Spceship-Titanic-Kaggle">Code →</a></div>
       </article>
 
       <article class="carte">
         <p class="langue">R</p>
-        <h3>Rythmes circadiens et toxicité</h3>
-        <p>Classification de la toxicité de molécules à partir de leurs effets sur les rythmes circadiens des cellules,
-          en binôme.</p>
+        <h3>Circadian rhythms and toxicity</h3>
+        <p>Classifying the toxicity of molecules from their effects on the circadian rhythms of cells, with a partner.</p>
         <div class="liens"><a href="https://github.com/yassinebarnicha/MRR-Project">Code →</a></div>
       </article>
 
@@ -741,33 +555,33 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
 
 <section id="methodes">
   <div class="page">
-    <p class="surtitre">En un coup d'œil</p>
-    <h2>Méthodes et outils</h2>
-    <p class="intro">Ce que les projets ci-dessus mettent en œuvre, et où le voir.</p>
+    <p class="surtitre">At a glance</p>
+    <h2>Methods and tools</h2>
+    <p class="intro">What the projects above use, and where to see it.</p>
     <div class="methodes">
       <div><h3>Pricing</h3><ul>
-        <li>Fourier : COS, PROJ <span class="ou">· calibration BTC</span></li>
-        <li>Monte-Carlo, pont brownien, BGK <span class="ou">· lookback</span></li>
+        <li>Fourier: COS, PROJ <span class="ou">· BTC calibration</span></li>
+        <li>Monte Carlo, Brownian bridge, BGK <span class="ou">· lookback</span></li>
         <li>Longstaff-Schwartz <span class="ou">· LSMC, HJM, BTC</span></li>
-        <li>Différences finies, θ-schéma <span class="ou">· EDP, HJM</span></li>
-        <li>Deep optimal stopping <span class="ou">· bermudéennes</span></li>
+        <li>Finite differences, θ-scheme <span class="ou">· PDE, HJM</span></li>
+        <li>Deep optimal stopping <span class="ou">· Bermudans</span></li>
       </ul></div>
-      <div><h3>Modèles</h3><ul>
+      <div><h3>Models</h3><ul>
         <li>Black-Scholes, Black-76, Bachelier</li>
         <li>Heston, double Heston, Bates</li>
-        <li>Sauts : Merton, Kou, CGMY, VG, NIG</li>
-        <li>HJM à un facteur</li>
+        <li>Jumps: Merton, Kou, CGMY, VG, NIG</li>
+        <li>One-factor HJM</li>
       </ul></div>
       <div><h3>Calibration</h3><ul>
-        <li>Nelder–Mead classique et adaptatif</li>
-        <li>Évolution différentielle</li>
-        <li>Bootstrap sur swaptions coterminales</li>
-        <li>Surrogate neuronal</li>
+        <li>Classic and adaptive Nelder–Mead</li>
+        <li>Differential evolution</li>
+        <li>Bootstrap on co-terminal swaptions</li>
+        <li>Neural surrogate</li>
       </ul></div>
-      <div><h3>Langages et outils</h3><ul>
+      <div><h3>Languages and tools</h3><ul>
         <li>Python, NumPy, SciPy, PyTorch, Keras</li>
         <li>C++ (DLL, CMake, Excel)</li>
-        <li>JavaScript, HTML, CSS</li>
+        <li>JavaScript, HTML, CSS, LaTeX</li>
         <li>R, Git, GitHub Actions</li>
       </ul></div>
     </div>
@@ -777,7 +591,7 @@ footer{border-color:rgb(255 255 255 / 9%);color:var(--ink2)}
 
 <footer>
   <div class="page">
-    <span>© 2026 Mohammed-Yassine Barnicha · code sous licence MIT</span>
+    <span>© 2026 Mohammed-Yassine Barnicha · code under the MIT licence</span>
     <span><a href="https://github.com/yassinebarnicha">github.com/yassinebarnicha</a></span>
   </div>
 </footer>

@@ -1,0 +1,582 @@
+% Report: Bermudan swaptions in a one-factor HJM model.
+% Build: pdflatex report.tex (twice). Figures read their data from data/*.dat, produced by the page's JavaScript engine.
+\documentclass[11pt,a4paper]{article}
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepackage{pgfplotstable}
+\usepackage{caption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage{cleveref}
+\hypersetup{pdftitle={Bermudan swaptions in a one-factor HJM model},pdfauthor={Mohammed-Yassine Barnicha}}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}[proposition]{Lemma}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\Bb}{\bar B}
+\newcommand{\dd}{\,\mathrm{d}}
+\pgfplotsset{every axis/.append style={width=0.48\textwidth,height=5.2cm,grid=major,grid style={gray!25},
+  scaled ticks=false,xticklabel style={/pgf/number format/fixed},yticklabel style={/pgf/number format/fixed},
+  tick label style={font=\footnotesize},label style={font=\footnotesize},legend style={font=\scriptsize,draw=none,fill=white,fill opacity=0.8,text opacity=1}}}
+
+\title{Bermudan Swaptions in a One-Factor HJM Model\\[4pt]
+  \large Calibration, PDE and Monte Carlo Pricing, and a Review of the Model}
+\author{Mohammed-Yassine Barnicha}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent We price co-terminal Bermudan swaptions in the one-factor Heath--Jarrow--Morton model with separable volatility
+$\sigma_f(t,T)=\sigma(t)e^{-\lambda(T-t)}$. The model is calibrated exactly to co-terminal European swaptions quoted in normal
+volatility, by a sequential bootstrap built on Jamshidian's decomposition, and the Bermudan is priced by a finite-difference
+scheme on the Markov factor and by Longstaff--Schwartz Monte Carlo. Reviewing the original implementation, we show that its
+zero-coupon bond formula carries the convexity adjustment with the wrong sign: the model then violates the martingale property
+of discounted bonds by $1.8\,\%$ on a 7-year bond, prices the same European swaption at $0.0258$ by Jamshidian and $0.0206$ by
+the PDE, and undervalues the reference Bermudan by $11\,\%$. We derive the correct formula, measure the other numerical
+issues (Monte Carlo discounting, regression bias, time scheme), and study how the mean-reversion parameter, which the
+calibration cannot identify, drives the Bermudan price through the correlation between exercise dates. All computations are
+reproduced by the interactive page \url{https://yassinebarnicha.github.io/swaptions-hjm/}.
+\end{abstract}
+
+\tableofcontents
+
+%======================================================================
+\section{Introduction}
+A Bermudan swaption gives its holder the right to enter, on any of a set of dates $T_1<\dots<T_m$, an interest-rate swap that
+ends at a fixed final date $T_N$. Each exercise right alone is a European swaption, which the market quotes; the Bermudan
+adds the right to \emph{choose} the date, and the value of that choice depends on how rates at the different dates are
+correlated, which European prices do not reveal. A pricing model must therefore (i) reproduce the Europeans, (ii) have a
+realistic dynamics across dates, and (iii) be numerically tractable for an optimal stopping problem.
+
+The one-factor Gaussian HJM model with separable volatility (equivalently the Hull--White model with time-dependent
+volatility) meets the third requirement best: it is Markov in one Gaussian factor, bonds are exponential-affine in it,
+Europeans have closed forms, and the Bermudan reduces to a one-dimensional PDE. Its mean-reversion speed $\lambda$ sets the
+inter-date correlation.
+
+\paragraph{Contributions.} This report documents the project and its review:
+\begin{enumerate}[nosep]
+  \item a self-contained derivation of the model (\cref{sec:model}), of the European pricing formulas (\cref{sec:europeans})
+        and of the calibration (\cref{sec:calibration});
+  \item the PDE and Monte Carlo methods for the Bermudan, with their error analysis and convergence study
+        (\cref{sec:bermudan,sec:pde,sec:lsmc});
+  \item the model review (\cref{sec:review}): a sign error in the bond formula, exposed by a martingale test, and its impact;
+  \item a study of mean reversion under recalibration (\cref{sec:meanrev}).
+\end{enumerate}
+
+%======================================================================
+\section{The model}\label{sec:model}
+\subsection{The HJM framework}
+Let $P(t,T)$ be the price at $t$ of the zero-coupon bond paying $1$ at $T$, $f(t,T)=-\partial_T\ln P(t,T)$ the instantaneous
+forward rate, $r_t=f(t,t)$ the short rate and $\beta_t=\exp\int_0^tr_s\dd s$ the bank account. Under the risk-neutral measure
+$\Q$, with a one-dimensional Brownian motion $W$, HJM specify
+\begin{equation}
+  \dd f(t,T)=\mu(t,T)\dd t+\sigma_f(t,T)\dd W_t,\qquad f(0,T)=f^{\mathrm{mkt}}(0,T).
+\end{equation}
+\begin{proposition}[HJM drift condition]\label{prop:drift}
+Discounted bond prices $P(t,T)/\beta_t$ are $\Q$-martingales for all $T$ if and only if
+\begin{equation}\label{eq:drift}
+  \mu(t,T)=\sigma_f(t,T)\int_t^T\sigma_f(t,u)\dd u .
+\end{equation}
+\end{proposition}
+\begin{proof}
+Let $\Sigma(t,T)=\int_t^T\sigma_f(t,u)\dd u$ and $A(t,T)=\int_t^T\mu(t,u)\dd u$. From $\ln P(t,T)=-\int_t^Tf(t,u)\dd u$ and
+the stochastic Fubini theorem, $\dd\ln P(t,T)=\big(r_t-A(t,T)\big)\dd t-\Sigma(t,T)\dd W_t$, so
+$\dd\big(P/\beta\big)/(P/\beta)=\big(\tfrac12\Sigma^2-A\big)\dd t-\Sigma\dd W_t$. The drift vanishes for all $T$ iff
+$A(t,T)=\tfrac12\Sigma(t,T)^2$; differentiating in $T$ gives \eqref{eq:drift}.
+\end{proof}
+
+\subsection{Separable volatility and the Markov factor}
+The model uses
+\begin{equation}
+  \sigma_f(t,T)=\sigma(t)\,e^{-\lambda(T-t)}=\eta(t)\,b(T),\qquad \eta(t)=\sigma(t)e^{\lambda t},\quad b(T)=e^{-\lambda T},
+\end{equation}
+with $\sigma(\cdot)$ piecewise constant on the exercise grid: $\sigma(t)=\sigma_k$ for $t\in(T_{k-1},T_k]$, $T_0=0$.
+Define
+\begin{equation}
+\begin{gathered}
+  X_t=\int_0^t\eta(u)\dd W_u,\qquad
+  \alpha(t)=\int_0^t\eta(u)^2\dd u,\\
+  \Bb(t)=\int_0^tb(u)\dd u=\frac{1-e^{-\lambda t}}{\lambda},\qquad
+  \gamma(t)=\int_0^t\eta(u)^2\,\Bb(u)\dd u .
+\end{gathered}
+\end{equation}
+$X$ is a continuous Gaussian martingale, $X_t\sim\N(0,\alpha(t))$, with independent increments. On a segment $[a,b]$ where
+$\sigma\equiv\sigma_j$,
+\begin{equation}\label{eq:alphagamma}
+  \alpha(b)-\alpha(a)=\sigma_j^2\,\frac{e^{2\lambda b}-e^{2\lambda a}}{2\lambda},\qquad
+  \gamma(b)-\gamma(a)=\frac{\sigma_j^2}{\lambda}\left[\frac{e^{2\lambda b}-e^{2\lambda a}}{2\lambda}-\frac{e^{\lambda b}-e^{\lambda a}}{\lambda}\right],
+\end{equation}
+with the limits $\sigma_j^2(b-a)$ and $\tfrac12\sigma_j^2(b^2-a^2)$ when $\lambda\to0$.
+
+\begin{proposition}[Forward rates, short rate and bonds]\label{prop:bonds}
+For $t\le T$,
+\begin{align}
+  f(t,T)&=f(0,T)+b(T)\big[\Bb(T)\,\alpha(t)-\gamma(t)+X_t\big],\label{eq:fwd}\\
+  r_t&=f(0,t)+e^{-\lambda t}\big[\Bb(t)\,\alpha(t)-\gamma(t)\big]+e^{-\lambda t}X_t,\label{eq:short}\\
+  P(t,T)&=\frac{P(0,T)}{P(0,t)}\exp\Big(-D(t,T)\big[c(t,T)+X_t\big]\Big),\label{eq:bond}
+\end{align}
+where $D(t,T)=\Bb(T)-\Bb(t)$ and $c(t,T)=\tfrac12\big(\Bb(T)+\Bb(t)\big)\alpha(t)-\gamma(t)$.
+\end{proposition}
+\begin{proof}
+By \eqref{eq:drift}, $\mu(s,T)=\eta(s)^2b(T)\big(\Bb(T)-\Bb(s)\big)$. Integrating $\dd f(s,T)$ over $s\in[0,t]$,
+\[
+  f(t,T)=f(0,T)+b(T)\int_0^t\eta(s)^2\big(\Bb(T)-\Bb(s)\big)\dd s+b(T)\int_0^t\eta(s)\dd W_s,
+\]
+which is \eqref{eq:fwd}; \eqref{eq:short} is $T=t$. For the bond, $\int_t^Tb(u)\dd u=D(t,T)$ and
+$\int_t^Tb(u)\Bb(u)\dd u=\tfrac12\big(\Bb(T)^2-\Bb(t)^2\big)=\tfrac12D(t,T)\big(\Bb(T)+\Bb(t)\big)$, so
+$\int_t^T\big[f(t,u)-f(0,u)\big]\dd u=D(t,T)\big[c(t,T)+X_t\big]$ and \eqref{eq:bond} follows from
+$P(0,T)/P(0,t)=\exp\big(-\int_t^Tf(0,u)\dd u\big)$.
+\end{proof}
+
+\begin{remark}[Hull--White]
+Applying It\^o's formula to \eqref{eq:short} gives $\dd r_t=\big(\theta(t)-\lambda r_t\big)\dd t+\sigma(t)\dd W_t$ for a
+deterministic $\theta(\cdot)$ that fits the initial curve: the model is the Hull--White model with time-dependent volatility.
+$\lambda$ is the speed of mean reversion of the short rate and $\sigma(t)$ its normal volatility.
+\end{remark}
+
+\begin{remark}[Dynamics of bond ratios]\label{rem:ratio}
+From \eqref{eq:bond}, the diffusion part of $\ln P(t,T)$ is $-D(t,T)\,\eta(t)\dd W_t$, hence that of
+$\ln\big(P(t,T_i)/P(t,T_e)\big)$ is $-\big(\Bb(T_i)-\Bb(T_e)\big)\eta(t)\dd W_t$: a deterministic constant times $\dd X_t$.
+Its integrated variance on $[0,T_e]$ is $D(T_e,T_i)^2\,\alpha(T_e)$.
+\end{remark}
+
+%======================================================================
+\section{European swaptions}\label{sec:europeans}
+\subsection{Swaps and market quotes}
+A payer swap starting at $T_0$ with fixed rate $K$, payment dates $T_1<\dots<T_n$ and accruals $\tau_i$ is worth, at $T_0$,
+$1-P(T_0,T_n)-K\sum_i\tau_iP(T_0,T_i)$ per unit notional. With the annuity $A_t=\sum_i\tau_iP(t,T_i)$ and the forward
+swap rate $S_t=\big(P(t,T_0)-P(t,T_n)\big)/A_t$, the swap value is $A_t(S_t-K)$ and the payer swaption pays
+$A_{T_0}(S_{T_0}-K)^+$. Under the annuity measure $\Q^A$ (num\'eraire $A$), $S$ is a martingale. The market convention
+(Bachelier) takes $\dd S_t=\sigma_N\dd W^A_t$, so that
+\begin{equation}\label{eq:bachelier}
+  V^{\mathrm{pay}}_0=A_0\,\E^{A}\big[(S_{T_0}-K)^+\big]=A_0\Big[(S_0-K)\,\Phi(d)+\sigma_N\sqrt{T_0}\,\varphi(d)\Big],\qquad
+  d=\frac{S_0-K}{\sigma_N\sqrt{T_0}},
+\end{equation}
+and $V^{\mathrm{rec}}_0=A_0\big[(K-S_0)\Phi(-d)+\sigma_N\sqrt{T_0}\,\varphi(d)\big]$. A quote $\sigma_N$ is thus a price.
+
+\subsection{Options on zero-coupon bonds}
+\begin{proposition}\label{prop:zbo}
+The price at $0$ of a put with expiry $T_e$ and strike $K$ on the bond $P(\cdot,T_i)$, $T_i>T_e$, is
+\begin{equation}
+\begin{gathered}
+  \mathrm{ZBP}(T_e,T_i,K)=K\,P(0,T_e)\,\Phi(-h+v)-P(0,T_i)\,\Phi(-h),\\
+  v=D(T_e,T_i)\sqrt{\alpha(T_e)},\qquad h=\frac1v\ln\frac{P(0,T_i)}{K\,P(0,T_e)}+\frac v2,
+\end{gathered}
+\end{equation}
+and the call is $\mathrm{ZBC}=P(0,T_i)\Phi(h)-K\,P(0,T_e)\Phi(h-v)$.
+\end{proposition}
+\begin{proof}
+Under the $T_e$-forward measure, $Y_t=P(t,T_i)/P(t,T_e)$ is a martingale; by \cref{rem:ratio} it is lognormal with total
+variance $v^2$ at $T_e$, and $Y_{T_e}=P(T_e,T_i)$. Then $\mathrm{ZBP}=P(0,T_e)\,\E^{T_e}[(K-Y_{T_e})^+]$ is Black's formula
+with forward $Y_0=P(0,T_i)/P(0,T_e)$.
+\end{proof}
+
+\subsection{Jamshidian's decomposition}
+\begin{proposition}[Jamshidian]\label{prop:jam}
+Let $c_i=K\tau_i$ for $i<n$ and $c_n=1+K\tau_n$. There is a unique $x^\star$ with $\sum_ic_iP(T_0,T_i;x^\star)=1$, and with
+$K_i=P(T_0,T_i;x^\star)$,
+\begin{equation}
+  V^{\mathrm{pay}}_0=\sum_{i=1}^nc_i\,\mathrm{ZBP}(T_0,T_i,K_i),\qquad V^{\mathrm{rec}}_0=\sum_{i=1}^nc_i\,\mathrm{ZBC}(T_0,T_i,K_i).
+\end{equation}
+\end{proposition}
+\begin{proof}
+The payer payoff is $\big(1-\sum_ic_iP(T_0,T_i;X_{T_0})\big)^+$. By \eqref{eq:bond}, each $P(T_0,T_i;x)$ is strictly decreasing
+in $x$ ($D>0$), from $+\infty$ to $0$, so $\sum_ic_iP(T_0,T_i;x)$ crosses $1$ exactly once, at $x^\star$. For $x\ge x^\star$ every
+$P(T_0,T_i;x)\le K_i$ and for $x<x^\star$ every $P(T_0,T_i;x)>K_i$; in both cases
+$\big(1-\sum_ic_iP_i\big)^+=\sum_ic_i\big(K_i-P_i\big)^+$, using $\sum_ic_iK_i=1$. Take expectations and apply \cref{prop:zbo}.
+\end{proof}
+The implementation finds $x^\star$ with Brent's method on $[-10,10]$. Put--call parity (payer $-$ receiver $=$ forward swap)
+holds to $10^{-8}$.
+
+%======================================================================
+\section{Calibration}\label{sec:calibration}
+\subsection{The co-terminal bootstrap}
+Each exercise date $T_k$ carries the co-terminal European swaption $T_k\to T_N$, quoted at $\sigma_{N,k}$. By
+\cref{prop:jam,prop:zbo}, its model price depends on $\sigma(\cdot)$ only through $\alpha(T_k)$, which by \eqref{eq:alphagamma}
+depends on $\sigma_1,\dots,\sigma_k$ only. Each bond put increases with $v$, so the price is continuous and strictly
+increasing in $\sigma_k$ once $\sigma_1,\dots,\sigma_{k-1}$ are fixed.
+\begin{proposition}\label{prop:boot}
+Given $\lambda$ and $\sigma_1,\dots,\sigma_{k-1}$, the equation $V^{\mathrm{model}}_k(\sigma_k)=V^{\mathrm{Bach}}_k(\sigma_{N,k})$
+has at most one solution $\sigma_k>0$; it exists iff the market price exceeds the model price with $\sigma_k=0$, i.e.\ iff the
+market does not imply less total variance at $T_k$ than is already accumulated on $[0,T_{k-1}]$.
+\end{proposition}
+The bootstrap solves the dates in increasing order with Brent's method on $[\sigma_{\min},\sigma_{\max}]$, and the fit is
+exact (residuals below $10^{-10}$). When the condition of \cref{prop:boot} fails, the page reports the instrument that
+cannot be fitted instead of returning a wrong $\sigma$.
+
+\subsection{Mean reversion is not identified}
+For every $\lambda$ in a wide range, \cref{prop:boot} produces a $\sigma(\cdot)$ that reproduces all the co-terminal Europeans
+exactly. The calibration set therefore leaves a one-parameter family of perfectly calibrated models, whose Bermudan prices
+differ (\cref{sec:meanrev}): on our reference case, from $0.01656$ ($\lambda=0$) to $0.01848$ ($\lambda=0.3$), a spread of
+$12\,\%$. $\lambda$ must be set from other information: historical correlation of rates, or other instruments (caps, diagonal or
+column swaptions) whose prices depend on inter-date correlation.
+
+%======================================================================
+\section{The Bermudan swaption}\label{sec:bermudan}
+The exercise value at $T_k$ is the underlying co-terminal swap, $h_k(x)=\big(1-P(T_k,T_N;x)-K\sum_{T_i>T_k}\tau_iP(T_k,T_i;x)\big)^+$
+for a payer. The price is the value of an optimal stopping problem over the stopping times $\tau$ taking values in
+$\{T_1,\dots,T_m\}$:
+\begin{equation}
+  V_0=\sup_\tau\E^\Q\big[\beta_\tau^{-1}h_\tau(X_\tau)\big].
+\end{equation}
+Since $X$ is Markov, dynamic programming gives
+\begin{equation}\label{eq:dp}
+  V_{T_m}=h_m,\qquad V_{T_k}=\max\big(h_k,C_k\big),\qquad
+  C_k(x)=\E^\Q\Big[e^{-\int_{T_k}^{T_{k+1}}r_s\dd s}\,V_{T_{k+1}}\,\Big|\,X_{T_k}=x\Big].
+\end{equation}
+Exercising always at a fixed $T_k$ is admissible, so $V_0\ge\max_kV^{\mathrm{Eur}}_k$; the difference is the
+\emph{early-exercise} (or switch) premium. On the reference case below the Bermudan is worth $0.016746$ against
+$0.014328$ for the most expensive European.
+
+\paragraph{Reference case.} Curve $P(0,t)$ at $t=1,2,3,5,7,10$: $0.978$, $0.954$, $0.930$, $0.885$, $0.842$, $0.780$; payer, $K=3\,\%$,
+annual payments from $2$ to $T_N=7$; exercise dates $1,2,3$ with normal vols $80$, $85$, $90$\,bp; $\lambda=3\,\%$. The
+bootstrap gives $\sigma=(86.12,\ 96.45,\ 106.37)$\,bp.
+
+%======================================================================
+\section{The PDE method}\label{sec:pde}
+\subsection{Equation and boundary conditions}
+Between exercise dates, by Feynman--Kac, $V(t,x)=\E[e^{-\int_t^{T}r}V(T,X_T)\,|\,X_t=x]$ solves
+\begin{equation}\label{eq:pde}
+  \partial_tV+\tfrac12\eta(t)^2\,\partial_{xx}V-r(t,x)\,V=0,\qquad r(t,x)=A(t)+e^{-\lambda t}x,
+\end{equation}
+with $A(t)=f(0,t)+e^{-\lambda t}\big[\Bb(t)\alpha(t)-\gamma(t)\big]$ from \eqref{eq:short}. There is no drift term because $X$ is
+a martingale; this is why the factor $X$, rather than $r$, is the natural state variable. At each $T_k$ the value is
+updated by $V\leftarrow\max(V,h_k)$, and the equation is solved backwards from $V(T_m,\cdot)=h_m$.
+
+The domain is truncated to $[-n\sqrt{\alpha(T_m)},\,n\sqrt{\alpha(T_m)}]$. Far from the origin the option is either deep in
+the money (exercise immediately) or worthless, so Dirichlet values equal to the largest intrinsic value among the remaining
+exercise dates are imposed. The truncation error is of the order of the probability of leaving the domain,
+$2\Phi(-n)\approx e^{-n^2/2}$, which is negligible from $n=5$ (\cref{tab:domain}).
+
+\subsection{Discretisation}
+On a uniform grid $x_j$ with step $\Delta x$, let $\mathcal L^n$ be the discrete operator
+$(\mathcal L^nV)_j=\tfrac12\eta(t_n)^2\,(V_{j+1}-2V_j+V_{j-1})/\Delta x^2-r(t_n,x_j)V_j$. The $\theta$-scheme reads
+\begin{equation}
+  \frac{V^n-V^{n+1}}{\Delta t}=\theta\,\mathcal L^nV^n+(1-\theta)\,\mathcal L^{n+1}V^{n+1},
+\end{equation}
+a tridiagonal system per step, solved by the Thomas algorithm in $O(n_x)$ operations. The time grid contains every exercise
+date, so that the $\max$ is applied exactly.
+\begin{itemize}[nosep]
+  \item $\theta=1$ (implicit Euler, the original code) is unconditionally stable and monotone whenever
+        $1+\Delta t\,r(t,x)>0$, but only first order in time.
+  \item $\theta=\tfrac12$ (Crank--Nicolson) is second order and unconditionally stable in $L^2$, but not L-stable: the
+        high-frequency components created by the kink of $h_k$ at each exercise date are damped by a factor close to $-1$ per
+        step and oscillate.
+  \item \emph{Rannacher time-stepping} replaces the first two Crank--Nicolson steps after each exercise date by implicit
+        steps (here: two full steps). This damps the oscillations and restores second-order convergence for non-smooth data
+        (Rannacher 1984; Giles and Carter 2006).
+\end{itemize}
+
+\subsection{Convergence}
+\Cref{fig:conv} shows the error in time against a reference computed with $n_t=12\,800$, and the error in space. Implicit
+Euler converges at order one and Crank--Nicolson with Rannacher steps at order two (the error is divided by about $4$ to $5$
+each time $n_t$ doubles). On this price, plain Crank--Nicolson is even more accurate at coarse steps: the oscillations it
+leaves near the exercise boundary are small and partly cancel in the value at $x=0$; they matter more for the Greeks, which is
+why the Rannacher steps are kept by default. In space the centred scheme is second order. With $n_x=501$, $n_t=1000$ and
+Crank--Nicolson--Rannacher the price is accurate to a few $10^{-7}$ (space error) and costs a few tens of milliseconds in the
+browser.
+
+This study also caught an error in an early version of the port: the $\theta$-scheme used $\eta(t_n)$ in both halves of
+the step, a first-order error in time since $\eta(t)=\sigma(t)e^{\lambda t}$ varies within a step. The scheme now uses
+$\eta(t_n)$ in the implicit part and $\eta(t_{n+1})$ in the explicit part, with $\sigma$ read on the segment of the step.
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{loglogaxis}[xlabel={time steps $n_t$},ylabel={$|V-V_{\mathrm{ref}}|$},legend pos=north east]
+  \addplot+[mark=*,thick] table[x=nt,y=implicite]{data/temps.dat}; \addlegendentry{implicit}
+  \addplot+[mark=square*,thick] table[x=nt,y=cn]{data/temps.dat}; \addlegendentry{Crank--Nicolson}
+  \addplot+[mark=triangle*,thick] table[x=nt,y=cnr]{data/temps.dat}; \addlegendentry{CN + Rannacher}
+\end{loglogaxis}
+\end{tikzpicture}\hfill
+\begin{tikzpicture}
+\begin{loglogaxis}[xlabel={space points $n_x$},ylabel={$|V-V_{\mathrm{ref}}|$}]
+  \addplot+[mark=*,thick] table[x=nx,y=err]{data/espace.dat};
+\end{loglogaxis}
+\end{tikzpicture}
+\caption{PDE convergence on the reference case. Left: time error ($n_x=1001$). Right: space error (CN + Rannacher,
+$n_t=4000$, reference $n_x=4001$).}\label{fig:conv}
+\end{figure}
+
+\begin{table}[ht]\centering\small
+\pgfplotstabletypeset[columns={nstd,prix},columns/nstd/.style={column name={$n$ (standard deviations)}},
+  columns/prix/.style={column name={Bermudan price},fixed,precision=8},every head row/.style={before row=\toprule,after row=\midrule},
+  every last row/.style={after row=\bottomrule}]{data/domaine.dat}
+\caption{Truncation of the PDE domain to $\pm n\sqrt{\alpha(T_m)}$ (space step kept constant).}\label{tab:domain}
+\end{table}
+
+\subsection{Exercise boundary}
+At each date the holder exercises where $h_k(x)>C_k(x)$. For a payer this is a half-line $x>x^\star_k$: high factor, high
+rates, valuable payer swap. \Cref{fig:boundary} shows $C_k$ and $h_k$ at $T_1$ and $T_2$; at the last date $C_m=0$ and the
+option is exercised as soon as it is in the money.
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{axis}[xlabel={factor $x$},ylabel={value},title={\footnotesize $T_1=1$},legend pos=north west,ymin=-0.002,xmin=-0.06,xmax=0.075]
+  \addplot[blue,thick] table[x=x,y=c1]{data/frontiere.dat}; \addlegendentry{continuation $C_1$}
+  \addplot[red,thick,dashed] table[x=x,y=e1]{data/frontiere.dat}; \addlegendentry{exercise $h_1$}
+\end{axis}
+\end{tikzpicture}\hfill
+\begin{tikzpicture}
+\begin{axis}[xlabel={factor $x$},title={\footnotesize $T_2=2$},ymin=-0.002,xmin=-0.06,xmax=0.075]
+  \addplot[blue,thick] table[x=x,y=c2]{data/frontiere.dat};
+  \addplot[red,thick,dashed] table[x=x,y=e2]{data/frontiere.dat};
+\end{axis}
+\end{tikzpicture}
+\caption{Continuation and exercise values from the PDE. The exercise boundary is the crossing point.}\label{fig:boundary}
+\end{figure}
+
+%======================================================================
+\section{Longstaff--Schwartz Monte Carlo}\label{sec:lsmc}
+\subsection{Algorithm}
+The factor is simulated exactly: $X_{t+\Delta}-X_t\sim\N\big(0,\alpha(t+\Delta)-\alpha(t)\big)$, independent of the past. The
+continuation value in \eqref{eq:dp} is a conditional expectation, estimated by least squares (Longstaff and Schwartz 2001).
+
+\begin{algorithm}[ht]\caption{Longstaff--Schwartz for the Bermudan swaption}\label{alg:lsmc}
+\begin{algorithmic}[1]
+\State simulate $N$ paths of $X$ (and of $I_t=\int_0^tr_s\dd s$) at the exercise dates
+\State $\mathrm{CF}^{(i)}\gets h_m(X^{(i)}_{T_m})$, $\ \tau^{(i)}\gets T_m$ for every path $i$
+\For{$k=m-1,\dots,1$}
+  \State $\mathcal I\gets\{i: h_k(X^{(i)}_{T_k})>0\}$ \Comment{in-the-money paths only}
+  \State regress $Y^{(i)}=e^{-(I^{(i)}_{\tau^{(i)}}-I^{(i)}_{T_k})}\,\mathrm{CF}^{(i)}$ on $\{1,\tilde x,\dots,\tilde x^d\}$,
+        $\tilde x=x/\sqrt{\alpha(T_k)}$, over $i\in\mathcal I$, giving $\hat C_k$
+  \For{$i\in\mathcal I$ with $h_k(X^{(i)}_{T_k})>\hat C_k(X^{(i)}_{T_k})$}
+     \State $\mathrm{CF}^{(i)}\gets h_k(X^{(i)}_{T_k})$, $\ \tau^{(i)}\gets T_k$
+  \EndFor
+\EndFor
+\State \Return $\hat V_0=\frac1N\sum_ie^{-I^{(i)}_{\tau^{(i)}}}\,\mathrm{CF}^{(i)}$ and its standard error
+\end{algorithmic}
+\end{algorithm}
+
+Normalising the regressor by $\sqrt{\alpha(T_k)}$ does not change the fit but keeps the normal equations well conditioned;
+the least-squares problem is solved by a Householder QR factorisation.
+
+\subsection{The two biases}
+Write $\hat\tau$ for the exercise rule produced by the regression.
+\begin{itemize}[nosep]
+  \item \emph{Low bias.} For any stopping rule, $\E[\beta_{\hat\tau}^{-1}h_{\hat\tau}]\le V_0$. If $\hat\tau$ is estimated on
+        one set of paths and applied to an independent set, the second set gives an unbiased estimate of this quantity, hence a
+        \emph{lower bound} of $V_0$ in expectation.
+  \item \emph{High bias.} When the same paths are used to estimate $\hat\tau$ and to price, the rule is fitted to the noise of
+        those paths and anticipates their future, which pushes the estimate up.
+\end{itemize}
+The page offers both estimators. An upper bound can be obtained by duality (Rogers 2002; Haugh and Kogan 2004; Andersen and
+Broadie 2004), a natural extension.
+
+\subsection{Discounting}
+Discounting must use the path of the short rate: $\beta_{T_k}^{-1}=e^{-I_{T_k}}$. The implementation simulates $X$ on a fine
+grid ($52$ steps per year by default) and integrates $r(t,X_t)$ by the trapezoidal rule, an $O(\Delta t^2)$ error. An exact
+alternative exists: $(X_t,I_t)$ is a Gaussian vector whose mean and covariance follow from \eqref{eq:short}, so it could be
+sampled jointly at the exercise dates without any grid.
+
+\subsection{Results}
+\Cref{fig:lsmc} shows the three estimators against the PDE price. With exact discounting, both the in-sample and the
+independent estimators contain the PDE value in their confidence intervals: with a degree-2 regression on one factor, both
+biases are smaller than the statistical error at these sample sizes. The original discounting (\cref{sec:review}) stays
+about $3$\,bp of notional above the PDE whatever the number of paths: it is a bias, not noise.
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{semilogxaxis}[width=0.75\textwidth,height=6cm,xlabel={paths $N$},ylabel={Bermudan price},legend pos=north east,
+  yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=3},xticklabel style={/pgf/number format/sci}]
+  \addplot+[mark=*,thick,error bars/.cd,y dir=both,y explicit] table[x=N,y=dans,y error=dans_ic]{data/lsmc.dat}; \addlegendentry{exact discounting, in-sample}
+  \addplot+[mark=square*,thick,error bars/.cd,y dir=both,y explicit] table[x=N,y=indep,y error=indep_ic]{data/lsmc.dat}; \addlegendentry{exact discounting, independent paths}
+  \addplot+[mark=triangle*,thick,error bars/.cd,y dir=both,y explicit] table[x=N,y=code,y error=code_ic]{data/lsmc.dat}; \addlegendentry{original discounting}
+  \addplot[black,dashed,domain=1000:100000] {0.016746}; \addlegendentry{PDE}
+\end{semilogxaxis}
+\end{tikzpicture}
+\caption{Longstaff--Schwartz estimates with $95\,\%$ confidence intervals, degree-2 regression, against the PDE price.}\label{fig:lsmc}
+\end{figure}
+
+%======================================================================
+\section{Review of the original model}\label{sec:review}
+\subsection{A sign error in the convexity term}
+The original \texttt{hjm\_1f.py} implements
+\begin{equation}
+  P^{\mathrm{code}}(t,T)=\frac{P(0,T)}{P(0,t)}\exp\Big(D(t,T)\big[c(t,T)-X_t\big]\Big),
+\end{equation}
+that is \eqref{eq:bond} with $+c$ instead of $-c$, and its short rate, $r^{\mathrm{code}}_t=-\partial_T\ln P^{\mathrm{code}}(t,T)|_{T=t}$,
+inherits the error: $r^{\mathrm{code}}_t=f(0,t)-e^{-\lambda t}\big[\Bb(t)\alpha(t)-\gamma(t)\big]+e^{-\lambda t}X_t$.
+\Cref{prop:bonds} derives the correct sign directly from the drift condition. Because $c(t,T)>0$ grows with
+$\alpha(t)$, the error grows with volatility and maturity.
+
+\paragraph{Why calibration does not see it.} Jamshidian's formula (\cref{prop:jam}) uses $P(0,\cdot)$ and the variance
+$v^2$ of bond ratios, neither of which depends on $c$: Europeans are priced correctly and the calibrated $\sigma$ are the
+same to $10^{-2}$\,bp. The error only appears in methods that use $r(t,x)$ and $P(t,T;x)$ along paths, the PDE and the Monte
+Carlo, so the model prices the same European differently depending on the method.
+
+\subsection{The martingale test}
+Under $\Q$, $\E\big[\beta_t^{-1}P(t,T)\big]$ must equal $P(0,T)$ for every $t$. \Cref{fig:mart} estimates it for $T=7$ with
+$200\,000$ paths ($\sigma=150$\,bp, $\lambda=3\,\%$). The original formula drifts away, to $2.2\,\%$ at $t=6$; the corrected
+one stays within the confidence band.
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.72\textwidth,height=5.6cm,xlabel={$t$ (years)},ylabel={$\E[\beta_t^{-1}P(t,7)]/P(0,7)-1$ (\%)},legend pos=north west]
+  \addplot+[mark=*,thick,error bars/.cd,y dir=both,y explicit] table[x=t,y=err_pct,y error=ic_pct]{data/martingale_code.dat};
+  \addlegendentry{original formula}
+  \addplot+[mark=square*,thick,error bars/.cd,y dir=both,y explicit] table[x=t,y=err_pct,y error=ic_pct]{data/martingale_corr.dat};
+  \addlegendentry{corrected formula}
+\end{axis}
+\end{tikzpicture}
+\caption{Martingale test of discounted bond prices, with $95\,\%$ confidence intervals.}\label{fig:mart}
+\end{figure}
+
+\subsection{Impact on prices}
+\begin{table}[ht]\centering\small
+\begin{tabular}{@{}lll@{}}\toprule
+ & original formula & corrected formula\\\midrule
+$\E[\beta_3^{-1}P(3,7)]$, vs $P(0,7)=0.842000$ & $0.856942$ ($+1.78\,\%$, $83$ s.e.) & $0.841949$ ($-0.3$ s.e.)\\
+European $3\mathrm{y}\to7\mathrm{y}$, Jamshidian & $0.02582$ & $0.02582$\\
+European $3\mathrm{y}\to7\mathrm{y}$, PDE & $0.02057$ & $0.02582$\\
+European $3\mathrm{y}\to7\mathrm{y}$, Monte Carlo & $0.02049\pm0.00015$ & $0.02574\pm0.00017$\\
+Reference Bermudan (PDE, implicit) & $0.014929$ & $0.016737$\\
+Early-exercise premium & $0.000601$ & $0.002409$\\\bottomrule
+\end{tabular}
+\caption{Consequences of the sign error. Rows 1--4: $\sigma=150$\,bp, $\lambda=3\,\%$. Rows 5--6: reference case
+($n_x=501$, $n_t=1000$); the premium is the Bermudan minus the most expensive European, $0.014328$, which is the same with both
+formulas.}\label{tab:impact}
+\end{table}
+
+The last row is the most telling. Since Europeans are unaffected, the whole error falls on the early-exercise premium, the
+quantity a Bermudan model exists to price: the original formula underestimates it by $75\,\%$.
+
+\subsection{Other findings}
+\begin{itemize}
+  \item \emph{Monte Carlo discounting.} \texttt{mc\_1f.py} freezes the short rate between exercise dates and discounts the
+        exercise value back to today at $r(0)$, ignoring the curve: on the reference case, Monte Carlo bond prices are off by
+        $0.26\,\%$ at $2$ years and $0.59\,\%$ at $3$ years, and the Bermudan is overpriced by about $3$\,bp of notional.
+        Fixed by the exact discounting of \cref{sec:lsmc}.
+  \item \emph{Regression bias.} Pricing on the regression paths only; independent paths and a choice of degree were added.
+  \item \emph{Time scheme.} Implicit Euler only; Crank--Nicolson with Rannacher steps was added (\cref{fig:conv}).
+  \item \emph{Receiver swaptions.} The Python returns the payer formula for a receiver; the port uses bond calls.
+\end{itemize}
+
+%======================================================================
+\section{Mean reversion under recalibration}\label{sec:meanrev}
+\subsection{Correlation between exercise dates}
+Since $X$ has independent increments, $\operatorname{Cov}(X_s,X_t)=\alpha(s)$ for $s\le t$ and
+\begin{equation}\label{eq:corr}
+  \rho(s,t)=\operatorname{corr}(X_s,X_t)=\sqrt{\alpha(s)/\alpha(t)} .
+\end{equation}
+The short rate and, to first order, the swap rates are affine in $X$ with deterministic coefficients, so \eqref{eq:corr} is
+also their correlation across dates.
+\begin{proposition}\label{prop:corr}
+For a constant $\sigma$ and $0<s<t$, $\rho(s,t)^2=\dfrac{e^{2\lambda s}-1}{e^{2\lambda t}-1}$ is strictly decreasing in
+$\lambda>0$, from $s/t$ at $\lambda=0$ to $0$ as $\lambda\to\infty$.
+\end{proposition}
+\begin{proof}
+$\partial_\lambda\ln\rho^2=g(s)-g(t)$ with $g(u)=\dfrac{2u\,e^{2\lambda u}}{e^{2\lambda u}-1}=\dfrac1\lambda\,\psi(2\lambda u)$
+and $\psi(z)=z/(1-e^{-z})$, which is strictly increasing on $(0,\infty)$. Hence $g(s)<g(t)$. The limits follow from
+$e^{2\lambda u}-1\sim2\lambda u$ and from $\rho^2\le e^{-2\lambda(t-s)}\cdot\frac{1}{1-e^{-2\lambda t}}$.
+\end{proof}
+
+\subsection{Why the Bermudan becomes more valuable}
+Recalibration pins each European: in the swap-rate approximation, the $k$-th European fixes the model variance of its own
+swap rate, $\alpha(T_k)\,\kappa_k(\lambda)^2\approx\sigma_{N,k}^2T_k$, where $\kappa_k=\partial S_k/\partial x$ is a duration-like
+factor containing $e^{-\lambda T_k}$. A higher $\lambda$ damps the impact of past shocks, so the calibration raises
+$\sigma$ (\cref{fig:mr}, left: from $(77.9,\,87.3,\,96.7)$\,bp at $\lambda=0$ to $(188.9,\,214.4,\,228.9)$\,bp at $\lambda=0.3$).
+The marginal law of each exercise value is then essentially unchanged, but the dates decorrelate:
+$\rho(T_1,T_3)$ falls from $0.513$ to $0.349$. With the marginals fixed and the dependence weaker, the right to choose the
+best date is worth more, exactly as the value of an option on the maximum of two assets increases when their correlation
+decreases. The Bermudan rises from $0.01656$ to $0.01848$ while every European stays at its market price
+(\cref{fig:mr}, right).
+
+Without recalibration ($\sigma$ frozen at the $\lambda=3\,\%$ values) the effect reverses: a higher $\lambda$ only reduces the
+variance of every future rate, and every price falls.
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{axis}[xlabel={$\lambda$},ylabel={calibrated $\sigma_k$ (bp)},legend pos=north west]
+  \addplot+[thick,mark=none] table[x=lam,y=s1]{data/lambda.dat}; \addlegendentry{$\sigma_1$}
+  \addplot+[thick,mark=none] table[x=lam,y=s2]{data/lambda.dat}; \addlegendentry{$\sigma_2$}
+  \addplot+[thick,mark=none] table[x=lam,y=s3]{data/lambda.dat}; \addlegendentry{$\sigma_3$}
+\end{axis}
+\end{tikzpicture}\hfill
+\begin{tikzpicture}
+\begin{axis}[xlabel={$\lambda$},ylabel={price},legend columns=2,legend style={at={(0.5,-0.3)},anchor=north},
+  yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=3}]
+  \addplot[blue,thick] table[x=lam,y=berm]{data/lambda.dat}; \addlegendentry{Berm., recalibrated}
+  \addplot[blue,thick,dashed] table[x=lam,y=bermfixe]{data/lambda.dat}; \addlegendentry{Berm., $\sigma$ frozen}
+  \addplot[red,thick] table[x=lam,y=eur]{data/lambda.dat}; \addlegendentry{max Eur., recalibrated}
+  \addplot[red,thick,dashed] table[x=lam,y=eurfixe]{data/lambda.dat}; \addlegendentry{max Eur., $\sigma$ frozen}
+\end{axis}
+\end{tikzpicture}
+
+\begin{tikzpicture}
+\begin{axis}[xlabel={$\lambda$},ylabel={correlation},legend pos=north east]
+  \addplot+[thick,mark=none] table[x=lam,y=corr12]{data/lambda.dat}; \addlegendentry{$\rho(T_1,T_2)$}
+  \addplot+[thick,mark=none] table[x=lam,y=corr13]{data/lambda.dat}; \addlegendentry{$\rho(T_1,T_3)$}
+\end{axis}
+\end{tikzpicture}\hfill
+\begin{tikzpicture}
+\begin{axis}[xlabel={$\rho(T_1,T_3)$},ylabel={Bermudan $-$ max European},x dir=reverse,
+  yticklabel style={/pgf/number format/fixed,/pgf/number format/precision=4},xticklabel style={/pgf/number format/precision=2}]
+  \addplot+[thick,mark=*,mark size=1.2pt] table[x=corr13,y expr=\thisrow{berm}-\thisrow{eur}]{data/lambda.dat};
+\end{axis}
+\end{tikzpicture}
+\caption{Mean reversion with recalibration. Top: calibrated volatilities and prices. Bottom: correlation between exercise
+dates and the early-exercise premium against it ($\lambda$ from $0$ to $0.3$).}\label{fig:mr}
+\end{figure}
+
+\begin{remark}
+This is a tendency, not a theorem: it relies on the calibration set (co-terminal Europeans), on the payoff, and on the
+one-factor structure. In a two-factor model, correlation between dates can be lowered without changing $\lambda$, which is one
+reason why two-factor models are preferred for products sensitive to inter-date correlation.
+\end{remark}
+
+%======================================================================
+\section{Validation}
+The JavaScript engine of the page is a line-by-line port of the Python package. With the original formula and the notebook
+settings (implicit scheme, $n_x=501$, $n_t=1000$, $\pm5$ standard deviations) it reproduces every PDE price of the notebook
+to the eighth decimal, for all grids, domains, $\lambda\in[0,0.3]$ and $K\in[2\,\%,4\,\%]$, and the calibrated $\sigma$ to
+$10^{-17}$. With the corrected formula, Jamshidian, the PDE and the Monte Carlo agree on European swaptions, and simulated bond
+prices recover the curve within their confidence intervals.
+
+\section{Conclusion}
+The one-factor HJM model calibrates exactly and quickly to co-terminal Europeans and prices Bermudans accurately by PDE, with
+Monte Carlo as an independent check. The review shows the value of model-level tests: a convexity sign error invisible to the
+calibration was caught by a martingale test and by the inconsistency between methods, and it moved the Bermudan price by
+$12\,\%$. The remaining model risk sits in $\lambda$, which the calibration does not determine and which moves the Bermudan by
+$12\,\%$ over a plausible range. Natural extensions are an exact joint simulation of $(X,\int r)$, a dual upper bound for the
+Monte Carlo, the calibration of $\lambda$ to correlation-sensitive instruments, and a two-factor version.
+
+\begin{thebibliography}{99}\small
+\bibitem{and} L.~Andersen and M.~Broadie. Primal-dual simulation algorithm for pricing multidimensional American options.
+  \emph{Management Science}, 50(9):1222--1234, 2004.
+\bibitem{ap} L.~Andersen and V.~Piterbarg. \emph{Interest Rate Modeling}, vols.~I--III. Atlantic Financial Press, 2010.
+\bibitem{bm} D.~Brigo and F.~Mercurio. \emph{Interest Rate Models -- Theory and Practice}. Springer, 2nd ed., 2006.
+\bibitem{gc} M.~Giles and R.~Carter. Convergence analysis of Crank--Nicolson and Rannacher time-marching.
+  \emph{Journal of Computational Finance}, 9(4):89--112, 2006.
+\bibitem{hk} M.~Haugh and L.~Kogan. Pricing American options: a duality approach. \emph{Operations Research}, 52(2):258--270, 2004.
+\bibitem{hjm} D.~Heath, R.~Jarrow and A.~Morton. Bond pricing and the term structure of interest rates: a new methodology for
+  contingent claims valuation. \emph{Econometrica}, 60(1):77--105, 1992.
+\bibitem{hw} J.~Hull and A.~White. Pricing interest-rate-derivative securities. \emph{Review of Financial Studies}, 3(4):573--592, 1990.
+\bibitem{jam} F.~Jamshidian. An exact bond option formula. \emph{Journal of Finance}, 44(1):205--209, 1989.
+\bibitem{ls} F.~Longstaff and E.~Schwartz. Valuing American options by simulation: a simple least-squares approach.
+  \emph{Review of Financial Studies}, 14(1):113--147, 2001.
+\bibitem{ran} R.~Rannacher. Finite element solution of diffusion problems with irregular data. \emph{Numerische Mathematik},
+  43:309--327, 1984.
+\bibitem{rs} P.~Ritchken and L.~Sankarasubramanian. Volatility structures of forward rates and the dynamics of the term
+  structure. \emph{Mathematical Finance}, 5(1):55--72, 1995.
+\bibitem{rog} L.~C.~G.~Rogers. Monte Carlo valuation of American options. \emph{Mathematical Finance}, 12(3):271--286, 2002.
+\end{thebibliography}
+\end{document}

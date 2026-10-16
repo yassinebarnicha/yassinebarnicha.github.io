@@ -1,8 +1,9 @@
-/* graphe.js — petits graphiques sur canevas, sans bibliothèque.
-   tracer(conteneur, {series, xlab, ylab, xfmt, yfmt, xmin, xmax, ymin, ymax, zero})
-     series : [{nom, x:[], y:[], type:'ligne'|'points'|'marches'|'barres', couleur:'c1'..'c8', tirets, epaisseur, bande:[ybas,yhaut]}]
-   carte(conteneur, {nx, ny, x0, x1, y0, y1, valeur(i,j)->0..1 ou NaN, couleurs:[bas,haut], xlab, ylab, points:[{x,y,couleur}]})
-   Le graphe se redessine seul quand son conteneur change de taille ou que le thème change. */
+/* graphe.js — small canvas charts, no library.
+   tracer(container, {series, xlab, ylab, xfmt, yfmt, xmin, xmax, ymin, ymax, zero})
+     series: [{nom (name), x:[], y:[], type:'ligne'|'points'|'marches' (steps)|'barres' (bars), couleur:'c1'..'c8',
+               tirets (dashed), epaisseur (width), bande:[ylow,yhigh]}]
+   carte(container, {nx, ny, x0, x1, y0, y1, valeur(i,j)->0..1 or NaN, couleurs:[low,high], xlab, ylab, points:[{x,y,couleur}]})
+   A chart redraws itself when its container is resized or the theme changes. */
 (function () {
   "use strict";
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -14,7 +15,7 @@
     if (a >= 100) return v.toFixed(a >= 1e4 ? 0 : 1);
     return +v.toPrecision(4) + "";
   };
-  // graduations « rondes »
+  // "round" tick values
   function graduations(a, b, n) {
     if (!(b > a)) { const m = a || 1; a = m - Math.abs(m) * 0.1 - 1e-12; b = m + Math.abs(m) * 0.1 + 1e-12; }
     const brut = (b - a) / Math.max(n, 1), p = Math.pow(10, Math.floor(Math.log10(brut))), r = brut / p;
@@ -67,7 +68,7 @@
       const {cv, bulle, g, W, H} = preparer(el);
       const encre = css("--ink"), encre2 = css("--ink2"), grille = css("--grid"), fond = css("--panel");
       const mono = css("--mono") || "monospace";
-      // domaine
+      // data range
       let xa = Infinity, xb = -Infinity, ya = Infinity, yb = -Infinity;
       for (const s of o.series) for (let i = 0; i < s.x.length; i++) {
         const x = s.x[i], y = s.y[i];
@@ -76,10 +77,10 @@
         if (y < ya) ya = y; if (y > yb) yb = y;
         if (s.bande) { const lo = s.bande[0][i], hi = s.bande[1][i]; if (isFinite(lo) && lo < ya) ya = lo; if (isFinite(hi) && hi > yb) yb = hi; }
       }
-      if (!isFinite(xa)) { g.fillStyle = encre2; g.font = "12px " + mono; g.fillText("Aucune donnée", 12, 24); return; }
+      if (!isFinite(xa)) { g.fillStyle = encre2; g.font = "12px " + mono; g.fillText("No data", 12, 24); return; }
       if (o.series.some(s => s.type === "barres")) {
         ya = Math.min(ya, 0); yb = Math.max(yb, 0);
-        // une demi-largeur de barre de marge de chaque côté
+        // half a bar width of margin on each side
         let pasMin = Infinity;
         for (const s of o.series) if (s.type === "barres") for (let i = 1; i < s.x.length; i++) pasMin = Math.min(pasMin, Math.abs(s.x[i] - s.x[i - 1]));
         if (!isFinite(pasMin)) pasMin = 1;
@@ -98,7 +99,7 @@
       const pw = W - gauche - droite, ph = H - haut - bas;
       const X = x => gauche + (x - xa) / (xb - xa) * pw, Y = y => haut + (1 - (y - ya) / (yb - ya)) * ph;
       g.clearRect(0, 0, W, H);
-      // grille
+      // grid
       g.lineWidth = 1; g.strokeStyle = grille; g.fillStyle = encre2; g.textAlign = "right"; g.textBaseline = "middle";
       for (const v of ty) { const y = Math.round(Y(v)) + .5; if (y < haut - 1 || y > haut + ph + 1) continue;
         g.beginPath(); g.moveTo(gauche, y); g.lineTo(gauche + pw, y); g.stroke(); g.fillText(o.yfmt(v), gauche - 6, y); }
@@ -109,7 +110,7 @@
       if (ya < 0 && yb > 0) { g.strokeStyle = encre2; g.globalAlpha = .5; g.beginPath(); g.moveTo(gauche, Math.round(Y(0)) + .5); g.lineTo(gauche + pw, Math.round(Y(0)) + .5); g.stroke(); g.globalAlpha = 1; }
       if (o.xlab) { g.fillStyle = encre2; g.textAlign = "center"; g.fillText(o.xlab, gauche + pw / 2, H - 15); }
       if (o.ylab) { g.save(); g.translate(11, haut + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = encre2; g.fillText(o.ylab, 0, 0); g.restore(); }
-      // séries
+      // series
       g.save(); g.beginPath(); g.rect(gauche - 4, haut - 4, pw + 8, ph + 8); g.clip();
       const nb = o.series.filter(s => s.type === "barres").length;
       let ib = 0;
@@ -148,7 +149,7 @@
         }
       }
       g.restore();
-      // survol : point le plus proche
+      // hover: nearest point
       el.onpointermove = ev => {
         const rc = cv.getBoundingClientRect(), ech = rc.width ? W / rc.width : 1;
         const mx = (ev.clientX - rc.left) * ech, my = (ev.clientY - rc.top) * ech;
@@ -171,7 +172,7 @@
     });
   }
 
-  // carte 2D (zones d'exercice, etc.)
+  // 2-D map (exercise regions, etc.)
   function carte(el, o) {
     legende(el, []);
     surveiller(el, () => {
