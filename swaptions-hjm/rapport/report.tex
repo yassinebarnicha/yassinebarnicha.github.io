@@ -58,7 +58,8 @@ factor (\cref{sec:2f}): Jamshidian's decomposition is lost and replaced by two-d
 induction. On the complete EUR market of 30 March 2016 (240 at-the-money swaptions, 16 caps, smiles) the second factor divides
 the root-mean-square error on the fitted swaptions by $3.2$ ($12.4$ to $3.9$\,bp) and on the fitted caps by $3.6$, moves the
 Bermudan by $-3.8\,\%$, and, with the Europeans held fixed, the correlation alone moves the Bermudan by $12\,\%$. All computations are
-reproduced by the interactive page \url{https://yassinebarnicha.github.io/swaptions-hjm/}.
+A third model (\cref{sec:sv}) multiplies both factors by a log-normal stochastic volatility: it divides the smile error by $2.7$ and lifts the Bermudan by about $1\,\%$ at identical Europeans,
+at the price of a Monte Carlo engine with a control variate. All computations are reproduced by the interactive page \url{https://yassinebarnicha.github.io/swaptions-hjm/}.
 \end{abstract}
 
 \tableofcontents
@@ -703,6 +704,45 @@ prices, covariances, caps, smile, segments and bootstrap, and the global fit ret
 by \texttt{validate\_2f.py}.
 
 %======================================================================
+\section{A stochastic volatility}\label{sec:sv}
+The one- and two-factor models are Gaussian: the normal volatility of a swaption does not depend on its strike. The data hold 13 smiles. A scalar multiplier of both
+factors keeps the HJM structure and produces a smile.
+
+\subsection{The model}
+\[
+\sigma_k(t,T)=\sigma_k(t)\,m_t\,e^{-\lambda_k(T-t)},\qquad m_t=e^{y_t-v(t)},\quad dy=-\kappa y\,dt+\xi\,dZ,\quad v(t)=\tfrac{\xi^2(1-e^{-2\kappa t})}{2\kappa},
+\]
+with $dZ=\rho_v\,dW^1+\sqrt{1-\rho_v^2}\,dB$, so that $\E[m_t^2]=1$. A log-normal multiplier (as in SABR) replaced a square-root one: on these steep short-expiry smiles the Euler scheme of the square-root process
+broke down at the volatility of volatility the fit asked for. The HJM drift is a pathwise identity, so the bond formula of \cref{eq:zc2} survives with random covariances
+$A_{kl}(t)=\rho_{kl}\int_0^t\sigma_k\sigma_le^{(\lambda_k+\lambda_l)u}m_u^2\,du$ (and the same for $G_{kl}$). Under the $T^\star$-forward measure the factors have the drift
+$-m_t^2\sigma_ke^{\lambda_kt}\sum_l\rho_{kl}\sigma_l\Bb_l(T^\star-t)$ and $y$ the extra drift $-\xi\rho_vm_t(\sigma_1\Bb_1+\rho\sigma_2\Bb_2)(T^\star-t)$.
+The increments of $A$, $G$ and of the mean are those of the two-factor model scaled by $m^2$: with $\xi=0$ the simulation is the exact Gaussian transition, which makes a \emph{control variate}
+possible: $\mathrm{price}_{SV}=\mathrm{price}_{2F}^{\mathrm{exact}}+(\mathrm{MC}_{SV}-\mathrm{MC}_{\xi=0})$ on the same random numbers. The martingale defect of this scheme is below
+the Monte Carlo error ($2\cdot10^{-4}$), for $\rho_v\neq0$ as well, which tests the drift of the volatility under the forward measure; a first version with an algebra slip in the cross terms of $G$ failed it by $10^{-3}$,
+i.e.\ $20\,\%$ on a 5-year swaption.
+
+\subsection{Calibration and results}
+$\kappa,\xi,\rho_v$ are fitted on the shape of the 9 smiles that expire within the window (54 points, strikes up to about 3 standard deviations from the forward); two starting points give
+$\kappa=2.29$, $\xi=0.925$, $\rho_v=0.41$. $\lambda_1,\lambda_2,\rho,\sigma_2/\sigma_1$ keep their two-factor values (a joint re-fit returns them). The 11 volatility segments are re-bootstrapped
+under the new dynamics on the same quotes (residual below $0.05\,$bp), so that the three models reproduce the same Europeans.
+
+\begin{table}[ht]\centering\small
+\begin{tabular}{lcccccc}\toprule
+ & smile, fitted & smile, test & fitted swpt & fitted caps & Bermudan & premium\\\midrule
+1 factor & $6.9$ & $3.8$ & $12.4$ & $21.7$ & $0.05006$ & $64$\\
+2 factors & $6.9$ & $3.8$ & $3.9$ & $6.0$ & $0.04816$ & $45$\\
+2 factors $+$ SV & $\mathbf{2.5}$ & $\mathbf{2.1}$ & $4.0$ & $5.9$ & $0.0486$--$0.0487$ & $48$--$50$\\\bottomrule
+\end{tabular}
+\caption{Root-mean-square errors in bp (smile: 54 fitted points and 24 points of three smiles never fitted; swaptions: 143, caps: 6), Bermudan price and premium (bp).
+The Monte Carlo uncertainty on the Bermudan is about $\pm0.0002$.}\label{tab:sv}
+\end{table}
+
+The smile error is divided by $2.7$ ($1.8$ out of sample); the at-the-money fit is unchanged inside the window and slightly worse beyond it ($12.8$ to $14.0\,$bp against $11.8$ for swaptions,
+depending on the random numbers); the Bermudan is about $1\,\%$ above the two-factor price with the Europeans unchanged, i.e.\ the price depends on the volatility dynamics and not
+only on the Europeans. What is lost: closed forms (swaptions and caps become Monte Carlo with a control variate), the exact Gaussian grid for the Bermudan (Longstaff--Schwartz with a control variate,
+$\pm0.4\,\%$), and the exact bootstrap. The JavaScript engine of the page and the Python package \texttt{hjm3sv} agree within the Monte Carlo error ($0.26\,$bp on implied volatilities, $0.06\,\%$ on the Bermudan).
+
+%======================================================================
 \section{Validation}
 The JavaScript engine of the page is a line-by-line port of the Python package. With the original formula and the notebook
 settings (implicit scheme, $n_x=501$, $n_t=1000$, $\pm5$ standard deviations) it reproduces every PDE price of the notebook
@@ -718,8 +758,8 @@ $12\,\%$. The remaining model risk sits in $\lambda$, which the calibration does
 $12\,\%$ over a plausible range. The two-factor version trades the closed forms for integrals and a two-dimensional grid, and in
 return fits the whole market (240 swaptions and 16 caps) instead of its diagonal: on the real EUR data the error on the fitted swaptions falls from
 $12.4$ to $3.9\,$bp and the Bermudan is $3.8\,\%$ lower. With the Europeans held fixed, the correlation alone moves the Bermudan by $12\,\%$, and the fit to
-the rest of the market is what selects it. Limits: the correlation sits on its bound, the model degrades beyond 5 to 7 years, and the smile is ignored. Natural
-extensions are a dual upper bound for the Monte Carlo, a third factor or a shifted diffusion for the negative-rate regime, and a stochastic volatility.
+the rest of the market is what selects it. Limits: the correlation sits on its bound and the model degrades beyond 5 to 7 years. A stochastic-volatility multiplier (\cref{sec:sv}) captures the smile
+(error divided by $2.7$) and raises the Bermudan by about $1\,\%$, without improving the at-the-money fit. Natural extensions are a dual upper bound for the Monte Carlo, a third factor or a shifted diffusion for the negative-rate regime, and the caps' own smiles.
 
 \begin{thebibliography}{99}\small
 \bibitem{and} L.~Andersen and M.~Broadie. Primal-dual simulation algorithm for pricing multidimensional American options.

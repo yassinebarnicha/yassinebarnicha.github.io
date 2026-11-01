@@ -175,7 +175,7 @@
       const den = Math.sqrt(c(a, a) * c(b, b));
       return den > 0 ? c(a, b) / den : 1;
     }
-    return {courbe, lam, rho, bucketEnds, sig1, sig2, cov, coeffs, zc, tauxCourtFixe, moyenneForward, valeursSwap, prixEuropeen, defautMartingale, zcbPut,
+    return {courbe, lam, rho, bucketEnds, sig1, sig2, cov, AG, coeffs, zc, tauxCourtFixe, moyenneForward, valeursSwap, prixEuropeen, defautMartingale, zcbPut,
       sigmaA, chargements, correlationTaux};
   }
 

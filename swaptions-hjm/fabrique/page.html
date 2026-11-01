@@ -50,13 +50,13 @@
       <b>calibrated live</b> to co-terminal European swaptions quoted in normal volatility; the Bermudan is then priced by a
       <b>PDE</b> (one factor) or a <b>2-D backward induction</b> (two factors) and checked by <b>Longstaff-Schwartz Monte Carlo</b>.
       The <b>two-factor</b> model gives up Jamshidian's trick but fits the whole swaption matrix: it is tested here on a real EUR
-      market. Reviewing the original code revealed a <b>sign error</b> in the zero-coupon bond formula: the page uses the corrected
+      market. A <b>third model</b> adds a stochastic volatility to capture the smile (Monte Carlo, with the exact two-factor price as control variate). Reviewing the original code revealed a <b>sign error</b> in the zero-coupon bond formula: the page uses the corrected
       formula (the original one stays available in the one-factor Pricer).</p>
   </header>
 
   <div class="modeles" role="group" aria-label="Model">
     <span class="lbl">Model</span>
-    <span class="choix"><button type="button" data-modele="1" aria-pressed="true">1 factor</button><button type="button" data-modele="2" aria-pressed="false">2 factors</button></span>
+    <span class="choix"><button type="button" data-modele="1" aria-pressed="true">1 factor</button><button type="button" data-modele="2" aria-pressed="false">2 factors</button><button type="button" data-modele="3" aria-pressed="false">2 factors + stoch. vol</button></span>
     <span class="note" id="modele-note">Hull–White type: one Gaussian factor, Jamshidian, 1-D PDE.</span>
   </div>
 
@@ -69,6 +69,10 @@
     <button type="button" data-vue="marche2" data-modele="2" hidden>Fit to the swaption matrix</button>
     <button type="button" data-vue="facteurs2" data-modele="2" hidden>Correlation and what it buys</button>
     <button type="button" data-vue="theorie2" data-modele="2" hidden>Theory: what changes</button>
+    <button type="button" data-vue="pricer3" data-modele="3" hidden>Pricer and comparison</button>
+    <button type="button" data-vue="smile3" data-modele="3" hidden>The smile</button>
+    <button type="button" data-vue="marche3" data-modele="3" hidden>Report card: three models</button>
+    <button type="button" data-vue="theorie3" data-modele="3" hidden>Theory: what it adds</button>
     <button type="button" data-vue="code" data-modele="*">Source code</button>
   </div>
 
@@ -753,6 +757,202 @@
       <m>\rho</m> is typically close to <m>-0.9</m>.</p>
   </section>
 
+  <!-- ============================== THREE: PRICER ============================== -->
+  <section class="vue" id="pricer3" hidden>
+    <div class="remarque">
+      <h2>A third model: two factors and a stochastic volatility</h2>
+      <p>The 1- and 2-factor models are <b>Gaussian</b>: their normal volatility is flat in the strike, so they cannot see the smile. This model scales both factors by a <b>stochastic volatility multiplier</b>
+        <m>m_t=\exp(y_t-v(t))</m>, <m>dy=-\kappa y\,dt+\xi\,dZ</m>, correlated with the first factor (<m>\rho_v</m>), and keeps everything else of the 2-factor model (same <m>\lambda_1,\lambda_2,\rho,\sigma_2/\sigma_1</m>).
+        It has <b>no closed form</b>: it is simulated, with the exact 2-factor price as a <b>control variate</b> (price = exact 2F + Monte Carlo difference with and without stochastic volatility, on the same random numbers).</p>
+      <ul>
+        <li><b>What it adds</b>: the smile (three parameters <m>\kappa,\xi,\rho_v</m> fitted on the swaption smiles of the data) and a Bermudan that depends on the volatility <i>dynamics</i>, not only on the Europeans.</li>
+        <li><b>Same Europeans for all three models</b>: the 11 volatility segments are re-bootstrapped under the stochastic-volatility dynamics so that every co-terminal quote (taken along the smile at the Bermudan's strike) is reproduced; only the dynamics differ.</li>
+      </ul>
+    </div>
+    <div class="espace" style="margin-top:20px">
+      <aside class="panneau reglages" aria-label="Three models">
+        <h3>Stochastic volatility</h3>
+        <div class="champ"><label for="s-kappa">κ: mean reversion of the log-volatility (0.02 – 3)</label><input type="number" id="s-kappa" value="2.29" step="0.1"></div>
+        <div class="champ"><label for="s-xi">ξ: volatility of volatility (0.02 – 2.5)</label><input type="number" id="s-xi" value="0.925" step="0.05"></div>
+        <div class="champ"><label for="s-rv">ρ<sub>v</sub>: correlation with the first factor (|ρ<sub>v</sub>| ≤ 0.95)</label><input type="number" id="s-rv" value="0.413" step="0.05"></div>
+        <p class="aide">Defaults: the fit of tab <i>The smile</i> (9 smiles of the data, 54 points). ξ = 0 gives back the 2-factor model exactly.</p>
+        <h3>Two-factor parameters</h3>
+        <div class="champ"><label for="s-l1">λ<sub>1</sub></label><input type="number" id="s-l1" value="-0.003414" step="0.01"></div>
+        <div class="champ"><label for="s-l2">λ<sub>2</sub></label><input type="number" id="s-l2" value="0.533868" step="0.05"></div>
+        <div class="champ"><label for="s-r">ρ</label><input type="number" id="s-r" value="-0.95" step="0.05"></div>
+        <div class="champ"><label for="s-q">σ<sub>2</sub>/σ<sub>1</sub></label><input type="number" id="s-q" value="1.483256" step="0.05"></div>
+        <div class="champ"><label for="s-lam1f">λ of the 1-factor model</label><input type="number" id="s-lam1f" value="-0.038913" step="0.01"></div>
+        <p class="aide">Fitted on 143 ATM swaptions and 6 caps (tab <i>Fit to the swaption matrix</i>, 2 factors). The product is the one of the other tabs: Bermudan into 10 years, exercisable at 1 to 5 years, struck at the 10-year par rate.</p>
+        <h3>Monte Carlo</h3>
+        <div class="champ"><label for="s-nmc">Paths (Bermudan)</label><input type="number" id="s-nmc" value="150000" step="10000"></div>
+        <div class="champ"><label for="s-nboot">Paths (re-bootstrap of the segments)</label><input type="number" id="s-nboot" value="60000" step="10000"></div>
+        <div class="btns"><button type="button" class="btn" id="s-go">Price the three models</button></div>
+        <progress id="s-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="s-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">Bermudan, 1 factor</div><div class="val" id="s-b1">—</div><div class="sous" id="s-b1-s"></div></div>
+          <div class="kpi"><div class="lbl">Bermudan, 2 factors</div><div class="val" id="s-b2">—</div><div class="sous" id="s-b2-s"></div></div>
+          <div class="kpi"><div class="lbl">Bermudan, 2 factors + stoch. vol</div><div class="val" id="s-b3">—</div><div class="sous" id="s-b3-s"></div></div>
+          <div class="kpi"><div class="lbl">Stoch. vol effect on the 2F price</div><div class="val" id="s-d">—</div><div class="sous" id="s-d-s"></div></div>
+        </div>
+        <div class="grille-res" style="margin-top:16px">
+          <div class="carte-res"><h2>Volatility segments</h2><p class="aide">Level of σ<sub>1</sub> in each segment (bp). With stochastic volatility the level is lower or higher than in the Gaussian models because E[σ m] ≠ σ: the segments are re-fitted on the same quotes.</p><div class="graphe haut" id="g-s-sig"></div></div>
+          <div class="carte-res"><h2>Quotes and segments</h2>
+            <div class="defile"><table id="t-s-q"><thead><tr><th>segment ends</th><th>swaption</th><th>quote (bp)</th><th>σ<sub>1</sub> 1F</th><th>σ<sub>1</sub> 2F</th><th>σ<sub>1</sub> 2F-SV</th></tr></thead><tbody></tbody></table></div>
+            <p class="aide" id="s-note"></p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== THREE: SMILE ============================== -->
+  <section class="vue" id="smile3" hidden>
+    <div class="remarque">
+      <h2>The smile: what the stochastic volatility buys</h2>
+      <p>The data hold <b>13 smiles</b> of swaption normal volatility (expiry 3 months to 15 years). A Gaussian model returns the same volatility at every strike (dashed). The stochastic-volatility model produces a smile from three parameters;
+        they are fitted on the <b>9 smiles that expire within the Bermudan's window</b> (strikes within about 3 standard deviations of the forward; further out the model prices are below the Monte Carlo resolution) and the model is then tested on the
+        <b>3 other smiles</b> (10×10, 10×20, 15×15), which it has not seen. The level of the smile is the job of the segments; the model is judged on its <i>shape</i> (model vol divided by model ATM vol, times the market ATM vol).</p>
+    </div>
+    <div class="espace" style="margin-top:20px">
+      <aside class="panneau reglages" aria-label="Smile">
+        <p class="aide" style="margin-top:0">Uses the parameters of the tab <i>Pricer and comparison</i>.</p>
+        <div class="champ"><label for="sm-n">Paths per smile</label><input type="number" id="sm-n" value="40000" step="10000"></div>
+        <div class="btns"><button type="button" class="btn" id="sm-go">Compute the smiles</button></div>
+        <h3>Refit κ, ξ, ρ<sub>v</sub></h3>
+        <div class="champ"><label for="sm-fev">Evaluations (Nelder–Mead)</label><input type="number" id="sm-fev" value="60" step="10"></div>
+        <div class="btns"><button type="button" class="btn creux" id="sm-fit">Fit on the 9 smiles</button></div>
+        <p class="aide">About 2 to 4 minutes in the browser. The values are copied into the tab <i>Pricer and comparison</i>.</p>
+        <progress id="sm-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="sm-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">In sample: Gaussian models</div><div class="val" id="sm-k1">—</div><div class="sous" id="sm-k1-s"></div></div>
+          <div class="kpi"><div class="lbl">In sample: stochastic vol</div><div class="val" id="sm-k2">—</div><div class="sous" id="sm-k2-s"></div></div>
+          <div class="kpi"><div class="lbl">Out of sample: Gaussian models</div><div class="val" id="sm-k3">—</div><div class="sous" id="sm-k3-s"></div></div>
+          <div class="kpi"><div class="lbl">Out of sample: stochastic vol</div><div class="val" id="sm-k4">—</div><div class="sous" id="sm-k4-s"></div></div>
+        </div>
+        <div class="grille-res" style="margin-top:16px">
+          <div class="carte-res"><h2>One smile</h2>
+            <div class="champ" style="max-width:300px"><label for="sm-sel">Swaption</label><select id="sm-sel"></select></div>
+            <p class="aide">Normal vol against the strike offset from the forward swap rate. Points: market. Dashed: 1 and 2 factors (flat). Line: 2 factors + stochastic volatility.</p>
+            <div class="graphe haut" id="g-sm"></div></div>
+          <div class="carte-res"><h2>Errors, all points</h2><p class="aide">Model − market in bp (Gaussian models: ATM vol − market).</p>
+            <div class="defile"><table id="t-sm"><thead><tr><th>smile</th><th>offset</th><th>market</th><th>Gaussian err.</th><th>SV err.</th><th>sample</th></tr></thead><tbody></tbody></table></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== THREE: REPORT CARD ============================== -->
+  <section class="vue" id="marche3" hidden>
+    <div class="remarque">
+      <h2>Three models, the whole market</h2>
+      <p>The same test as for two factors: fitted on the ATM swaptions and caps within the 5-year window, judged on <b>all 240 swaptions and 16 caps</b>. The stochastic-volatility model keeps the structural parameters of the 2-factor fit;
+        only the volatility level is re-fitted under the new dynamics. Its ATM fit is therefore <i>not</i> expected to beat the 2-factor model: the gain is the smile and the Bermudan, at the price of a Monte Carlo engine.</p>
+    </div>
+    <div class="espace" style="margin-top:20px">
+      <aside class="panneau reglages" aria-label="Report card">
+        <p class="aide" style="margin-top:0">Uses the parameters of the tab <i>Pricer and comparison</i>.</p>
+        <div class="champ"><label for="mc-n">Paths (swaptions and caps)</label><input type="number" id="mc-n" value="40000" step="10000"></div>
+        <div class="btns"><button type="button" class="btn" id="mc-go">Run the report card</button></div>
+        <p class="aide">About 1 to 2 minutes.</p>
+        <progress id="mc-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="mc-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="carte-res"><h2>Root-mean-square error by group (bp of normal volatility)</h2>
+          <div class="defile"><table id="t-mc"><thead><tr><th></th><th>fitted swaptions</th><th>fitted caps</th><th>beyond: swaptions</th><th>beyond: caps</th><th>smile in sample</th><th>smile out of sample</th></tr></thead><tbody></tbody></table></div>
+          <p class="aide" id="mc-note"></p></div>
+        <div class="grille-res" style="margin-top:16px">
+          <div class="carte-res"><h2>Caps</h2><p class="aide">ATM normal vol against maturity. The dashed line is the end of the window.</p><div class="graphe haut" id="g-mc-caps"></div></div>
+          <div class="carte-res"><h2>2 factors + stochastic vol: model − market (bp)</h2><p class="aide">Rows: expiry; columns: tenor. Bold rows are within the fitting window.</p><div class="defile" id="mc-t3"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== THREE: THEORY ============================== -->
+  <section class="vue texte" id="theorie3" hidden>
+    <ul class="sommaire">
+      <li><a href="#theorie3/u3-modele">1. The model</a></li><li><a href="#theorie3/u3-prix">2. Pricing</a></li>
+      <li><a href="#theorie3/u3-calib">3. Calibration</a></li><li><a href="#theorie3/u3-res">4. Results</a></li>
+      <li><a href="#theorie3/u3-bilan">5. Lost and gained</a></li><li><a href="#theorie3/u3-valid">6. Validation</a></li>
+      <li><a href="#theorie3/u3-limites">7. Limits</a></li>
+    </ul>
+
+    <h2 id="u3-modele">1. A stochastic volatility on top of two factors</h2>
+    <p>The 1- and 2-factor models have <b>deterministic</b> volatilities, so every swaption has a normal volatility that does not depend on its strike: no smile. The remedy that keeps the HJM structure is a scalar multiplier of both factors,</p>
+    <md>\sigma_k(t,T)=\sigma_k(t)\,m_t\,e^{-\lambda_k(T-t)},\qquad m_t=e^{\,y_t-v(t)},\quad dy_t=-\kappa y_t\,dt+\xi\,dZ_t,\quad v(t)=\frac{\xi^2\,(1-e^{-2\kappa t})}{2\kappa},</md>
+    <p>with <m>dZ=\rho_v\,dW^1+\sqrt{1-\rho_v^2}\,dB</m> (<m>B</m> independent of the two Brownian motions of the factors). The compensator <m>v(t)</m> gives <m>\mathbb E[m_t^2]=1</m>: the average variance is that of the 2-factor model, and
+      the stochastic volatility only redistributes it. A log-normal multiplier (as in SABR) was preferred to a square-root one (Heston): on this market, whose smiles are steep at short expiries, the square-root process needed a volatility of volatility so
+      large that the Euler scheme broke down, and the fit was driven to the bounds. Three parameters are added: <m>\kappa</m>, <m>\xi</m>, <m>\rho_v</m> (<m>\rho_v&gt;0</m>: volatility rises with rates, which gives the upward-sloping smiles of the data).</p>
+
+    <h2 id="u3-prix">2. Pricing: random covariances, control variate</h2>
+    <p>The HJM drift of the forward rates is a pathwise identity, so the bond formula of the 2-factor model survives, with <b>random</b> covariances: <m>A_{kl}(t)=\rho_{kl}\int_0^t\sigma_k\sigma_l\,e^{(\lambda_k+\lambda_l)u}\,m_u^2\,du</m>,
+      and the same for <m>G_{kl}(t)</m>:</p>
+    <md>P(t,T)=\frac{P(0,T)}{P(0,t)}\exp\Big(-\sum_kD_k(t,T)X^k_t+\kappa(t,T;A_t,G_t)\Big).</md>
+    <p>The model is simulated under the <m>T^\star</m>-forward measure (values deflated by <m>P(t,T^\star)</m> are martingales, no path-dependent discounting). There <m>X^k</m> has the drift <m>-m_t^2\,\sigma_k e^{\lambda_kt}\sum_l\rho_{kl}\sigma_lB_l(T^\star-t)</m> and <m>y</m> acquires the drift
+      <m>-\xi\rho_v\,m_t\,(\sigma_1B_1(T^\star-t)+\rho\,\sigma_2B_2(T^\star-t))</m>: the change of measure also acts on the volatility, because it is correlated with the first factor. The step is exact in <m>y</m> (Ornstein–Uhlenbeck), and the increments of <m>A</m>, <m>G</m> and of the
+      mean are those of the 2-factor model scaled by <m>m^2</m>, so that <b>with <m>\xi=0</m> the simulation is the exact Gaussian transition</m>.</p>
+    <p><b>Control variate.</b> Run twice on the same random numbers, with the stochastic volatility and with <m>\xi=0</m>, and add the difference to the exact 2-factor price:</p>
+    <md>\text{price}_{SV}=\text{price}_{2F}^{\text{exact}}+\big(\text{MC}_{SV}-\text{MC}_{\xi=0}\big).</md>
+    <p>The noise only has to resolve the effect of the stochastic volatility, not the price itself. European swaptions use the exact 2-D integral, caps the closed-form bond put, the Bermudan the 2-D quadrature of the previous tab; Longstaff–Schwartz (basis: bivariate polynomials plus <m>m^2-1</m>) supplies the difference.</p>
+
+    <h2 id="u3-calib">3. Calibration</h2>
+    <ul>
+      <li><b>Smile (the new parameters).</b> <m>\kappa,\xi,\rho_v</m> are fitted by Nelder–Mead on the 9 smiles of the data that expire within the Bermudan's window (54 points: strikes up to about 3 standard deviations from the forward; further out the prices are below the Monte Carlo resolution),
+        on the <i>shape</i> of the smile (model vol divided by the model's ATM vol, times the market ATM vol). Two different starting points give the same optimum, <m>\kappa=2.29</m>, <m>\xi=0.925</m>, <m>\rho_v=0.41</m>, which is more than can be said of the 2-factor parameters (flat valley, one bound active).</li>
+      <li><b>Structural parameters.</b> <m>\lambda_1,\lambda_2,\rho,\sigma_2/\sigma_1</m> are kept at their 2-factor values. A joint re-fit under the stochastic volatility on the 143 swaptions and 6 caps returns the same values (RMSE 4.01 bp against 3.96 at the 2-factor values).</li>
+      <li><b>Segments.</b> The 11 volatility levels are re-bootstrapped under the new dynamics on the <i>same quotes</i> (co-terminals along the smile at the Bermudan's strike, ATM swaptions for the other expiries), by an over-relaxed fixed-point iteration on the Monte Carlo prices (residual below 0.05 bp).
+        The levels rise by 0 to 13 % relative to the 2-factor model (typically 4 to 6 %), because at equal levels an at-the-money option is cheaper under the multiplier. All three models therefore reproduce the same Europeans: <b>the Bermudan differs by the dynamics only</b>.</li>
+    </ul>
+
+    <h2 id="u3-res">4. Results (EUR, 30 March 2016; 5-year window)</h2>
+    <table class="tab-texte"><thead><tr><th></th><th>smile, fitted (54 pts)</th><th>smile, test (24 pts)</th><th>fitted swaptions</th><th>fitted caps</th><th>beyond: swaptions</th><th>beyond: caps</th><th>Bermudan</th><th>premium</th></tr></thead><tbody>
+      <tr><td>1 factor</td><td>6.9 bp</td><td>3.8 bp</td><td>12.4 bp</td><td>21.7 bp</td><td>21.4 bp</td><td>7.6 bp</td><td>0.05006</td><td>64 bp</td></tr>
+      <tr><td>2 factors</td><td>6.9 bp</td><td>3.8 bp</td><td>3.9 bp</td><td>6.0 bp</td><td>11.8 bp</td><td>9.6 bp</td><td>0.04816</td><td>45 bp</td></tr>
+      <tr><td>2 factors + stochastic vol</td><td><b>2.5 bp</b></td><td><b>2.1 bp</b></td><td>4.0 bp</td><td>5.9 bp</td><td>12.8–14.0 bp</td><td>9.0–9.3 bp</td><td>0.0486–0.0487</td><td>48–50 bp</td></tr>
+    </tbody></table>
+    <ul>
+      <li><b>The smile error is divided by 2.6 to 2.7</b> (6.9 to 2.5–2.6 bp) on the fitted smiles and by 1.7 to 1.8 (3.8 to 2.1–2.2 bp) on three smiles the model has never seen (10×10, 10×20, 15×15); the two figures depend on the random numbers (Python 2.5 and 2.1 bp, this page 2.6 and 2.2). The Gaussian models have the same smile error because their volatility is flat.</li>
+      <li><b>The at-the-money fit is not improved</b>: 4.0 against 3.9 bp on the fitted swaptions, 5.9 against 6.0 on the caps. Beyond the window it is slightly worse (12.8 to 14.0 against 11.8 bp on swaptions, depending on the random numbers: every swaption beyond the window leans on the level of the last segment, which the Monte Carlo fixes to about 0.3 bp); those swaptions are not in the fitted set, so a joint re-fit does not correct it.</li>
+      <li><b>The Bermudan is about 1 % higher</b> than in two factors (0.0486 to 0.0487 against 0.04816, over three seeds and two regression bases) and its exercise premium 4 to 6 bp higher, with the Europeans unchanged. It stays about 3 % below the one-factor price.
+        The Monte Carlo uncertainty is about ±0.0002 (±0.4 %): the page displays the number it computes, which varies by that much from one set of paths to another.</li>
+    </ul>
+
+    <h2 id="u3-bilan">5. What is lost, what is gained</h2>
+    <table class="tab-texte"><thead><tr><th></th><th>2 factors</th><th>2 factors + stochastic vol</th></tr></thead><tbody>
+      <tr><td>Smile</td><td>flat normal vol in the strike</td><td><span class="gain">gained</span> — 3 parameters, error ÷ 2.6–2.7 (÷ 1.7–1.8 out of sample)</td></tr>
+      <tr><td>European swaption</td><td>2-D integral, deterministic</td><td><span class="perte">lost</span> — Monte Carlo with control variate (exact price + noisy correction)</td></tr>
+      <tr><td>Caps</td><td>closed-form bond put</td><td><span class="perte">lost</span> — same, simulated</td></tr>
+      <tr><td>Bermudan engine</td><td>exact Gaussian transitions on a 2-D grid</td><td><span class="perte">lost</span> — Longstaff–Schwartz with control variate; results move by about 0.4 % with the random numbers</td></tr>
+      <tr><td>Calibration</td><td>exact bootstrap per segment</td><td><span class="perte">lost</span> — fixed-point iteration on simulated prices; 3 more parameters (well identified)</td></tr>
+      <tr><td>ATM fit (swaptions and caps)</td><td>3.9 and 6.0 bp</td><td>unchanged (4.0 and 5.9 bp); worse beyond the window</td></tr>
+      <tr><td>Bermudan with the same Europeans</td><td>set by the dependence structure</td><td><span class="gain">gained</span> — also depends on the volatility dynamics (+1 % here): one more model risk, and one more thing the data can pin down</td></tr>
+      <tr><td>Hedging</td><td>level and slope</td><td><span class="gain">gained</span> — a vega to the volatility of volatility and a skew risk, none of which the Gaussian models can show</td></tr>
+    </tbody></table>
+
+    <h2 id="u3-valid">6. Validation</h2>
+    <ul>
+      <li><b>No arbitrage</b>: <m>\mathbb E^{T^\star}[P(t,b)/P(t,T^\star)]=P(0,b)/P(0,T^\star)</m> holds to within the Monte Carlo error (<m>2\cdot10^{-4}</m> relative) for <m>\xi=0</m> and for stochastic-volatility parameters with <m>\rho_v\ne0</m>, which tests the drift of the factors <i>and</i> of the volatility under the forward measure.
+        (A first version of the bond formula, with a slip in the cross terms of <m>G</m>, failed this test by <m>10^{-3}</m>, which is 20 % on the price of a 5-year swaption: the test is sensitive.)</li>
+      <li><b>Gaussian limit</b>: with <m>\xi=0</m> the simulation reproduces the exact 2-D integral of the 2-factor model within the Monte Carlo error, and the Bermudan quadrature is unchanged.</li>
+      <li><b>Two languages</b>: the JavaScript engine of this page and the Python package <code>hjm3sv</code> agree within the Monte Carlo error (0.26 bp on the implied vols, 0.06 % on the Bermudan) with different random-number generators.</li>
+      <li><b>Every number of this tab</b> is recomputed by <code>run_sv.py</code> and checked by <code>validate_2f.py</code>.</li>
+    </ul>
+
+    <h2 id="u3-limites">7. Limits</h2>
+    <ul>
+      <li>One multiplier drives both factors: the smile is explained, but the term structure of the smile (long expiries) relies on a single mean reversion; strikes beyond about 3 standard deviations are not fitted.</li>
+      <li>With <m>\rho_v&lt;0</m> the log-normal volatility has a forward-measure drift that can explode; the simulation clips <m>y</m> at ±4 and the fitted <m>\rho_v</m> is positive, so the clip is inactive on the real case, but the page accepts <m>\rho_v&lt;0</m>.</li>
+      <li>The ATM structure of the 2-factor model is not re-fitted jointly with the smile. The caps' own smiles (strikes −0.5 % to 5 %) are not used and would be the natural next test.</li>
+      <li>The Bermudan is a Monte Carlo price: it carries noise, a lower-bias regression policy and no dual upper bound.</li>
+    </ul>
+  </section>
+
   <section class="vue" id="code" hidden></section>
 </main>
 
@@ -774,6 +974,9 @@
 </script>
 <script id="src-hjm2">
 /*__HJMDEUX__*/
+</script>
+<script id="src-hjm3">
+/*__HJMTROIS__*/
 </script>
 <script>
 /*__DONNEES__*/
@@ -977,12 +1180,81 @@ function capsLambda(p, e, prog) {
   });
   return {lignes, mats: mats.map(c => ({m: c.m, v: c.v * 1e4}))};
 }
+// ---------------- third model: two factors + stochastic volatility ----------------
+// common ingredients: the 2F bootstrap on the quotes, then the volatility segments re-bootstrapped under the SV dynamics (cached per parameter set)
+const cache3 = {};
+const TENORS3 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30];
+const SMILES_IN = [[0.25, 2], [0.25, 10], [1, 1], [1, 5], [1, 10], [2, 2], [2, 10], [5, 5], [5, 10]], SMILES_OUT = [[10, 10], [10, 20], [15, 15]];
+function preparer3(p, prog) {
+  const D = p.D, courbe = HJM.Courbe(D.curve.map(c => c[0]), D.curve.map(c => c[1])), exo = Array.from({length: p.last}, (_, i) => i + 1);
+  const plan = HJM2.planTranches(courbe, D, p.terminal, exo, true), K = HJM2.tauxParSwap(courbe, p.terminal);
+  const pay = Array.from({length: p.terminal}, (_, i) => i + 1), berm = HJM.Bermudeenne(exo, p.terminal, K, pay, pay.map(() => 1), true);
+  const c2 = HJM2.bootstrap2(courbe, p.lam, p.rho, p.ratio, plan.fins, plan.instruments, 1e-6, 0.2, 161);
+  const cle = JSON.stringify([p.sv, p.lam, p.rho, p.ratio, p.last, p.terminal, p.nBoot]);
+  if (!cache3[cle]) cache3[cle] = HJM3.rebootstrap(courbe, p.lam, p.rho, p.ratio, plan.fins, plan.instruments, p.sv, c2.sigmas, p.nBoot, 14, prog);
+  return {D, courbe, exo, plan, K, pay, berm, c2, rb: cache3[cle]};
+}
+function calculer3(p, prog) {
+  const c = preparer3(p, f => prog(0.05 + 0.4 * f)), tMax = Math.max(...c.exo), exoIdx = c.plan.fins.map(e => c.exo.indexOf(e) >= 0);
+  const c1 = HJM.bootstrap(c.courbe, p.lam1F, c.plan.fins, c.plan.instruments, 1e-6, 0.2, "corrigee");
+  const b1 = HJM.prixEDP(c1.modele, c.berm, HJM.grilleEcartsTypes(c1.modele, tMax, 5, 801, 1500), false, {theta: 0.5, rannacher: 2}); prog(0.55);
+  const b2 = HJM2.prixQuad(c.c2.modele, c.berm, {nGrille: 81, nQuad: 101}); prog(0.65);
+  const b3q = HJM2.prixQuad(c.rb.modele, c.berm, {nGrille: 81, nQuad: 101}); prog(0.72);
+  const t0 = Date.now(), r3 = HJM3.prixBermudeenSV(c.rb.modele, p.sv, c.berm, b3q, p.nMC, 5), tMC = Date.now() - t0;
+  const eur = prix => Math.max(...prix.filter((m, i) => exoIdx[i]));
+  const eurQuotes = Math.max(...c.plan.instruments.filter((m, i) => exoIdx[i]).map(it => HJM.prixBachelier(c.courbe, it.swaption, it.volN)));
+  const quotes = c.plan.instruments.map((it, i) => ({e: c.plan.fins[i], co: exoIdx[i], tenor: Math.round(it.swaption.terminal - it.swaption.expiry), quote: it.volN,
+    v1: HJM.volNImplicite(c.courbe, it.swaption, c1.modeles[i]), v2: HJM.volNImplicite(c.courbe, it.swaption, c.c2.modeles[i]),
+    sig1: c1.sigmas[i], sig2: c.c2.sigmas[i], sig3: c.rb.sigmas[i]}));
+  return {K: c.K, fins: c.plan.fins, quotes, erreurBoot: c.rb.erreurMax,
+    b1, e1: eur(c1.modeles), b2, e2: eur(c.c2.modeles), b3: r3.prix, e3: eurQuotes, lsmcSV: r3.lsmcSV, lsmc0: r3.lsmc0, b3gauss: b3q, tMC};
+}
+// smiles of the 12 tabulated swaptions: market, flat Gaussian vol of the 1F/2F models, SV model (shape, level given by the segments)
+function lissage3(p, prog) {
+  const c = preparer3(p, f => prog(0.3 * f)), res = [];
+  const groupes = [[SMILES_IN, 10, "in"], [SMILES_OUT, 30, "out"]];
+  groupes.forEach(([paires, tStar, tag], k) => {
+    const pts = HJM3.pointsSmile(c.courbe, c.D, paires), mot = HJM3.MoteurSmile(c.rb.modele, pts, tStar, p.nSmile, 21), er = mot.erreurs(p.sv);
+    er.forEach(r => res.push({e: r.e, t: r.t, off: r.off, marche: r.marche, atm: r.atm, modele: r.modele, tag}));
+    prog(0.3 + 0.7 * (k + 1) / groupes.length);
+  });
+  return {pts: res, rb: c.rb.erreurMax};
+}
+// fit of kappa, xi, rho_v on the in-sample smiles (2F base model, as in the Python package)
+function ajuster3(p, prog) {
+  const c = preparer3(Object.assign({}, p, {sv: {kappa: 1, xi: 0, rhoV: 0}}), () => {});
+  const pts = HJM3.pointsSmile(c.courbe, c.D, SMILES_IN), mot = HJM3.MoteurSmile(c.c2.modele, pts, 10, p.nSmile, 21);
+  const r = HJM3.ajusterSV(mot, p.sv, p.maxFev, f => prog(f));
+  return r;
+}
+// report card: 1F, 2F and 2F-SV on every ATM swaption and every ATM cap of the data
+function marche3(p, prog) {
+  const c = preparer3(p, f => prog(0.1 * f)), D = c.D, fen = Math.max(...c.exo), zero = c.plan.fins.map(() => 0);
+  const c1 = HJM.bootstrap(c.courbe, p.lam1F, c.plan.fins, c.plan.instruments, 1e-6, 0.2, "corrigee");
+  const M1 = HJM2.Modele2(c.courbe, [p.lam1F, 0.5], c.plan.fins, c1.sigmas, zero, 0);
+  const card1 = HJM2.bulletin(M1, c.courbe, D, fen, TENORS3, true), card2 = HJM2.bulletin(c.c2.modele, c.courbe, D, fen, TENORS3, true); prog(0.2);
+  const lignes = [];
+  D.expiries.forEach((e, i) => D.tenors.forEach((t, j) => { if (HJM2.aSwaption(D, e, t)) lignes.push({e, t, marche: D.vol[i][j]}); }));
+  const sws = lignes.map(r => HJM2.swaptionATM(c.courbe, r.e, r.t));
+  const v3 = HJM3.volsSV(c.rb.modele, p.sv, sws, 30, p.nCard, 31); prog(0.6);
+  const sw3 = lignes.map((r, k) => ({e: r.e, t: r.t, marche: r.marche, modele: v3[k], err: (v3[k] - r.marche) * 1e4,
+    groupe: r.e <= fen + 1e-9 ? (TENORS3.indexOf(r.t) >= 0 ? "fitted" : "window") : "beyond"}));
+  const mats = D.caps.maturities, vc = HJM3.volsCaps(c.rb.modele, p.sv, mats, 30, p.nCard, 41); prog(0.85);
+  const caps3 = mats.map((m, k) => ({m, marche: D.caps.atmVol[k], modele: vc[k], err: (vc[k] - D.caps.atmVol[k]) * 1e4, groupe: (m - 0.5 <= fen + 1e-9) ? "fitted" : "beyond"}));
+  const card3 = {sw: sw3, caps: caps3};
+  const ptsIn = HJM3.pointsSmile(c.courbe, D, SMILES_IN), ptsOut = HJM3.pointsSmile(c.courbe, D, SMILES_OUT);
+  const eIn = HJM3.MoteurSmile(c.rb.modele, ptsIn, 10, p.nSmile, 21).erreurs(p.sv).map(r => r.err), eOut = HJM3.MoteurSmile(c.rb.modele, ptsOut, 30, p.nSmile, 21).erreurs(p.sv).map(r => r.err);
+  const flatIn = HJM3.erreursFlat(ptsIn).map(r => r.err), flatOut = HJM3.erreursFlat(ptsOut).map(r => r.err);
+  prog(1);
+  return {fen, card1, card2, card3, resume: [HJM2.resume(card1), HJM2.resume(card2), HJM2.resume(card3)],
+    smile: {flatIn: HJM2.rmse(flatIn), flatOut: HJM2.rmse(flatOut), svIn: HJM2.rmse(eIn), svOut: HJM2.rmse(eOut), nIn: eIn.length, nOut: eOut.length}};
+}
 self.onmessage = ev => {
   const {id, type, p, e} = ev.data;
   try {
     const prog = f => self.postMessage({id, progres: f});
     const res = type === "etudes" ? etudes(p, e, prog) : type === "lambda" ? etudeLambda(p, e, prog) : type === "calcul2" ? calculer2(p)
-      : type === "marche2" ? ajusterMarche(p, prog) : type === "capsLambda" ? capsLambda(p, e, prog) : type === "facteurs2" ? etudeFacteurs2(p, e, prog) : calculer(p);
+      : type === "marche2" ? ajusterMarche(p, prog) : type === "capsLambda" ? capsLambda(p, e, prog) : type === "calcul3" ? calculer3(p, prog) : type === "lissage3" ? lissage3(p, prog) : type === "ajuster3" ? ajuster3(p, prog) : type === "marche3" ? marche3(p, prog) : type === "facteurs2" ? etudeFacteurs2(p, e, prog) : calculer(p);
     self.postMessage({id, ok: true, res});
   } catch (err) { self.postMessage({id, ok: false, msg: err.message}); }
 };
@@ -1072,7 +1344,7 @@ function lire() {
 }
 
 // ---------- worker thread ----------
-const travail = UI.travailleur("src-hjm", "src-hjm2", "src-travail");
+const travail = UI.travailleur("src-hjm", "src-hjm2", "src-hjm3", "src-travail");
 let dernierId = 0, enCours = {};
 travail.onmessage = ev => { const m = ev.data, f = enCours[m.id]; if (!f) return; if (m.progres != null) { f.progres && f.progres(m.progres); return; } delete enCours[m.id]; f.fin(m); };
 function demander(type, p, e, progres) { const id = ++dernierId; return new Promise(fin => { enCours[id] = {fin, progres}; travail.postMessage({id, type, p, e}); }); }
@@ -1329,7 +1601,8 @@ document.addEventListener("vue", ev => { if (ev.detail === "lambda" && !lambdaFa
 let modeleCourant = "1", fait2 = false, ajusteFait = false, facteursFait = false;
 const ongletsBtn = [...document.querySelectorAll(".onglets button[data-vue]")];
 const NOTES_MODELE = {"1": "Hull–White type: one Gaussian factor, Jamshidian's decomposition, 1-D PDE.",
-  "2": "Two correlated Gaussian factors: no Jamshidian (2-D integrals), 2-D backward induction; fitted to a whole swaption and cap market."};
+  "2": "Two correlated Gaussian factors: no Jamshidian (2-D integrals), 2-D backward induction; fitted to a whole swaption and cap market.",
+  "3": "Two factors scaled by a stochastic volatility: no closed form, Monte Carlo with the exact 2-factor price as control variate; produces the smile."};
 function appliquerModele(m) {
   modeleCourant = m;
   document.querySelectorAll(".modeles button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.modele === m)));
@@ -1595,6 +1868,123 @@ $("m-usage").onclick = () => {
     paie: pay.join(" "), accr: pay.map(() => 1).join(" "), lam1: +b.lam[0].toFixed(6), lam2: +b.lam[1].toFixed(6), rho: +b.rho.toFixed(6), ratio: +b.ratio.toFixed(6), note: "Segments, product and 2-factor parameters of the fit of the previous tab."};
   appliquer2("eur"); ongletsBtn.find(x => x.dataset.vue === "pricer2").click(); lancer2();
 };
+
+// ======================================================================= third model: two factors + stochastic volatility
+let fait3 = false, lisse3 = false, carte3 = false, dernierLissage = null;
+function lire3() {
+  const N = (id, d) => lireNombre($(id), d);
+  const p = {D: D2, last: 5, terminal: 10, sv: {kappa: N("s-kappa", 2.29), xi: N("s-xi", 0.925), rhoV: N("s-rv", 0.413)},
+    lam: [N("s-l1", -0.003414), N("s-l2", 0.533868)], rho: N("s-r", -0.95), ratio: N("s-q", 1.483256), lam1F: N("s-lam1f", -0.038913),
+    nMC: Math.round(N("s-nmc", 100000)), nBoot: Math.round(N("s-nboot", 40000)), nSmile: Math.round(N("sm-n", 40000)), nCard: Math.round(N("mc-n", 40000))};
+  if (!(p.sv.kappa >= 0.02 && p.sv.kappa <= 3)) throw new Error("κ between 0.02 and 3");
+  if (!(p.sv.xi >= 0 && p.sv.xi <= 2.5)) throw new Error("ξ between 0 and 2.5 (0 gives back the 2-factor model)");
+  if (!(Math.abs(p.sv.rhoV) <= 0.95)) throw new Error("|ρ_v| ≤ 0.95");
+  if (!(p.lam[0] >= -0.5 && p.lam[0] <= 0.5 && p.lam[1] >= -0.5 && p.lam[1] <= 3)) throw new Error("λ₁ in [−0.5, 0.5] and λ₂ in [−0.5, 3]");
+  if (!(Math.abs(p.rho) <= 0.95) || !(p.ratio >= 0.05 && p.ratio <= 8)) throw new Error("|ρ| ≤ 0.95 and σ₂/σ₁ in [0.05, 8]");
+  if (!(p.nMC >= 5000 && p.nMC <= 400000 && p.nBoot >= 5000 && p.nBoot <= 200000 && p.nSmile >= 5000 && p.nSmile <= 200000 && p.nCard >= 5000 && p.nCard <= 200000)) throw new Error("paths between 5,000 and 400,000");
+  return p;
+}
+async function lancer3() {
+  const etat = $("s-etat"), echec = msg => { etat.textContent = msg; etat.className = "etat err"; };
+  let p; try { p = lire3(); } catch (err) { return echec(err.message); }
+  $("s-go").disabled = true; $("s-prog").hidden = false; $("s-prog").value = 0; etat.className = "etat"; etat.textContent = "Re-fitting the segments under the stochastic volatility, then pricing…";
+  const t0 = Date.now(), m = await demander("calcul3", p, null, f => { $("s-prog").value = f; });
+  $("s-go").disabled = false; $("s-prog").hidden = true;
+  if (!m.ok) return echec(m.msg);
+  const r = m.res;
+  etat.textContent = `Done in ${((Date.now() - t0) / 1000).toFixed(0)} s`; etat.className = "etat ok";
+  $("s-b1").textContent = fmt(r.b1, 6); $("s-b1-s").textContent = `premium ${bp(r.b1 - r.e1, 1)} · PDE (Crank–Nicolson)`;
+  $("s-b2").textContent = fmt(r.b2, 6); $("s-b2-s").textContent = `${((r.b2 / r.b1 - 1) * 100).toFixed(1)} % vs 1 factor · premium ${bp(r.b2 - r.e2, 1)}`;
+  $("s-b3").textContent = fmt(r.b3, 6); $("s-b3-s").textContent = `${((r.b3 / r.b1 - 1) * 100).toFixed(1)} % vs 1 factor · premium ${bp(r.b3 - r.e3, 1)}`;
+  $("s-d").textContent = `${((r.b3 / r.b2 - 1) * 100).toFixed(2)} %`;
+  $("s-d-s").textContent = `${bp(r.b3 - r.b2, 1)} · control variate: LSMC ${fmt(r.lsmcSV, 5)} (SV) − ${fmt(r.lsmc0, 5)} (ξ = 0) · ${(r.tMC / 1000).toFixed(0)} s`;
+  const xs = r.fins;
+  Graphe.tracer($("g-s-sig"), {series: [
+    {nom: "1 factor", x: xs, y: r.quotes.map(q => q.sig1 * 1e4), couleur: "c5", tirets: true},
+    {nom: "2 factors (σ₁)", x: xs, y: r.quotes.map(q => q.sig2 * 1e4), couleur: "c1", epaisseur: 2.5},
+    {nom: "2 factors + SV (σ₁)", x: xs, y: r.quotes.map(q => q.sig3 * 1e4), couleur: "c2", epaisseur: 2.5}], xlab: "segment end (years)", ylab: "σ₁ (bp)", yfmt: v => v.toFixed(0)});
+  $("t-s-q").tBodies[0].innerHTML = r.quotes.map(q => `<tr><td>${+q.e.toFixed(3)}</td><td>${q.co ? "co-terminal " : "ATM "}${q.e < 1 ? Math.round(q.e * 12) + "M" : q.e + "Y"} × ${q.tenor}Y</td><td>${(q.quote * 1e4).toFixed(1)}</td>`
+    + `<td>${(q.sig1 * 1e4).toFixed(1)}</td><td>${(q.sig2 * 1e4).toFixed(1)}</td><td>${(q.sig3 * 1e4).toFixed(1)}</td></tr>`).join("");
+  $("s-note").textContent = `Strike ${pct(r.K, 3)}. All three models reproduce the quotes (the 2-factor Monte Carlo re-fit leaves at most ${r.erreurBoot.toFixed(2)} bp). The Bermudan of the stochastic-volatility model is the exact 2F price on the re-fitted segments (${fmt(r.b3gauss, 6)}) plus the Monte Carlo difference; it varies by about ±0.0002 with the random numbers (Theory tab, section 4).`;
+}
+$("s-go").onclick = lancer3;
+
+async function lancerLissage() {
+  const etat = $("sm-etat"), echec = msg => { etat.textContent = msg; etat.className = "etat err"; };
+  let p; try { p = lire3(); } catch (err) { return echec(err.message); }
+  $("sm-go").disabled = true; $("sm-fit").disabled = true; $("sm-prog").hidden = false; $("sm-prog").value = 0; etat.className = "etat"; etat.textContent = "Computing the smiles…";
+  const t0 = Date.now(), m = await demander("lissage3", p, null, f => { $("sm-prog").value = f; });
+  $("sm-go").disabled = false; $("sm-fit").disabled = false; $("sm-prog").hidden = true;
+  if (!m.ok) return echec(m.msg);
+  dernierLissage = m.res; etat.textContent = `Done in ${((Date.now() - t0) / 1000).toFixed(0)} s`; etat.className = "etat ok";
+  const pts = m.res.pts, groupe = tag => pts.filter(x => x.tag === tag), rm = a => HJM2.rmse(a);
+  const fl = tag => rm(groupe(tag).map(x => (x.atm - x.marche) * 1e4));
+  $("sm-k1").textContent = fl("in").toFixed(2) + " bp"; $("sm-k1-s").textContent = `${groupe("in").length} points, 9 smiles`;
+  $("sm-k2").textContent = rm(groupe("in").map(x => (x.modele - x.marche) * 1e4)).toFixed(2) + " bp"; $("sm-k2-s").textContent = `${(fl("in") / rm(groupe("in").map(x => (x.modele - x.marche) * 1e4))).toFixed(1)}× smaller`;
+  $("sm-k3").textContent = fl("out").toFixed(2) + " bp"; $("sm-k3-s").textContent = `${groupe("out").length} points, 3 smiles never fitted`;
+  $("sm-k4").textContent = rm(groupe("out").map(x => (x.modele - x.marche) * 1e4)).toFixed(2) + " bp"; $("sm-k4-s").textContent = `${(fl("out") / rm(groupe("out").map(x => (x.modele - x.marche) * 1e4))).toFixed(1)}× smaller`;
+  const cles = []; pts.forEach(x => { const c = x.e + "|" + x.t; if (!cles.includes(c)) cles.push(c); });
+  const lab = c => { const [e, t] = c.split("|").map(Number); return (e < 1 ? Math.round(e * 12) + "M" : e + "Y") + " × " + t + "Y"; };
+  const cur = $("sm-sel").value;
+  $("sm-sel").innerHTML = cles.map(c => `<option value="${c}">${lab(c)} (${pts.find(x => x.e + "|" + x.t === c).tag === "in" ? "fitted" : "not fitted"})</option>`).join("");
+  $("sm-sel").value = cles.includes(cur) ? cur : "1|5"; dessinerLissage();
+  $("t-sm").tBodies[0].innerHTML = pts.map(x => `<tr><td>${lab(x.e + "|" + x.t)}</td><td>${x.off > 0 ? "+" : ""}${x.off} bp</td><td>${(x.marche * 1e4).toFixed(1)}</td><td>${((x.atm - x.marche) * 1e4).toFixed(1)}</td><td>${((x.modele - x.marche) * 1e4).toFixed(1)}</td><td>${x.tag === "in" ? "fitted" : "test"}</td></tr>`).join("");
+}
+function dessinerLissage() {
+  if (!dernierLissage) return;
+  const [e, t] = $("sm-sel").value.split("|").map(Number), l = dernierLissage.pts.filter(x => x.e === e && x.t === t).sort((a, b) => a.off - b.off);
+  if (!l.length) return;
+  const xs = l.map(x => x.off), atm = l[0].atm * 1e4, lim = [Math.min(...xs) - 10, Math.max(...xs) + 10];
+  Graphe.tracer($("g-sm"), {series: [{nom: "market", x: xs, y: l.map(x => x.marche * 1e4), couleur: "c3", type: "points", rayon: 4},
+    {nom: "1 and 2 factors (flat)", x: lim, y: [atm, atm], couleur: "c5", tirets: true},
+    {nom: "2 factors + stochastic vol", x: xs, y: l.map(x => x.modele * 1e4), couleur: "c2", epaisseur: 2.5, marqueurs: true}],
+    xlab: "strike − forward swap rate (bp)", ylab: "normal vol (bp)", yfmt: v => v.toFixed(0)});
+}
+$("sm-sel").onchange = dessinerLissage;
+$("sm-go").onclick = lancerLissage;
+$("sm-fit").onclick = async () => {
+  const etat = $("sm-etat"), echec = msg => { etat.textContent = msg; etat.className = "etat err"; };
+  let p; try { p = lire3(); } catch (err) { return echec(err.message); }
+  p.maxFev = Math.round(lireNombre($("sm-fev"), 60)); if (!(p.maxFev >= 10 && p.maxFev <= 400)) return echec("evaluations between 10 and 400");
+  if (!(p.sv.xi > 0)) { p.sv = {kappa: 2, xi: 0.8, rhoV: 0.4}; }
+  $("sm-go").disabled = true; $("sm-fit").disabled = true; $("sm-prog").hidden = false; $("sm-prog").value = 0; etat.className = "etat"; etat.textContent = "Fitting κ, ξ, ρ_v on the 9 smiles…";
+  const t0 = Date.now(), m = await demander("ajuster3", p, null, f => { $("sm-prog").value = f; });
+  $("sm-go").disabled = false; $("sm-fit").disabled = false; $("sm-prog").hidden = true;
+  if (!m.ok) return echec(m.msg);
+  const sv = m.res.sv; $("s-kappa").value = sv.kappa.toFixed(3); $("s-xi").value = sv.xi.toFixed(3); $("s-rv").value = sv.rhoV.toFixed(3);
+  etat.textContent = `Fitted in ${((Date.now() - t0) / 1000).toFixed(0)} s: κ = ${sv.kappa.toFixed(2)}, ξ = ${sv.xi.toFixed(3)}, ρ_v = ${sv.rhoV.toFixed(3)} (smile RMSE ${m.res.rmse.toFixed(2)} bp, ${m.res.evaluations} evaluations). Recomputing the smiles…`; etat.className = "etat ok";
+  lancerLissage();
+};
+
+async function lancerCarte() {
+  const etat = $("mc-etat"), echec = msg => { etat.textContent = msg; etat.className = "etat err"; };
+  let p; try { p = lire3(); } catch (err) { return echec(err.message); }
+  $("mc-go").disabled = true; $("mc-prog").hidden = false; $("mc-prog").value = 0; etat.className = "etat"; etat.textContent = "Report card on 240 swaptions and 16 caps…";
+  const t0 = Date.now(), m = await demander("marche3", p, null, f => { $("mc-prog").value = f; });
+  $("mc-go").disabled = false; $("mc-prog").hidden = true;
+  if (!m.ok) return echec(m.msg);
+  const r = m.res, f2 = v => isFinite(v) ? v.toFixed(2) : "—", s = r.smile;
+  etat.textContent = `Done in ${((Date.now() - t0) / 1000).toFixed(0)} s`; etat.className = "etat ok";
+  const ligne = (nom, x, si, so) => `<tr><td>${nom}</td><td>${f2(x.swaptions_fitted)}</td><td>${f2(isFinite(x.caps_fitted) ? x.caps_fitted : x.caps_window)}</td><td>${f2(x.swaptions_beyond)}</td><td>${f2(x.caps_beyond)}</td><td>${si}</td><td>${so}</td></tr>`;
+  $("t-mc").tBodies[0].innerHTML = ligne("1 factor", r.resume[0], f2(s.flatIn), f2(s.flatOut)) + ligne("2 factors", r.resume[1], f2(s.flatIn), f2(s.flatOut)) + ligne("2 factors + stochastic vol", r.resume[2], f2(s.svIn), f2(s.svOut));
+  $("mc-note").textContent = `Fitted: ${r.resume[2].n_swaptions_fitted} ATM swaptions and ${r.resume[2].n_caps_fitted} caps of the window (${r.fen} years); beyond: ${r.resume[2].n_swaptions_beyond} swaptions and ${r.resume[2].n_caps_beyond} caps. Smile: ${s.nIn} points of 9 fitted smiles, ${s.nOut} points of 3 test smiles; the Gaussian models have the same (flat) smile error.`;
+  const fen = r.fen, fc = c => c.filter(x => isFinite(x.modele));
+  Graphe.tracer($("g-mc-caps"), {series: [
+    {nom: "market", x: r.card1.caps.map(c => c.m), y: r.card1.caps.map(c => c.marche * 1e4), couleur: "c3", type: "points", rayon: 4},
+    {nom: "1 factor", x: fc(r.card1.caps).map(c => c.m), y: fc(r.card1.caps).map(c => c.modele * 1e4), couleur: "c5", tirets: true},
+    {nom: "2 factors", x: fc(r.card2.caps).map(c => c.m), y: fc(r.card2.caps).map(c => c.modele * 1e4), couleur: "c1", epaisseur: 2.5},
+    {nom: "2 factors + SV", x: fc(r.card3.caps).map(c => c.m), y: fc(r.card3.caps).map(c => c.modele * 1e4), couleur: "c2", epaisseur: 2.5},
+    {nom: "end of the window", x: [fen + 0.5, fen + 0.5], y: [0, 80], couleur: "c7", tirets: true}], xlab: "cap maturity (years)", ylab: "ATM normal vol (bp)", zero: true, yfmt: v => v.toFixed(0)});
+  const mx = Math.max(...r.card3.sw.map(x => Math.abs(x.err)).filter(isFinite), 1e-9) * 0.6;
+  $("mc-t3").innerHTML = tableMatrice({sw: r.card3.sw.filter(x => isFinite(x.err))}, fen, mx);
+}
+$("mc-go").onclick = lancerCarte;
+
+document.addEventListener("vue", ev => {
+  if (ev.detail === "pricer3" && !fait3) { fait3 = true; lancer3(); }
+  if (ev.detail === "smile3" && !lisse3) { lisse3 = true; lancerLissage(); }
+  if (ev.detail === "marche3" && !carte3) { carte3 = true; lancerCarte(); }
+});
 
 // ---------- correlation studies ----------
 async function lancerFacteurs() {

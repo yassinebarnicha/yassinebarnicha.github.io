@@ -194,6 +194,59 @@ def main() -> int:
     check("premium at rho = +0.9 is about 102 bp", prem[0.9], 101.9, 0.8)
     check("Bermudan moves by 12 % between rho = -0.95 and +0.9", (bermu[0.9] / bermu[-0.95] - 1) * 100, 11.6, 0.8)
 
+    print("\n== 7. Stochastic volatility, third model (theory 3, sections 2 to 4) ==")
+    from hjm3sv.model import SVParams, bond, simulate
+    from hjm3sv.pricing import ZERO, SmileEngine, bermudan_sv, flat_smile_errors, smile_points
+    from run_sv import IN_SAMPLE, LAM as LAM_SV, OUT_SAMPLE, RATIO as RATIO_SV, RHO as RHO_SV, model_vols, rebootstrap
+    sv = SVParams(2.29, 0.925, 0.413)
+    ends5, ins5 = md.bucket_plan(10, [1, 2, 3, 4, 5], use_smile=True)
+    r2 = CoterminalBootstrap2F(md.curve, LAM_SV, RHO_SV, RATIO_SV, ends5).calibrate(ins5, n_grid=161)
+    base2 = HJM2FModel(md.curve, LAM_SV, r2.sigma1, r2.sigma2, RHO_SV)
+    for label, par in (("xi = 0", ZERO), ("fitted kappa, xi, rho_v", sv)):
+        got = {}
+
+        def obs(st, got=got):
+            pn, pb = bond(base2, 3.0, 10.0, st), bond(base2, 3.0, 6.0, st)
+            got["m"] = float(np.mean(pb / pn))
+
+        simulate(base2, par, 10.0, [3.0], 60000, 1, obs)
+        target = md.curve.discount(6.0) / md.curve.discount(10.0)
+        at_most(f"martingale E[P(3,6)/P(3,10)] under the 10-forward measure, {label}: relative error", abs(got["m"] / target - 1), 1e-3)
+    sws5 = [i.swaption for i in ins5]
+    exact5 = np.array([base2.european_swaption_price(s, n_grid=161) for s in sws5])
+    from hjm3sv.model import europeans
+    at_most("xi = 0: Monte Carlo reproduces the exact 2-D integral (worst relative gap, noise 0.5 %)", float(np.max(np.abs(europeans(base2, ZERO, sws5, 10.0, 60000, 3) / exact5 - 1))), 0.01)
+    vtiny = model_vols(base2, SVParams(1.0, 1e-6, 0.4), sws5, 10.0, 40000, 3)
+    from hjm2f.calibration_2f import implied_normal_vol
+    v2 = np.array([implied_normal_vol(md.curve, s, p) for s, p in zip(sws5, exact5)])
+    at_most("control variate: a vanishing xi gives back the 2F implied vols (worst gap, bp)", float(np.max(np.abs(vtiny - v2)) * 1e4), 0.05)
+
+    pts_in, pts_out = smile_points(md, IN_SAMPLE), smile_points(md, OUT_SAMPLE)
+    check("Gaussian models: smile RMSE in sample = 6.9 bp (54 points)", float(np.sqrt(np.mean([e * e for _, e in flat_smile_errors(pts_in)]))), 6.86, 0.05)
+    check("Gaussian models: smile RMSE out of sample = 3.8 bp (24 points)", float(np.sqrt(np.mean([e * e for _, e in flat_smile_errors(pts_out)]))), 3.78, 0.05)
+    base3, err3 = rebootstrap(md, sv, ends5, ins5, r2.sigma1.values, 60000, time.time(), iterations=14)
+    at_most("SV segments re-bootstrapped: worst error on the quotes, bp", float(np.max(np.abs(err3))), 0.1)
+    ratios = [a / b for a, b in zip(base3.sigma1.values, r2.sigma1.values)]
+    at_most("SV segments: levels 0 to 13 % above the 2F ones (max ratio)", max(ratios), 1.14)
+    check("SV segments: no level below the 2F one (min ratio >= 1)", min(ratios), 1.0, 0.01)
+    rm_in = SmileEngine(base3, pts_in, 10.0, n_paths=60000).rmse(sv)
+    rm_out = SmileEngine(base3, pts_out, 30.0, n_paths=60000).rmse(sv)
+    check("SV smile RMSE in sample = 2.5 bp (6.9 for the Gaussian models)", rm_in, 2.55, 0.25)
+    check("SV smile RMSE out of sample = 2.1 bp (3.8 for the Gaussian models)", rm_out, 2.12, 0.3)
+    at_most("SV smile in sample at least 2.4 times smaller than flat", rm_in * 2.4, 6.86)
+    at_most("SV smile out of sample at least 1.5 times smaller than flat", rm_out * 1.5, 3.78)
+    both5 = md.targets(5.0, TENORS, with_caps=True)
+    sw_fit = [s for s, _ in both5.swaptions]
+    v3 = model_vols(base3, sv, sw_fit, 10.0, 40000, 31)
+    errs = [(a - m) * 1e4 for a, (_, m) in zip(v3, both5.swaptions)]
+    check("SV model: fitted swaptions RMSE = 4.0 bp (3.9 in 2F)", float(np.sqrt(np.mean(np.square(errs)))), 4.0, 0.35)
+    quad3 = BermudanQuad2F(base3, bm, n_grid=81, n_quad=101).price()
+    prices = [bermudan_sv(base3, sv, bm, quad3, n_paths=150000, seed=s)[0] for s in (1, 2)]
+    check("SV Bermudan = 0.0486-0.0487 (mean of two seeds)", float(np.mean(prices)), 0.04865, 2.5e-4)
+    at_most("SV Bermudan above the 2F price (0.048161)", 0.048161, float(np.mean(prices)))
+    at_most("SV Bermudan below the 1F price (0.050057)", float(np.mean(prices)), 0.050057)
+    check("SV exercise premium = 48-50 bp", (float(np.mean(prices)) - eur2) * 1e4, 49.0, 2.0)
+
     print(f"\n{sum(RESULTS)}/{len(RESULTS)} checks passed in {time.time() - t_start:.0f} s")
     return 0 if all(RESULTS) else 1
 
