@@ -36,8 +36,8 @@
   scaled ticks=false,xticklabel style={/pgf/number format/fixed},yticklabel style={/pgf/number format/fixed},
   tick label style={font=\footnotesize},label style={font=\footnotesize},legend style={font=\scriptsize,draw=none,fill=white,fill opacity=0.8,text opacity=1}}}
 
-\title{Bermudan Swaptions in a One-Factor HJM Model\\[4pt]
-  \large Calibration, PDE and Monte Carlo Pricing, and a Review of the Model}
+\title{Bermudan Swaptions in One- and Two-Factor HJM Models\\[4pt]
+  \large Calibration, PDE, Grid and Monte Carlo Pricing, and a Review of the Model}
 \author{Mohammed-Yassine Barnicha}
 \date{October 2026}
 
@@ -53,7 +53,10 @@ zero-coupon bond formula carries the convexity adjustment with the wrong sign: t
 of discounted bonds by $1.8\,\%$ on a 7-year bond, prices the same European swaption at $0.0258$ by Jamshidian and $0.0206$ by
 the PDE, and undervalues the reference Bermudan by $11\,\%$. We derive the correct formula, measure the other numerical
 issues (Monte Carlo discounting, regression bias, time scheme), and study how the mean-reversion parameter, which the
-calibration cannot identify, drives the Bermudan price through the correlation between exercise dates. All computations are
+calibration cannot identify, drives the Bermudan price through the correlation between exercise dates. Finally we add a second
+factor (\cref{sec:2f}): Jamshidian's decomposition is lost and replaced by two-dimensional integrals and a two-dimensional backward
+induction, but on a real EUR swaption matrix (30 March 2016, 50 at-the-money swaptions) the root-mean-square fit drops from $11.2$ to
+$2.6$\,bp, and the Bermudan price, which the co-terminal Europeans leave undetermined, changes by $5\,\%$. All computations are
 reproduced by the interactive page \url{https://yassinebarnicha.github.io/swaptions-hjm/}.
 \end{abstract}
 
@@ -540,8 +543,137 @@ dates and the early-exercise premium against it ($\lambda$ from $0$ to $0.3$).}\
 \begin{remark}
 This is a tendency, not a theorem: it relies on the calibration set (co-terminal Europeans), on the payoff, and on the
 one-factor structure. In a two-factor model, correlation between dates can be lowered without changing $\lambda$, which is one
-reason why two-factor models are preferred for products sensitive to inter-date correlation.
+reason why two-factor models are preferred for products sensitive to inter-date correlation (\cref{sec:2f}).
 \end{remark}
+
+%======================================================================
+\section{A second factor}\label{sec:2f}
+In one factor, $\lambda$ is not identified by the co-terminal Europeans and it ties together the volatilities of the swaptions of all
+tenors, which are all driven by the same Gaussian variable. A second factor removes both limits. The price is that Jamshidian's
+decomposition no longer exists.
+
+\subsection{The model}
+Two Brownian motions $W^1,W^2$ with $d\langle W^1,W^2\rangle_t=\rho\,dt$ drive the forward rates with separable volatilities
+$\sigma_k(t,T)=\sigma_k(t)e^{-\lambda_k(T-t)}$, $k=1,2$; this is the two-factor Hull--White model, $r=r_0+r_1+r_2$ with
+$dr_k=-\lambda_kr_k\,dt+\sigma_k\,dW^k$, in which $\rho$ is typically close to $-0.9$ (a steepening of the curve is negatively
+correlated with a parallel move)~\cite{les}. With $\rho_{kk}=1$ and $\rho_{12}=\rho$, the model is Markov in the driftless Gaussian
+vector $X^k_t=\int_0^t\sigma_k(u)e^{\lambda_ku}\dd W^k_u$, whose covariance is
+\[
+A_{kl}(t)=\rho_{kl}\int_0^t\sigma_k(u)\sigma_l(u)\,e^{(\lambda_k+\lambda_l)u}\dd u .
+\]
+Let $D_k(t,T)=\Bb_k(T)-\Bb_k(t)$ and $G_{kl}(t)=\rho_{kl}\int_0^t\sigma_k\sigma_le^{(\lambda_k+\lambda_l)u}\Bb_l(u)\dd u$. The no-arbitrage drift
+of the forward rates gives
+\begin{align}
+P(t,T)&=\frac{P(0,T)}{P(0,t)}\exp\Big(-\sum_kD_k(t,T)X^k_t+\kappa(t,T)\Big),\notag\\
+\kappa(t,T)&=-\tfrac12\sum_{k,l}\Big[\big(\Bb_k(T)\Bb_l(T)-\Bb_k(t)\Bb_l(t)\big)A_{kl}(t)-D_k(t,T)G_{kl}(t)-D_l(t,T)G_{lk}(t)\Big].
+\label{eq:zc2}
+\end{align}
+With $\sigma_2=0$, $\kappa=-D\,c$ and \eqref{eq:zc2} is the corrected one-factor formula. Under the $T$-forward measure the factors keep a
+covariance $A(t)$ and acquire the deterministic mean $m_k(t;T)=-\sum_l\rho_{kl}\int_0^t\sigma_k\sigma_le^{\lambda_ku}\Bb_l(T-u)\dd u$. The martingale
+defect $\E^T[P(t,b)/P(t,T)]-P(0,b)/P(0,T)$ computed with these two ingredients is zero to machine precision for generic parameters.
+
+\subsection{What replaces Jamshidian}
+Jamshidian's trick needs the swap value to be monotone in the single factor, so that one root $x^\star$ splits the swaption into options
+on zero-coupon bonds. With two factors the swap value $S(x_1,x_2)$ is a function of the plane and the exercise set $\{S>0\}$ is bounded by a
+curve: there is no common strike and no decomposition. The European price is the integral
+\[
+V_0=P(0,T_0)\,\E^{T_0}\!\big[S(X_{T_0})^+\big],\qquad X_{T_0}\sim\N\big(m(T_0;T_0),A(T_0)\big),
+\]
+evaluated on a fine uniform grid of the normal law: since the payoff has a kink, such a rule is more accurate than Gauss--Hermite
+(relative error $4\cdot10^{-4}$ against Jamshidian in the one-factor limit, with $161\times161$ points). The bootstrap still works, because the
+price increases with the volatility level, but each Brent step now costs an integral.
+
+\subsection{Calibration: what is identified}
+For given $(\lambda_1,\lambda_2,\rho,\sigma_2/\sigma_1)$ the co-terminal bootstrap fixes the level of $\sigma_1$ exactly, but these structural
+parameters are invisible to the co-terminals. They are identified by swaptions of other tenors, through a global fit (Nelder--Mead on the
+root-mean-square gap in normal volatility, the level being re-bootstrapped at every evaluation).
+
+We use the market data of the ENSAE course~\cite{ensae}: the stripped EUR curve of 30 March 2016 and the matrix of at-the-money normal
+volatilities of swaptions. The Bermudan is a payer swaption into a 10-year swap, exercisable at 1 to 5 years, struck at the 10-year par rate
+($0.532\,\%$); the targets are the 50 ATM swaptions with expiries 1 to 5 years and tenors 1 to 10 years, the Bermudan's five
+co-terminals included.
+
+\begin{table}[ht]\centering\small
+\begin{tabular}{lcccccc}\toprule
+ & $\lambda_1$ & $\lambda_2$ & $\rho$ & $\sigma_2/\sigma_1$ & RMSE (bp) & Bermudan\\\midrule
+1 factor & $0$ & -- & -- & -- & $11.2$ & $0.051765$\\
+2 factors & $\approx0$ & $0.916$ & $-0.980$ & $2.65$ & $2.58$ & $0.048973$\\\bottomrule
+\end{tabular}
+\caption{Fit of the 50 ATM swaptions and price of the 10-year Bermudan (exercise premium: $75\,$bp in one factor, $47\,$bp in two).
+The one-factor optimum sits on the bound $\lambda=0$.}\label{tab:fit2f}
+\end{table}
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{axis}[title={expiry 1 year},xlabel={tenor (years)},ylabel={normal vol (bp)},legend pos=south east]
+  \addplot[only marks,mark=*,mark size=1.6pt] table[x=tenor,y=mkt1]{data/matrice.dat}; \addlegendentry{market}
+  \addplot[red,thick,dashed] table[x=tenor,y=f1_1]{data/matrice.dat}; \addlegendentry{1 factor}
+  \addplot[blue,thick] table[x=tenor,y=f2_1]{data/matrice.dat}; \addlegendentry{2 factors}
+\end{axis}
+\end{tikzpicture}\hfill
+\begin{tikzpicture}
+\begin{axis}[title={expiry 3 years},xlabel={tenor (years)},ylabel={normal vol (bp)},legend pos=south east]
+  \addplot[only marks,mark=*,mark size=1.6pt] table[x=tenor,y=mkt3]{data/matrice.dat}; \addlegendentry{market}
+  \addplot[red,thick,dashed] table[x=tenor,y=f1_3]{data/matrice.dat}; \addlegendentry{1 factor}
+  \addplot[blue,thick] table[x=tenor,y=f2_3]{data/matrice.dat}; \addlegendentry{2 factors}
+\end{axis}
+\end{tikzpicture}
+\caption{ATM normal volatility against the tenor of the swap, EUR, 30 March 2016. With one factor the volatility is nearly flat in the tenor;
+the market, and the two-factor model, are steeply increasing at short expiries.}\label{fig:fit2f}
+\end{figure}
+
+\paragraph{Caveats.} The fitted $\rho$ is close to $-1$ and the objective has a flat valley: three of five starting points reach the same fit ($2.58$
+to $2.62\,$bp) with $\lambda_2\in[0.92,1.03]$, $\rho\in[-1.00,-0.98]$ and $\sigma_2/\sigma_1\in[2.65,3.0]$, while two others stall against the bounds
+($7.2\,$bp and $11.1\,$bp, the latter being the one-factor solution). The gain in fit is solid, the individual parameters are not well identified, and the
+starting point matters. In 2016 the EUR short end had
+negative rates and a very steep volatility term structure, which a Gaussian two-factor model reproduces by stretching the factors against each
+other; a third factor, a shifted diffusion or a stochastic volatility would be the next steps. The smile is ignored: ATM vols are used as the
+quotes of swaptions struck at the Bermudan's rate.
+
+\subsection{The Bermudan on a two-dimensional grid}
+In two factors the PDE has a cross-derivative, but between exercise dates the factors are exactly Gaussian, so time need not be discretised.
+Under the $T_N$-forward measure, on values deflated by $P(t,T_N)$ (martingales, hence no discount factor to simulate),
+\[
+U_j(x)=\max\Big(\frac{h_j(x)}{P(T_j,T_N;x)},\;\E^{T_N}\big[U_{j+1}(X_{T_{j+1}})\,\big|\,X_{T_j}=x\big]\Big),\qquad V_0=P(0,T_N)\,\E^{T_N}[U_1(X_{T_1})],
+\]
+where $X_{T_{j+1}}-X_{T_j}\sim\N\big(m(T_{j+1};T_N)-m(T_j;T_N),\,A(T_{j+1})-A(T_j)\big)$ independently of the past. The conditional expectation is a
+Gaussian kernel integrated against a bilinear interpolation of $U_{j+1}$; the only errors are the grid and the kernel ($1.2\,\%$ at $41\times61$, $0.2\,\%$ at
+$101\times141$). Longstaff--Schwartz runs on the same deflated values with a two-variable polynomial basis and brackets the grid price from below.
+
+\paragraph{The Europeans do not determine the Bermudan.} On the illustrative case of the page, every point of \cref{fig:rho2f} is calibrated to the
+same three Europeans; the exercise premium moves from $19$ to $29\,$bp as $\rho$ goes from $-0.95$ to $+0.9$, against $24\,$bp in one factor.
+This is model risk made visible, and also the freedom that lets the model fit other swaptions or a quoted Bermudan.
+
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{axis}[xlabel={$\rho$},ylabel={Bermudan $-$ max European (bp)},legend pos=south east]
+  \addplot[blue,thick,mark=*,mark size=1.4pt] table[x=rho,y=prem]{data/rho2f.dat}; \addlegendentry{2 factors}
+  \addplot[red,thick,dashed,domain=-0.95:0.9] {24.19}; \addlegendentry{1 factor}
+\end{axis}
+\end{tikzpicture}
+\caption{Exercise premium against $\rho$ ($\lambda_1=0.03$, $\lambda_2=0.5$, $\sigma_2/\sigma_1=0.6$), each point recalibrated to the three co-terminal Europeans.}\label{fig:rho2f}
+\end{figure}
+
+\subsection{What is lost, what is gained}
+\begin{table}[ht]\centering\small
+\begin{tabular}{p{3.6cm}p{4.6cm}p{6.2cm}}\toprule
+ & 1 factor & 2 factors\\\midrule
+European swaption & closed form (Jamshidian) & \textbf{lost}: 2-D integral, about $26{,}000$ points\\
+Bermudan engine & tridiagonal PDE, a few ms & \textbf{lost}: 2-D grid, $0.4$--$1.5\,$s; three factors would need Monte Carlo\\
+Co-terminal calibration & exact bootstrap & still exact, but three structural parameters are not identified by it\\
+Swaptions of other tenors & RMSE $11.2\,$bp & \textbf{gained}: $2.6\,$bp\\
+Correlation of forward rates & $1$ for all maturities & \textbf{gained}: free\\
+Bermudan with the same Europeans & almost fixed by $\lambda$ & \textbf{gained}: set by the dependence (model risk as well)\\
+Hedging factors & parallel shift & \textbf{gained}: level and slope\\\bottomrule
+\end{tabular}
+\caption{One factor against two.}\label{tab:perte}
+\end{table}
+
+\subsection{Validation}
+(i) The martingale defect is zero. (ii) With $\sigma_2=0$ the European integral reproduces Jamshidian ($4\cdot10^{-4}$ relative) and the grid reproduces the
+corrected one-factor PDE ($0.2\,\%$). (iii) With $\rho=1$, $\lambda_1=\lambda_2$ and $\sigma_1+\sigma_2=\sigma$ the one-factor price is recovered.
+(iv) Grid and Monte Carlo agree within $0.4\,\%$ on four scenarios. (v) The JavaScript engine of the page and the Python package \texttt{hjm2f} agree to $10^{-16}$ on
+prices, covariances and bootstrap, and find the same global fit on the real data.
 
 %======================================================================
 \section{Validation}
@@ -556,8 +688,10 @@ The one-factor HJM model calibrates exactly and quickly to co-terminal Europeans
 Monte Carlo as an independent check. The review shows the value of model-level tests: a convexity sign error invisible to the
 calibration was caught by a martingale test and by the inconsistency between methods, and it moved the Bermudan price by
 $12\,\%$. The remaining model risk sits in $\lambda$, which the calibration does not determine and which moves the Bermudan by
-$12\,\%$ over a plausible range. Natural extensions are an exact joint simulation of $(X,\int r)$, a dual upper bound for the
-Monte Carlo, the calibration of $\lambda$ to correlation-sensitive instruments, and a two-factor version.
+$12\,\%$ over a plausible range. The two-factor version trades the closed forms for integrals and a two-dimensional grid, and in
+return fits the whole swaption matrix instead of its diagonal; on real data it makes the Bermudan price depend on information that
+the co-terminal Europeans do not contain. Natural extensions are a dual upper bound for the Monte Carlo, a third factor or a shifted
+diffusion for the negative-rate regime, and the use of the smile.
 
 \begin{thebibliography}{99}\small
 \bibitem{and} L.~Andersen and M.~Broadie. Primal-dual simulation algorithm for pricing multidimensional American options.
@@ -570,7 +704,10 @@ Monte Carlo, the calibration of $\lambda$ to correlation-sensitive instruments, 
 \bibitem{hjm} D.~Heath, R.~Jarrow and A.~Morton. Bond pricing and the term structure of interest rates: a new methodology for
   contingent claims valuation. \emph{Econometrica}, 60(1):77--105, 1992.
 \bibitem{hw} J.~Hull and A.~White. Pricing interest-rate-derivative securities. \emph{Review of Financial Studies}, 3(4):573--592, 1990.
+\bibitem{ensae} ENSAE Paris, course \emph{Mod\`eles de la courbe des taux d'int\'er\^et} (A.~Chaix, C.~Hillairet): lecture notes and practical work,
+  workbook \emph{Pricer caps, floors et swaptions} (EUR curve and swaption volatilities of 30 March 2016).
 \bibitem{jam} F.~Jamshidian. An exact bond option formula. \emph{Journal of Finance}, 44(1):205--209, 1989.
+\bibitem{les} A.~Lesniewski. \emph{Interest Rate and Credit Models}, lecture notes (chapter on term structure and short rate models: the two-factor Hull--White model).
 \bibitem{ls} F.~Longstaff and E.~Schwartz. Valuing American options by simulation: a simple least-squares approach.
   \emph{Review of Financial Studies}, 14(1):113--147, 2001.
 \bibitem{ran} R.~Rannacher. Finite element solution of diffusion problems with irregular data. \emph{Numerische Mathematik},

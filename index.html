@@ -303,8 +303,8 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
       <a class="app" href="swaptions-hjm/">
         <img src="img/hjm.webp" width="900" height="579" loading="lazy" alt="Bermudan swaption pricer under HJM">
         <div class="corps"><h3>Bermudan swaptions under HJM</h3>
-          <p>Bootstrap calibration, PDE and Longstaff-Schwartz; effect of mean reversion after recalibration; a sign error found and
-            fixed in the model.</p>
+          <p>One and two factors: bootstrap calibration, PDE, 2-D backward induction and Longstaff-Schwartz; fit to a real EUR swaption
+            matrix; a sign error found and fixed in the model.</p>
           <span class="ouvrir">Open</span></div></a>
       <a class="app" href="options-lookback/">
         <img src="img/lookback.webp" width="900" height="579" loading="lazy" alt="Lookback option pricer">
@@ -429,10 +429,11 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
       <article class="carte">
         <p class="langue">Python · JavaScript</p>
         <h3>Bermudan swaptions under HJM</h3>
-        <p>One-factor HJM model with mean reversion and piecewise-constant volatility, usable online.</p>
+        <p>HJM model with one or two factors, mean reversion and piecewise-constant volatility, usable online.</p>
         <ul>
           <li>Live calibration by bootstrap to co-terminal swaptions (Bachelier normal volatilities).</li>
-          <li>Bermudan priced by PDE (implicit or Crank–Nicolson), checked by Longstaff-Schwartz.</li>
+          <li>One factor: Jamshidian and PDE (implicit or Crank–Nicolson); two factors: 2-D integrals and 2-D backward induction; both checked by Longstaff-Schwartz.</li>
+          <li>Real EUR data (30 March 2016): the second factor cuts the swaption-matrix error from 11.2 to 2.6 bp and moves the Bermudan by 5 %.</li>
           <li>Model review: sign error found and fixed in the bond formula, martingale test.</li>
         </ul>
         <div class="liens"><a href="swaptions-hjm/">Open the application</a><a href="swaptions-hjm/rapport/report.pdf">Report (PDF)</a><a href="swaptions-hjm/#code">Code →</a></div>
@@ -570,12 +571,13 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
         <li>Black-Scholes, Black-76, Bachelier</li>
         <li>Heston, double Heston, Bates</li>
         <li>Jumps: Merton, Kou, CGMY, VG, NIG</li>
-        <li>One-factor HJM</li>
+        <li>HJM, one and two factors</li>
       </ul></div>
       <div><h3>Calibration</h3><ul>
         <li>Classic and adaptive Nelder–Mead</li>
         <li>Differential evolution</li>
         <li>Bootstrap on co-terminal swaptions</li>
+        <li>Global fit to a swaption matrix (Nelder–Mead)</li>
         <li>Neural surrogate</li>
       </ul></div>
       <div><h3>Languages and tools</h3><ul>

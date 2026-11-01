@@ -5,7 +5,7 @@ Home page of my projects and their online applications: **https://yassinebarnich
 | Page | Address | Report |
 |---|---|---|
 | Home: all projects | https://yassinebarnicha.github.io/ | |
-| Bermudan swaptions under HJM | https://yassinebarnicha.github.io/swaptions-hjm/ | [PDF](swaptions-hjm/rapport/report.pdf) |
+| Bermudan swaptions under HJM (1 and 2 factors) | https://yassinebarnicha.github.io/swaptions-hjm/ | [PDF](swaptions-hjm/rapport/report.pdf) |
 | Lookback options | https://yassinebarnicha.github.io/options-lookback/ | [PDF](options-lookback/rapport/report.pdf) |
 | Bitcoin option calibration (separate repository) | https://yassinebarnicha.github.io/calibration-btc-svjd/ | in its repository |
 
@@ -25,6 +25,9 @@ construire.py            builds <project>/index.html for each project
 <project>/code/          the original code of the project
 <project>/rapport/       the report: report.tex, report.pdf and the data of its figures
 ```
+
+The Bermudan swaptions page has a model switch (1 factor / 2 factors) with its own set of tabs for each model, a shared *Source code* tab,
+and two JavaScript engines (`hjm.js`, `hjm2.js`) plus the market data of its real-data example (`donnees.js`).
 
 After changing a template, an engine or the kit: `python construire.py` (all pages) or `python construire.py swaptions-hjm`
 (one page). Python standard library only; Node.js is needed only when a formula is new (rendered formulas are cached in

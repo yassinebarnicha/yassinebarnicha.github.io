@@ -52,12 +52,19 @@ class BermudanPDE1F:
     1) exercise dates are inserted *exactly* in the time grid;
     2) boundary conditions are no longer built from a wrong underlying-at-time-t proxy;
     3) early exercise is applied exactly at the Bermudan dates.
+
+    Time scheme: theta = 1 is implicit Euler (first order); theta = 0.5 is Crank-Nicolson (second order),
+    for which `rannacher` implicit steps after the final date and after every exercise date damp the
+    oscillations caused by the kink of the payoff.
     """
 
-    def __init__(self, model: HJM1FModel, bermudan: BermudanCoterminalSwaption, grid: PDEGrid):
+    def __init__(self, model: HJM1FModel, bermudan: BermudanCoterminalSwaption, grid: PDEGrid,
+                 theta: float = 1.0, rannacher: int = 0):
         self.model = model
         self.bermudan = bermudan
         self.grid = grid
+        self.theta = theta
+        self.rannacher = rannacher
 
     def _exercise_values(self, t: float, xs: np.ndarray) -> np.ndarray:
         und = self.bermudan.underlying_at(t)
@@ -74,9 +81,6 @@ class BermudanPDE1F:
         We keep the continuation value inherited from the next time slice and also
         enforce that the boundary value cannot fall below the best intrinsic value
         over the remaining exercise dates.
-
-        This is much safer than the previous implementation, which used the swap
-        value of an incorrect underlying as a Dirichlet boundary proxy.
         """
         left = float(v_next[0])
         right = float(v_next[-1])
@@ -122,26 +126,48 @@ class BermudanPDE1F:
         dx = xs[1] - xs[0]
         ts = self._build_time_grid()
         exercise_set = {round(t, 12) for t in self.bermudan.exercise_times}
+        model = self.model
 
         last_ex = self.bermudan.exercise_times[-1]
         v = self._exercise_values(last_ex, xs)
+        smoothing = self.rannacher
 
         for n in range(len(ts) - 2, -1, -1):
             t = float(ts[n])
-            dt = float(ts[n + 1] - ts[n])
-            eta = self.model.eta(t)
-            rs = np.array([self.model.short_rate(t, float(x)) for x in xs])
-            diff = 0.5 * eta * eta / (dx * dx)
+            t1 = float(ts[n + 1])
+            dt = t1 - t
+            theta = 1.0 if smoothing > 0 else self.theta
+            if smoothing > 0:
+                smoothing -= 1
 
+            # the short rate is affine in x: r(t, x) = A(t) + b(t) x
+            a_t = model.short_rate(t, 0.0)
+            b_t = model.b(t)
             m = self.grid.nx - 2
-            lower = np.full(m - 1, -dt * diff)
-            diag = np.array([1.0 + 2.0 * dt * diff + dt * rs[i + 1] for i in range(m)])
-            upper = np.full(m - 1, -dt * diff)
-            rhs = v[1:-1].copy()
+            v_in = v[1:-1]
+
+            if self.theta == 1.0:
+                eta = model.eta(t)
+                diff = 0.5 * eta * eta / (dx * dx)
+                diag = 1.0 + 2.0 * dt * diff + dt * (a_t + b_t * xs[1:-1])
+                rhs = v_in.copy()
+            else:
+                # every coefficient at its own end of the step; sigma read in the middle of the step
+                a_1 = model.short_rate(t1, 0.0)
+                b_1 = model.b(t1)
+                s = model.sigma_curve.sigma(0.5 * (t + t1))
+                e0 = s * math.exp(model.lam * t)
+                e1 = s * math.exp(model.lam * t1)
+                diff = 0.5 * e0 * e0 / (dx * dx)
+                diff1 = 0.5 * e1 * e1 / (dx * dx)
+                diag = 1.0 + theta * dt * (2.0 * diff + a_t + b_t * xs[1:-1])
+                rhs = v_in - (1.0 - theta) * dt * ((2.0 * diff1 + a_1 + b_1 * xs[1:-1]) * v_in - diff1 * (v[:-2] + v[2:]))
+            lower = np.full(m - 1, -theta * dt * diff)
+            upper = np.full(m - 1, -theta * dt * diff)
 
             left_bc, right_bc = self._boundary_values(t, v, xs)
-            rhs[0] += dt * diff * left_bc
-            rhs[-1] += dt * diff * right_bc
+            rhs[0] += theta * dt * diff * left_bc
+            rhs[-1] += theta * dt * diff * right_bc
 
             inner = solve_tridiagonal(lower, diag, upper, rhs)
             v_new = np.zeros_like(v)
@@ -151,6 +177,7 @@ class BermudanPDE1F:
 
             if round(t, 12) in exercise_set:
                 v_new = np.maximum(v_new, self._exercise_values(t, xs))
+                smoothing = self.rannacher
 
             v = v_new
 

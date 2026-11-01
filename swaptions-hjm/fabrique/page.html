@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bermudan swaptions under HJM — Mohammed-Yassine Barnicha</title>
-<meta name="description" content="Online pricer for co-terminal Bermudan swaptions under a one-factor HJM model: bootstrap calibration to normal volatilities, PDE and Longstaff-Schwartz Monte Carlo, model review and correction, all in the browser.">
+<meta name="description" content="Online pricer for co-terminal Bermudan swaptions under one-factor and two-factor HJM models: bootstrap calibration to normal volatilities, PDE, 2-D quadrature and Longstaff-Schwartz Monte Carlo, fit to a real EUR swaption matrix, model review and correction, all in the browser.">
 <meta name="theme-color" content="#080b12">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23080b12'/%3E%3Cpath d='M7 22 13 10l5 12 7-13' stroke='%2391b9ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
 <style>
@@ -18,6 +18,20 @@
 .remarque .phrase{font-style:italic;color:var(--ink);border-top:1px solid var(--edge);padding-top:10px;margin-bottom:0}
 .tab-texte{margin:12px 0;font-size:13px}
 .tab-texte td,.tab-texte th{text-align:left}
+.onglets button[hidden]{display:none}
+.modeles{display:flex;align-items:center;gap:10px;margin:18px 0 10px;flex-wrap:wrap}
+.modeles .lbl{font:11px var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--ink2)}
+.modeles .choix{display:inline-flex;padding:3px;border:1px solid var(--edge);border-radius:999px;background:var(--glass)}
+.modeles button{border:0;background:transparent;color:var(--ink2);font:600 13.5px var(--sans);padding:7px 18px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s}
+.modeles button:hover{color:var(--ink)}
+.modeles button[aria-pressed="true"]{color:#10182a;background:linear-gradient(125deg,#93baff,#b2a4ff)}
+.modeles .note{font-size:12px;color:var(--ink2)}
+#t-cal2 th,#t-m-par th,#t-f th{text-transform:none}
+.heat{border-collapse:collapse;font:11.5px var(--mono);margin:8px 0;width:100%}
+.heat td,.heat th{padding:4px 3px;text-align:right;border:1px solid var(--edge)}
+.heat th{font-weight:500;color:var(--ink2);background:transparent}
+.gain{color:var(--good)}.perte{color:var(--bad)}
+.tab-texte .gain,.tab-texte .perte{font-weight:600}
 </style>
 </head>
 <body>
@@ -25,26 +39,37 @@
 <div class="barre"><div class="page">
   <a class="mono-nom" href="../" title="Home page">MYB</a>
   <span class="titre">Bermudan swaptions under HJM</span>
-  <nav><a href="../">← Projects</a><a href="#theorie">Theory</a><a href="rapport/report.pdf">Report (PDF)</a><a href="#code">Code</a></nav>
+  <nav><a href="../">← Projects</a><a href="#theorie">Theory 1F</a><a href="#theorie2">Theory 2F</a><a href="rapport/report.pdf">Report (PDF)</a><a href="#code">Code</a></nav>
 </div></div>
 
 <main class="page">
   <header class="entete">
-    <p class="surtitre">Interest rates · one-factor HJM · PDE · Longstaff-Schwartz</p>
+    <p class="surtitre">Interest rates · HJM with one or two factors · PDE · quadrature · Longstaff-Schwartz</p>
     <h1>Co-terminal Bermudan swaption pricer</h1>
-    <p class="chapeau">The <b>one-factor HJM model</b> (mean reversion <m>\lambda</m>, piecewise-constant volatility <m>\sigma(t)</m>) is
+    <p class="chapeau">The <b>HJM model</b> (mean reversion <m>\lambda</m>, piecewise-constant volatility <m>\sigma(t)</m>) is
       <b>calibrated live</b> to co-terminal European swaptions quoted in normal volatility; the Bermudan is then priced by a
-      <b>PDE</b> and checked by <b>Longstaff-Schwartz Monte Carlo</b>. Every input and every numerical choice can be changed.
-      Reviewing the original code revealed a <b>sign error</b> in the zero-coupon bond formula: the page uses the corrected
-      formula and keeps the original one as an option (see the Theory tab).</p>
+      <b>PDE</b> (one factor) or a <b>2-D backward induction</b> (two factors) and checked by <b>Longstaff-Schwartz Monte Carlo</b>.
+      The <b>two-factor</b> model gives up Jamshidian's trick but fits the whole swaption matrix: it is tested here on a real EUR
+      market. Reviewing the original code revealed a <b>sign error</b> in the zero-coupon bond formula: the page uses the corrected
+      formula (the original one stays available in the one-factor Pricer).</p>
   </header>
 
+  <div class="modeles" role="group" aria-label="Model">
+    <span class="lbl">Model</span>
+    <span class="choix"><button type="button" data-modele="1" aria-pressed="true">1 factor</button><button type="button" data-modele="2" aria-pressed="false">2 factors</button></span>
+    <span class="note" id="modele-note">Hull–White type: one Gaussian factor, Jamshidian, 1-D PDE.</span>
+  </div>
+
   <div class="onglets" role="tablist">
-    <button type="button" data-vue="pricer">Pricer and calibration</button>
-    <button type="button" data-vue="lambda">Mean reversion</button>
-    <button type="button" data-vue="etudes">Sensitivity studies</button>
-    <button type="button" data-vue="theorie">Theory and model review</button>
-    <button type="button" data-vue="code">Source code</button>
+    <button type="button" data-vue="pricer" data-modele="1">Pricer and calibration</button>
+    <button type="button" data-vue="lambda" data-modele="1">Mean reversion</button>
+    <button type="button" data-vue="etudes" data-modele="1">Sensitivity studies</button>
+    <button type="button" data-vue="theorie" data-modele="1">Theory and model review</button>
+    <button type="button" data-vue="pricer2" data-modele="2" hidden>Pricer and calibration</button>
+    <button type="button" data-vue="marche2" data-modele="2" hidden>Fit to the swaption matrix</button>
+    <button type="button" data-vue="facteurs2" data-modele="2" hidden>Correlation and what it buys</button>
+    <button type="button" data-vue="theorie2" data-modele="2" hidden>Theory: what changes</button>
+    <button type="button" data-vue="code" data-modele="*">Source code</button>
   </div>
 
   <!-- ============================== PRICER ============================== -->
@@ -365,6 +390,10 @@
     <p>The calibrated <m>\sigma</m> barely move: Jamshidian only uses <m>P(0,\cdot)</m> and the variance of the bonds, which do not
       depend on <m>c</m>. The error only shows in the PDE and the Monte Carlo, which use <m>r(t,x)</m> and <m>P(t,T;x)</m>: the
       model contradicts itself. "Notebook values" restores the original formula and reproduces <code>Main.ipynb</code> exactly.</p>
+    <p><b>The corrections are now in the Python package as well</b> (Source code tab, group <i>hjm1f, corrected</i>): the bond and short-rate formulas, the receiver swaption, the forward-measure Longstaff-Schwartz
+      (deflating by <m>P(t,T_N)</m> instead of simulating <m>e^{-\int r}</m>: same result, no fine time grid), the last volatility segment extended beyond its end, and the Crank–Nicolson / Rannacher scheme and the
+      regression options. The two files as reviewed are kept under <i>Original code, before the review</i>. <code>check_1f_consistency.py</code> now checks that, for payers and receivers, PDE and Jamshidian agree
+      to 0.06 %, and that the Longstaff-Schwartz price is within 0.6 % of the PDE.</p>
     <ul class="revue">
       <li><b>Monte Carlo discounting</b>. <code>mc_1f.py</code> freezes the short rate between exercise dates and then discounts
         everything at <m>r(0)</m> back to today, ignoring the curve: discount factors are off by 0.26 % at 2 years and 0.59 % at
@@ -385,6 +414,294 @@
       derivations, the proofs and the numerical study.</p>
   </section>
 
+  <!-- ============================== TWO FACTORS: PRICER ============================== -->
+  <section class="vue" id="pricer2" hidden>
+    <div class="espace">
+      <aside class="panneau reglages" aria-label="Inputs, two factors">
+        <h3>Market data</h3>
+        <div class="champ"><label for="preset2">Data set</label><select id="preset2"><option value="cours">illustrative (as in the 1-factor Pricer)</option><option value="eur">EUR, 30 March 2016 (course data)</option></select></div>
+        <p class="aide" id="preset2-note"></p>
+        <h3>Zero-coupon curve P(0,t)</h3>
+        <table class="tab-edit" id="t-courbe2"><thead><tr><th>t (years)</th><th>P(0,t)</th><th>zero rate</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="btns"><button type="button" class="btn creux" id="courbe-plus2">+ pillar</button></div>
+
+        <h3>Two-factor model</h3>
+        <div class="champ"><label for="lam1"><b>λ<sub>1</sub></b> slow factor</label><input type="number" id="lam1" step="0.01" min="0" value="0.03"></div>
+        <div class="champ"><label for="lam2"><b>λ<sub>2</sub></b> fast factor</label><input type="number" id="lam2" step="0.05" min="0" value="0.5"></div>
+        <div class="champ"><label for="rho"><b>ρ</b> correlation of the factors</label><input type="number" id="rho" step="0.05" min="-1" max="1" value="-0.5"></div>
+        <div class="champ"><label for="ratio"><b>σ<sub>2</sub>/σ<sub>1</sub></b> volatility ratio</label><input type="number" id="ratio" step="0.1" min="0" value="0.6"></div>
+        <p class="aide">The co-terminal Europeans fix the <b>level</b> of <m>\sigma_1(t)</m> (with <m>\sigma_2=\text{ratio}\times\sigma_1</m>). They cannot
+          identify <m>\lambda_2</m>, <m>\rho</m> and the ratio: that takes swaptions of other tenors (tab <i>Fit to the swaption matrix</i>).
+          A ratio of 0 is the one-factor model.</p>
+
+        <h3>Product</h3>
+        <div class="champ"><label for="sens2">Side</label><select id="sens2"><option value="1">Payer</option><option value="0">Receiver</option></select></div>
+        <div class="champ"><label for="strike2"><b>K</b> fixed rate (%)</label><input type="number" id="strike2" step="0.05" value="3"></div>
+        <div class="champ"><label for="terminal2"><b>T<sub>N</sub></b> final maturity</label><input type="number" id="terminal2" step="0.5" value="7"></div>
+        <div class="champ"><label for="paie2">Fixed payment dates</label><input type="text" id="paie2" value="2 3 4 5 6 7"></div>
+        <div class="champ"><label for="accr2">Accrual fractions</label><input type="text" id="accr2" value="1 1 1 1 1 1"></div>
+        <h3>Exercise dates and quotes</h3>
+        <table class="tab-edit" id="t-ex2"><thead><tr><th>exercise T<sub>k</sub></th><th>normal vol (bp)</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="btns"><button type="button" class="btn creux" id="ex-plus2">+ exercise date</button></div>
+
+        <h3>Bootstrap (Brent)</h3>
+        <div class="champ"><label for="bas2">Lowest σ<sub>1</sub></label><input type="number" id="bas2" value="0.000001" step="0.000001"></div>
+        <div class="champ"><label for="haut2">Highest σ<sub>1</sub></label><input type="number" id="haut2" value="0.2" step="0.01"></div>
+        <div class="champ"><label for="neur">European integral: points per axis</label><input type="number" id="neur" value="161" step="20"></div>
+
+        <h3>Bermudan: 2-D backward induction</h3>
+        <div class="champ"><label for="ng2">Grid points per axis</label><input type="number" id="ng2" value="61" step="10"></div>
+        <div class="champ"><label for="nstd2">Domain ± n standard deviations</label><input type="number" id="nstd2" value="4.5" step="0.5"></div>
+        <div class="champ"><label for="nq2">Kernel points per axis</label><input type="number" id="nq2" value="81" step="10"></div>
+
+        <h3>Longstaff-Schwartz Monte Carlo</h3>
+        <label class="case"><input type="checkbox" id="mc-on2" checked> Compute the LSMC price</label>
+        <div class="champ"><label for="nmc2">Paths</label><input type="number" id="nmc2" value="40000" step="5000"></div>
+        <div class="champ"><label for="graine2">Seed</label><input type="number" id="graine2" value="1234"></div>
+        <div class="champ"><label for="deg2">Regression degree</label><input type="number" id="deg2" value="2" step="1" min="1" max="4"></div>
+        <label class="case"><input type="checkbox" id="indep2"> Regress on independent paths</label>
+        <div class="btns"><button type="button" class="btn creux" id="defaut2">Reset to the data set</button></div>
+      </aside>
+
+      <div class="resultats">
+        <div class="etat" id="etat2" role="status">Computing…</div>
+        <div class="alerte" id="alerte2" hidden></div>
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">Bermudan — 2-D quadrature</div><div class="val" id="k-q2">—</div><div class="sous" id="k-q2-s"></div></div>
+          <div class="kpi"><div class="lbl">Bermudan — LSMC</div><div class="val" id="k-mc2">—</div><div class="sous" id="k-mc2-s"></div></div>
+          <div class="kpi"><div class="lbl">Same Europeans, 1 factor</div><div class="val" id="k-un2">—</div><div class="sous" id="k-un2-s"></div></div>
+          <div class="kpi"><div class="lbl">Early-exercise premium (2 factors)</div><div class="val" id="k-eep2">—</div><div class="sous" id="k-eep2-s"></div></div>
+        </div>
+
+        <div class="carte-res">
+          <h2>Calibration: co-terminal European swaptions</h2>
+          <p class="aide">Market price = Bachelier at the quoted normal vol; model price = <b>2-D integral</b> (there is no Jamshidian decomposition with two factors),
+            converted back into an implied normal vol.</p>
+          <div class="defile"><table id="t-cal2"><thead><tr><th>expiry</th><th>fwd swap</th><th>annuity</th><th>market vol</th><th>model vol</th><th>market price</th><th>model price</th><th>gap</th><th>σ<sub>1</sub></th><th>σ<sub>2</sub></th></tr></thead><tbody></tbody></table></div>
+        </div>
+
+        <div class="grille-res">
+          <div class="carte-res"><h2>Volatility of the two factors</h2><p class="aide">Piecewise constant, one segment per exercise date; <m>\sigma_2=\text{ratio}\times\sigma_1</m>.</p><div class="graphe" id="g-sig2"></div></div>
+          <div class="carte-res"><h2>Volatility of the forward curve</h2><p class="aide"><m>\sigma_f(0,\tau)</m>: the two loadings <m>\sigma_ke^{-\lambda_k\tau}</m> and their combination, against the one-factor model with the same Europeans.</p><div class="graphe" id="g-fvol2"></div></div>
+          <div class="carte-res"><h2>The curve decorrelates</h2><p class="aide">Correlation of the instantaneous forward rates <m>f(0,T_1)</m> and <m>f(0,T)</m>. With one factor it is 1 whatever the maturities.</p><div class="graphe" id="g-corr2"></div></div>
+          <div class="carte-res"><h2>Where the Monte Carlo exercises</h2><p class="aide">Paths exercised at each date.</p><div class="graphe" id="g-mc2"></div></div>
+        </div>
+
+        <div class="carte-res">
+          <h2>Exercise region in the plane of the two factors</h2>
+          <p class="aide">At each date the option is exercised where the exercise value exceeds the continuation value. With one factor this is a half-line
+            (one threshold <m>x^\star</m>, hence Jamshidian); with two factors it is a region of the plane delimited by a <b>curve</b>.</p>
+          <div class="champ" style="max-width:360px"><label for="tranche2">Exercise date</label><select id="tranche2"></select></div>
+          <div class="graphe haut" id="g-region2"></div>
+          <p class="aide" id="region-note2"></p>
+        </div>
+
+        <div class="carte-res" id="c-mart2">
+          <h2>Martingale check (Monte Carlo)</h2>
+          <p class="aide">Under the <m>T_N</m>-forward measure, <m>P(t_1,T)/P(t_1,T_N)</m> has expectation <m>P(0,T)/P(0,T_N)</m> at the first exercise date: the simulated factors must reproduce the curve.</p>
+          <div class="defile"><table id="t-mart2"><thead><tr><th>T</th><th>curve</th><th>Monte Carlo</th><th>gap</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== TWO FACTORS: SWAPTION MATRIX ============================== -->
+  <section class="vue" id="marche2" hidden>
+    <div class="remarque">
+      <h2>Real market: what the extra factor buys</h2>
+      <p>The data are those of the course (<b>EUR, 30 March 2016</b>): the stripped discount curve and the matrix of at-the-money normal volatilities of swaptions (expiry × tenor).
+        The Bermudan below is a payer swaption into a swap ending at <m>T_N</m>, exercisable at the dates you choose and struck at the <m>T_N</m>-year par rate. Its co-terminal Europeans are
+        <b>matched exactly</b> by the bootstrap in both models; what differs is how the other swaptions (same expiries, other tenors) are reproduced.</p>
+      <ul>
+        <li><b>1 factor</b>: only <m>\lambda</m> is free. The vols of swaptions of different tenors are tied together by one Gaussian factor.</li>
+        <li><b>2 factors</b>: <m>\lambda_1,\lambda_2,\rho</m> and <m>\sigma_2/\sigma_1</m> are fitted by Nelder–Mead on the root-mean-square gap to the market (in bp of normal vol), the level of <m>\sigma_1(t)</m> being re-bootstrapped at every step.</li>
+      </ul>
+    </div>
+    <div class="espace" style="margin-top:20px">
+      <aside class="panneau reglages" aria-label="Fit">
+        <h3>Product and targets</h3>
+        <div class="champ"><label for="m-terminal"><b>T<sub>N</sub></b> final maturity</label><input type="number" id="m-terminal" value="10" step="1"></div>
+        <div class="champ"><label for="m-ex">Exercise dates = swaption expiries</label><input type="text" id="m-ex" value="1 2 3 4 5"></div>
+        <div class="champ"><label for="m-ten">Tenors of the targets</label><input type="text" id="m-ten" value="1 2 3 4 5 6 7 8 9 10"></div>
+        <p class="aide">Targets: every ATM swaption with an expiry in the list and a tenor in the list (those with a tenor of <m>T_N-</m>expiry are the Bermudan's co-terminals).</p>
+        <h3>Two-factor parameters</h3>
+        <label class="case"><input type="checkbox" id="m-f1" checked> fit λ<sub>1</sub></label>
+        <div class="champ"><label for="m-l1">start λ<sub>1</sub> (0 – 0.5)</label><input type="number" id="m-l1" value="0.01" step="0.01"></div>
+        <label class="case"><input type="checkbox" id="m-f2" checked> fit λ<sub>2</sub></label>
+        <div class="champ"><label for="m-l2">start λ<sub>2</sub> (0 – 3)</label><input type="number" id="m-l2" value="1" step="0.1"></div>
+        <label class="case"><input type="checkbox" id="m-f3" checked> fit ρ</label>
+        <div class="champ"><label for="m-r">start ρ</label><input type="number" id="m-r" value="-0.9" step="0.05"></div>
+        <label class="case"><input type="checkbox" id="m-f4" checked> fit σ<sub>2</sub>/σ<sub>1</sub></label>
+        <div class="champ"><label for="m-q">start σ<sub>2</sub>/σ<sub>1</sub></label><input type="number" id="m-q" value="1.5" step="0.1"></div>
+        <h3>Numerics</h3>
+        <div class="champ"><label for="m-n">European integral: points per axis</label><input type="number" id="m-n" value="61" step="10"></div>
+        <div class="champ"><label for="m-fev">Evaluations (Nelder–Mead)</label><input type="number" id="m-fev" value="250" step="50"></div>
+        <div class="btns"><button type="button" class="btn" id="m-go">Fit 1 and 2 factors</button><button type="button" class="btn creux" id="m-usage" disabled>Use in the Pricer tab</button></div>
+        <progress id="m-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="m-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">RMSE, 1 factor</div><div class="val" id="m-k1">—</div><div class="sous" id="m-k1-s"></div></div>
+          <div class="kpi"><div class="lbl">RMSE, 2 factors</div><div class="val" id="m-k2">—</div><div class="sous" id="m-k2-s"></div></div>
+          <div class="kpi"><div class="lbl">Bermudan, 1 factor</div><div class="val" id="m-b1">—</div><div class="sous" id="m-b1-s"></div></div>
+          <div class="kpi"><div class="lbl">Bermudan, 2 factors</div><div class="val" id="m-b2">—</div><div class="sous" id="m-b2-s"></div></div>
+        </div>
+        <div class="grille-res" style="margin-top:16px">
+          <div class="carte-res"><h2>1 factor: model − market (bp)</h2><p class="aide">Rows: expiry; columns: tenor. Orange: model above the market; blue: below.</p><div class="defile" id="m-t1"></div></div>
+          <div class="carte-res"><h2>2 factors: model − market (bp)</h2><p class="aide">Same scale. The diagonal of the Bermudan's co-terminals is zero by construction.</p><div class="defile" id="m-t2"></div></div>
+        </div>
+        <div class="grille-res" style="margin-top:16px">
+          <div class="carte-res"><h2>Smile of tenors at one expiry</h2>
+            <div class="champ" style="max-width:300px"><label for="m-sel">Expiry</label><select id="m-sel"></select></div>
+            <p class="aide">ATM normal vol against the tenor of the swap: market, 1 factor, 2 factors.</p><div class="graphe" id="g-m-vol"></div></div>
+          <div class="carte-res"><h2>Convergence of the fit</h2><p class="aide">Root-mean-square gap (bp) over the evaluations of the 2-factor Nelder–Mead.</p><div class="graphe" id="g-m-hist"></div></div>
+        </div>
+        <div class="carte-res" style="margin-top:16px">
+          <h2>Fitted parameters and Bermudan</h2>
+          <div class="defile"><table id="t-m-par"><thead><tr><th></th><th>λ<sub>1</sub></th><th>λ<sub>2</sub></th><th>ρ</th><th>σ<sub>2</sub>/σ<sub>1</sub></th><th>σ<sub>1</sub> (bp)</th><th>RMSE (bp)</th><th>Bermudan</th><th>most expensive European</th><th>exercise premium</th></tr></thead><tbody></tbody></table></div>
+          <p class="aide" id="m-note"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== TWO FACTORS: CORRELATION ============================== -->
+  <section class="vue" id="facteurs2" hidden>
+    <div class="remarque">
+      <h2>Remark: the Europeans do not determine the Bermudan</h2>
+      <p>With one factor, once the co-terminal Europeans are matched, the Bermudan is almost fixed: only <m>\lambda</m> is left, and its effect is studied in the one-factor
+        <i>Mean reversion</i> tab. With two factors, <b>the same Europeans are compatible with very different Bermudans</b>: what matters is how the swap rate at one exercise date
+        co-moves with the swap rate at the next, and that is set by <m>\rho</m>, <m>\lambda_2</m> and <m>\sigma_2/\sigma_1</m>, which the co-terminals do not see.</p>
+      <ul>
+        <li><b>The premium moves with the dependence structure</b>: with the default inputs the exercise premium (Bermudan − most expensive European) goes from about 19 bp at <m>\rho=-0.95</m> to about 29 bp at <m>\rho=+0.9</m>, against 24 bp for one factor.
+          The mechanism is the one of the one-factor <i>Mean reversion</i> tab: how much the swap rates of successive exercise dates move together decides how much choosing the date is worth.</li>
+        <li>This is <b>model risk made visible</b>, not a defect: it is exactly the freedom that lets the model fit swaptions of other tenors, or a quoted Bermudan price.</li>
+      </ul>
+    </div>
+    <div class="espace" style="margin-top:20px">
+      <aside class="panneau reglages" aria-label="Sweeps">
+        <p class="aide" style="margin-top:0">The charts use the inputs of the two-factor Pricer (curve, product, quotes, grids); every point is recalibrated to the co-terminal Europeans.</p>
+        <h3>Values of ρ</h3>
+        <div class="champ"><label for="f-rho">ρ</label><input type="text" id="f-rho" value="-0.95 -0.9 -0.5 0 0.5 0.9"></div>
+        <h3>Values of λ<sub>2</sub></h3>
+        <div class="champ"><label for="f-l2">λ<sub>2</sub></label><input type="text" id="f-l2" value="0.1 0.25 0.5 1 2"></div>
+        <h3>Values of σ<sub>2</sub>/σ<sub>1</sub></h3>
+        <div class="champ"><label for="f-q">ratio</label><input type="text" id="f-q" value="0.25 0.5 1 1.5 2.5"></div>
+        <h3>Swaptions not in the calibration</h3>
+        <div class="champ"><label for="f-cib">expiry/tenor</label><input type="text" id="f-cib" value="1/1 1/5 1/9 3/1 3/5"></div>
+        <h3>Accuracy</h3>
+        <div class="champ"><label for="f-ng">Bermudan grid per axis</label><input type="number" id="f-ng" value="61" step="10"></div>
+        <div class="champ"><label for="f-nq">Kernel points per axis</label><input type="number" id="f-nq" value="81" step="10"></div>
+        <div class="champ"><label for="f-ne">European integral: points per axis</label><input type="number" id="f-ne" value="101" step="20"></div>
+        <div class="btns"><button type="button" class="btn" id="f-go">Recompute</button></div>
+        <progress id="f-prog" max="1" value="0" hidden></progress>
+        <div class="etat" id="f-etat"></div>
+      </aside>
+      <div class="resultats">
+        <div class="grille-res">
+          <div class="carte-res"><h2>1. The Bermudan moves, the Europeans do not</h2><p class="aide">Bermudan (2-D quadrature) and most expensive co-terminal European, against <m>\rho</m>. Dashed: the one-factor price with the same Europeans.</p><div class="graphe haut" id="g-f-rho"></div></div>
+          <div class="carte-res"><h2>2. Early-exercise premium</h2><p class="aide">Bermudan − most expensive European (basis points of notional), against <m>\rho</m>. The one-factor premium is a single number.</p><div class="graphe haut" id="g-f-eep"></div></div>
+          <div class="carte-res"><h2>3. Swaptions the one-factor model cannot tune</h2><p class="aide">ATM normal vol (bp) of the non-calibrated swaptions, for each <m>\rho</m>, and the one-factor value.</p><div class="graphe haut" id="g-f-off"></div></div>
+          <div class="carte-res"><h2>4. Calibrated volatility level</h2><p class="aide">Bootstrapped <m>\sigma_1</m> on each segment against <m>\rho</m>: the more the factors offset each other, the higher the level needed to keep the same Europeans.</p><div class="graphe haut" id="g-f-sig"></div></div>
+        </div>
+        <div class="carte-res">
+          <h2>The figures</h2>
+          <div class="defile"><table id="t-f"><thead><tr><th>scenario</th><th>σ<sub>1</sub> (bp)</th><th>most expensive European</th><th>Bermudan</th><th>exercise premium</th><th>off-calibration vols (bp)</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="grille-res" style="margin-top:16px">
+          <div class="carte-res"><h2>Exercise premium against λ<sub>2</sub></h2><p class="aide">Bermudan − most expensive European (bp of notional); dashed: one factor.</p><div class="graphe" id="g-f-l2"></div></div>
+          <div class="carte-res"><h2>Exercise premium against σ<sub>2</sub>/σ<sub>1</sub></h2><p class="aide">Same quantity; at a ratio of 0 the model is the one-factor model.</p><div class="graphe" id="g-f-q"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== TWO FACTORS: THEORY ============================== -->
+  <section class="vue texte" id="theorie2" hidden>
+    <ul class="sommaire">
+      <li><a href="#theorie2/u-modele">1. Two factors</a></li><li><a href="#theorie2/u-zc">2. Bonds</a></li>
+      <li><a href="#theorie2/u-euro">3. No Jamshidian</a></li><li><a href="#theorie2/u-calib">4. Calibration</a></li>
+      <li><a href="#theorie2/u-berm">5. Bermudan</a></li><li><a href="#theorie2/u-bilan">6. Lost and gained</a></li>
+      <li><a href="#theorie2/u-valid">7. Validation</a></li><li><a href="#theorie2/u-src">8. Data and sources</a></li>
+    </ul>
+
+    <h2 id="u-modele">1. From one factor to two</h2>
+    <p>The forward rates are driven by two Brownian motions with correlation <m>\rho</m>, and each factor keeps the separable exponential volatility of the one-factor model:</p>
+    <md>\sigma_k(t,T)=\sigma_k(t)\,e^{-\lambda_k(T-t)},\qquad k=1,2,\qquad d\langle W^1,W^2\rangle_t=\rho\,dt .</md>
+    <p>The no-arbitrage drift is <m>\sum_{k,l}\rho_{kl}\,\sigma_k(t,T)\int_t^T\sigma_l(t,u)\,du</m> (with <m>\rho_{kk}=1</m>, <m>\rho_{12}=\rho</m>). Exactly as before, the model is Markovian in two
+      <b>driftless Gaussian factors</b> <m>X^k_t=\int_0^t\sigma_k(u)e^{\lambda_ku}dW^k_u</m>, jointly normal with</p>
+    <md>\operatorname{Cov}\big(X^k_t,X^l_t\big)=A_{kl}(t)=\rho_{kl}\int_0^t\sigma_k(u)\sigma_l(u)\,e^{(\lambda_k+\lambda_l)u}\,du .</md>
+    <p>This is the two-factor Hull–White model of the lecture notes (<m>r=r_0+r_1+r_2</m>, <m>dr_k=-\lambda_kr_k\,dt+\sigma_k\,dW^k</m>), where a negative <m>\rho</m> (around <m>-0.9</m>) lets the first factor
+      carry the level of the curve and the second its slope. With <m>\sigma_2=0</m> it is the one-factor model of the other tab, exactly.</p>
+
+    <h2 id="u-zc">2. Zero-coupon bonds</h2>
+    <p>With <m>\bar B_k(t)=(1-e^{-\lambda_kt})/\lambda_k</m>, <m>D_k(t,T)=\bar B_k(T)-\bar B_k(t)</m> and
+      <m>G_{kl}(t)=\rho_{kl}\int_0^t\sigma_k\sigma_le^{(\lambda_k+\lambda_l)u}\bar B_l(u)\,du</m>,</p>
+    <md>P(t,T)=\frac{P(0,T)}{P(0,t)}\exp\Big(-\sum_kD_k(t,T)\,X^k_t+\kappa(t,T)\Big),</md>
+    <md>\kappa(t,T)=-\tfrac12\sum_{k,l}\Big[\big(\bar B_k(T)\bar B_l(T)-\bar B_k(t)\bar B_l(t)\big)A_{kl}(t)-D_k(t,T)\,G_{kl}(t)-D_l(t,T)\,G_{lk}(t)\Big].</md>
+    <p>For one factor <m>\kappa=-D\,c</m>: this is the corrected formula of the other tab (convexity term with the sign of <m>X_t</m>). The check that matters is the <b>martingale defect</b>
+      <m>\mathbb E^{T}\!\big[P(t,b)/P(t,T)\big]-P(0,b)/P(0,T)</m>, computed with the closed-form drift of the factors under the <m>T</m>-forward measure: it is zero to machine precision for any parameters.</p>
+
+    <h2 id="u-euro">3. What replaces Jamshidian</h2>
+    <p>Jamshidian's trick rests on one fact: the swap value <m>1-P(T_0,T_n)-K\sum_i\tau_iP(T_0,T_i)</m> is monotone in the single factor, so a single root <m>x^\star</m> splits it into options on
+      zero-coupon bonds. With two factors the swap value is a function <m>S(x_1,x_2)</m> of the plane and the exercise set <m>\{S>0\}</m> is bounded by a <b>curve</b>: there is no threshold, no
+      common strike <m>K_i</m>, no decomposition (the region plot of the Pricer tab shows the curve). The price is instead the integral</p>
+    <md>V_0=P(0,T_0)\;\mathbb E^{T_0}\big[S(X_{T_0})^+\big],\qquad X_{T_0}\sim\mathcal N\big(m(T_0;T_0),\,A(T_0)\big),</md>
+    <p>where the mean <m>m_k(t;T)=-\sum_l\rho_{kl}\int_0^t\sigma_k\sigma_le^{\lambda_ku}\bar B_l(T-u)\,du</m> is the (deterministic) drift of the factors under the <m>T</m>-forward measure. The page evaluates it on a fine uniform
+      grid of the normal law (default 161 × 161 points): the payoff has a kink, and on a kink a fine uniform rule is more accurate than Gauss–Hermite (measured: <m>4\cdot10^{-4}</m> relative against Jamshidian in the one-factor limit).
+      The bootstrap still works because the price increases with the volatility level, but every Brent step now costs an integral instead of a closed form.</p>
+    <p>Closed-form approximations exist (conditioning on one factor then applying a Jamshidian-type argument on the other, or Gaussian approximations of the swap rate): they are faster but approximate, and are not used here.</p>
+
+    <h2 id="u-calib">4. Calibration: what the Europeans can and cannot identify</h2>
+    <p>The co-terminal bootstrap is unchanged: for given <m>(\lambda_1,\lambda_2,\rho,\sigma_2/\sigma_1)</m>, one root per exercise date fixes the level of <m>\sigma_1</m>, and the fit is exact.
+      But <b>these structural parameters are invisible to the co-terminals</b>: any value of them can be compensated by the level. Identifying them needs swaptions of other tenors, and that
+      is a global, non-linear fit (Nelder–Mead on the root-mean-square gap, the level being re-bootstrapped at every evaluation).</p>
+    <p>On the real data of the course (EUR, 30 March 2016; 50 ATM swaptions, expiries 1 to 5 years, tenors 1 to 10 years; Bermudan into 10 years exercisable at 1 to 5 years):</p>
+    <table class="tab-texte"><thead><tr><th></th><th>parameters</th><th>RMSE on the 50 swaptions</th><th>largest gap</th></tr></thead><tbody>
+      <tr><td>1 factor</td><td><m>\lambda=0</m> (lower bound)</td><td>11.2 bp</td><td>35 bp (1y × 1y)</td></tr>
+      <tr><td>2 factors</td><td><m>\lambda_1\approx0,\ \lambda_2=0.92,\ \rho=-0.98,\ \sigma_2/\sigma_1=2.65</m></td><td>2.6 bp</td><td>6 bp</td></tr>
+    </tbody></table>
+    <p><b>Caveats.</b> The fitted <m>\rho</m> is close to <m>-1</m> and the parameters sit in a flat valley: three of five starting points reach the same fit (2.58 to 2.62 bp) with
+      <m>\lambda_2</m> between 0.92 and 1.03, <m>\rho</m> between <m>-0.98</m> and <m>-1.00</m> and a ratio between 2.65 and 3.0, while two others stall against the bounds (7.2 bp, with <m>\lambda_2=3</m>,
+      <m>\rho=-1</m>; and 11.1 bp, which is the one-factor solution). The gain in fit is solid, the individual values are not well identified, and the starting point matters. In 2016 the EUR short end had negative rates and a very steep volatility term structure; a Gaussian two-factor model reproduces it by stretching
+      the two factors against each other, which also makes the forward volatility dip near a one-year maturity (chart in the Pricer tab). A third factor, a displaced (shifted) diffusion or a stochastic volatility would be the next steps.
+      Smile is ignored: ATM vols are used as the quotes of swaptions struck at the Bermudan's rate.</p>
+
+    <h2 id="u-berm">5. The Bermudan on a two-dimensional grid</h2>
+    <p>The one-factor PDE is a tridiagonal system per time step. In two factors the PDE has a cross-derivative and costs a grid of <m>n^2</m> points per step. But between exercise dates the
+      factors are <b>exactly Gaussian</b>, so the page does not discretise time at all. Working under the <m>T_N</m>-forward measure, on values deflated by <m>P(t,T_N)</m> (martingales: no discount factor to simulate),</p>
+    <md>U_j(x)=\max\Big(\frac{h_j(x)}{P(T_j,T_N;x)},\;\mathbb E^{T_N}\big[U_{j+1}(X_{T_{j+1}})\,\big|\,X_{T_j}=x\big]\Big),\qquad V_0=P(0,T_N)\,\mathbb E^{T_N}\big[U_1(X_{T_1})\big],</md>
+    <p>where <m>X_{T_{j+1}}-X_{T_j}\sim\mathcal N\big(m(T_{j+1};T_N)-m(T_j;T_N),\,A(T_{j+1})-A(T_j)\big)</m> independently of the past. The conditional expectation is a Gaussian kernel integrated against bilinear interpolation of
+      <m>U_{j+1}</m> on its grid. The only errors are the grid and the kernel quadrature (measured: 1.2 % at 41 × 61, 0.2 % at 101 × 141). The Longstaff-Schwartz engine runs on the same deflated values with a two-variable polynomial basis,
+      and brackets the quadrature from below (suboptimal exercise rule).</p>
+
+    <h2 id="u-bilan">6. What is lost, what is gained</h2>
+    <table class="tab-texte"><thead><tr><th></th><th>1 factor</th><th>2 factors</th></tr></thead><tbody>
+      <tr><td>European swaption</td><td>closed form: one root and <m>n</m> bond options (Jamshidian)</td><td><span class="perte">lost</span> — a 2-D integral (about 26,000 points per price)</td></tr>
+      <tr><td>Bermudan engine</td><td>tridiagonal PDE, a few ms</td><td><span class="perte">lost</span> — 2-D grid and kernel, 0.4–1.5 s; 3 factors would need Monte Carlo</td></tr>
+      <tr><td>Calibration to the co-terminals</td><td>exact bootstrap</td><td>still exact, but <span class="perte">three structural parameters</span> cannot be identified from them: global fit, flat valleys</td></tr>
+      <tr><td>Swaptions of other tenors (EUR 2016, 50 ATM)</td><td>RMSE 11.2 bp</td><td><span class="gain">gained</span> — RMSE 2.6 bp</td></tr>
+      <tr><td>Correlation between forward rates</td><td>1 for all maturities</td><td><span class="gain">gained</span> — free, through <m>\rho</m>, <m>\lambda_2</m></td></tr>
+      <tr><td>Bermudan given the same Europeans</td><td>nearly fixed by <m>\lambda</m></td><td><span class="gain">gained</span> — depends on the dependence structure, so it can be pinned by the market (10-year Bermudan: 0.0518 against 0.0490, exercise premium 75 against 47 bp); also a <span class="perte">model risk</span></td></tr>
+      <tr><td>Risk factors for hedging</td><td>parallel shift</td><td><span class="gain">gained</span> — level and slope</td></tr>
+    </tbody></table>
+
+    <h2 id="u-valid">7. Validation</h2>
+    <ul>
+      <li><b>No arbitrage</b>: the martingale defect is zero (<m>10^{-17}</m>) for generic parameters; the bond formula and the drift of the factors agree.</li>
+      <li><b>One-factor limit</b>: with <m>\sigma_2=0</m>, the European 2-D integral reproduces Jamshidian (<m>4\cdot10^{-4}</m> relative) and the quadrature reproduces the corrected one-factor PDE (0.2 %).</li>
+      <li><b>Perfect correlation</b>: <m>\rho=1</m> with <m>\lambda_1=\lambda_2</m> and <m>\sigma_1+\sigma_2=\sigma</m> gives the one-factor price.</li>
+      <li><b>Two engines</b>: quadrature and Monte Carlo agree within 0.4 % on four scenarios (the quadrature usually slightly above, the Monte Carlo below: its exercise rule is suboptimal).</li>
+      <li><b>Two languages</b>: the JavaScript engine of this page and the Python package <code>hjm2f</code> agree to <m>10^{-16}</m> on prices, covariances and bootstrap, and find the same global fit on the real data.</li>
+    </ul>
+
+    <h2 id="u-src">8. Data and sources</h2>
+    <p>Curve and swaption matrix: the practical work of the ENSAE course <i>Modèles de la courbe des taux d'intérêt</i> (workbook <i>Pricer caps, floors et swaptions</i>, EUR, 30 March 2016); the one-factor
+      HJM and Hull–White material of the same course, and the two-factor Hull–White model of A. Lesniewski's <i>Interest Rate and Credit Models</i> (chapter on term structure models) for the model and the
+      usual range of <m>\rho</m>. The data are in <code>data/eur_2016-03-30.json</code> (Source code tab, example <code>run_market_2f.py</code>).</p>
+  </section>
+
   <section class="vue" id="code" hidden></section>
 </main>
 
@@ -403,6 +720,12 @@
 </script>
 <script id="src-hjm">
 /*__HJM__*/
+</script>
+<script id="src-hjm2">
+/*__HJMDEUX__*/
+</script>
+<script>
+/*__DONNEES__*/
 </script>
 <script type="text/plain" id="src-travail">
 // ---- worker thread: receives the inputs, returns the results ----
@@ -499,11 +822,78 @@ function etudeLambda(p, e, progres) {
   ];
   return {lignes, base, eurBase, chocs, lam0: q0.lam};
 }
+// ---------------- two factors ----------------
+function construire2(p) {
+  const courbe = HJM.Courbe(p.courbeT, p.courbeP);
+  const inst = p.ex.map((e, i) => ({swaption: HJM.Swaption(e, p.terminal, p.K, p.paie, p.accr, p.payer), volN: p.vols[i]}));
+  const berm = HJM.Bermudeenne(p.ex, p.terminal, p.K, p.paie, p.accr, p.payer);
+  return {courbe, inst, berm};
+}
+// one factor with the same Europeans (lambda = lambda_1, corrected formula, Crank-Nicolson PDE): the reference of the 2-factor results
+function unFacteur(p, b) {
+  try {
+    const c1 = HJM.bootstrap(b.courbe, p.lam1, p.ex, b.inst, p.bas, p.haut, "corrigee"), tMax = p.ex[p.ex.length - 1];
+    const prix = HJM.prixEDP(c1.modele, b.berm, HJM.grilleEcartsTypes(c1.modele, tMax, 5, 501, 1000), false, {theta: 0.5, rannacher: 2});
+    return {prix, sigmas: c1.sigmas, modele: c1.modele, eur: Math.max(...c1.modeles)};
+  } catch (err) { return {erreur: err.message}; }
+}
+function calculer2(p) {
+  const b = construire2(p), lam = [p.lam1, p.lam2];
+  const cal = HJM2.bootstrap2(b.courbe, lam, p.rho, p.ratio, p.ex, b.inst, p.bas, p.haut, p.nEur), M = cal.modele;
+  const details = b.inst.map((it, i) => ({fwd: HJM.tauxSwapForward(b.courbe, it.swaption), ann: HJM.annuite(b.courbe, it.swaption.rest, it.swaption.acc),
+    volModele: HJM.volNImplicite(b.courbe, it.swaption, cal.modeles[i])}));
+  const t0 = Date.now(), q = HJM2.prixQuad(M, b.berm, {nGrille: p.ng, nStd: p.nstd, nQuad: p.nq, profil: true}), tQ = Date.now() - t0;
+  let mc = null, tMc = 0;
+  if (p.mc) { const t1 = Date.now(); mc = HJM2.prixLSMC2(M, b.berm, p.nmc, p.graine, {degre: p.deg, independants: p.indep}); tMc = Date.now() - t1; }
+  const un = unFacteur(p, b);
+  const taus = Array.from({length: 121}, (_, k) => 10 * k / 120), v1 = [], v2 = [], tot = [], v1f = [];
+  taus.forEach(tau => { const c = M.chargements(0, tau); v1.push(c[0]); v2.push(c[1]);
+    tot.push(Math.sqrt(Math.max(c[0] * c[0] + c[1] * c[1] + 2 * p.rho * c[0] * c[1], 0))); v1f.push(un.sigmas ? un.sigmas[0] * Math.exp(-p.lam1 * tau) : NaN); });
+  const Tg = Array.from({length: 40}, (_, k) => 0.25 + (10 - 0.25) * k / 39);
+  const corr = [1, 2, 5].map(T1 => ({T1, T: Tg, c: Tg.map(T => M.correlationTaux(0, T1, T))}));
+  const tranches = q.tranches.map(tr => ({t: tr.t, a1: Array.from(tr.a1), a2: Array.from(tr.a2), exo: tr.exo}));
+  return {sigmas: cal.sigmas, sigmas2: cal.sigmas2, marche: cal.marche, modeles: cal.modeles, details, quad: {prix: q.prix, tranches}, tQ, mc, tMc,
+    un: un.erreur ? {erreur: un.erreur} : {prix: un.prix, sigmas: un.sigmas, eur: un.eur}, fvol: {taus, v1, v2, tot, v1f}, corr};
+}
+// global fit of the structural parameters to a matrix of ATM swaptions, 1 factor against 2 factors
+function ajusterMatrice2(p, prog) {
+  const courbe = HJM.Courbe(p.courbeT, p.courbeP), ex = p.ex;
+  const instruments = ex.map((e, i) => ({swaption: HJM.Swaption(e, p.terminal, p.K, p.paie, p.accr, true), volN: p.volsCot[i]}));
+  const cibles = p.cibles.map(c => ({sw: HJM2.swaptionATM(courbe, c.e, c.t), volN: c.vol}));
+  const f1 = HJM2.ajuster1F(courbe, ex, instruments, cibles); prog(0.04);
+  const x0 = HJM2.depuisParams([p.l1, p.l2], p.r, p.q);
+  const f2 = HJM2.ajuster2F(courbe, ex, instruments, cibles, x0, p.libres, p.nGrille, p.maxFev, f => prog(0.04 + 0.9 * f));
+  const berm = HJM.Bermudeenne(ex, p.terminal, p.K, p.paie, p.accr, true), tMax = ex[ex.length - 1];
+  const c1 = HJM.bootstrap(courbe, f1.lam, ex, instruments, 1e-6, 0.2, "corrigee");
+  const b1 = HJM.prixEDP(c1.modele, berm, HJM.grilleEcartsTypes(c1.modele, tMax, 5, 801, 1500), false, {theta: 0.5, rannacher: 2});
+  const c2 = HJM2.bootstrap2(courbe, f2.lam, f2.rho, f2.ratio, ex, instruments, 1e-6, 0.2, 161);
+  const b2 = HJM2.prixQuad(c2.modele, berm, {nGrille: 81, nQuad: 101});
+  return {f1: {lam: f1.lam, rmse: f1.rmse, err: f1.erreurs, sigmas: c1.sigmas, berm: b1, eur: Math.max(...c1.modeles)},
+    f2: {lam: f2.lam, rho: f2.rho, ratio: f2.ratio, rmse: f2.rmse, err: f2.erreurs, sigmas: c2.sigmas, berm: b2, eur: Math.max(...c2.modeles), n: f2.evaluations, hist: f2.historique}};
+}
+// sweeps of rho, lambda_2 and sigma_2/sigma_1, each point recalibrated to the co-terminal Europeans
+function etudeFacteurs2(p, e, prog) {
+  const b = construire2(p), un = unFacteur(p, b), lam = [p.lam1, p.lam2];
+  const total = e.rhos.length + e.l2s.length + e.qs.length; let fait = 0;
+  const cib = e.cibles.map(([E, T]) => HJM2.swaptionATM(b.courbe, E, T));
+  const refUn = un.erreur ? null : {berm: un.prix, eur: un.eur, off: cib.map(sw => HJM.volNImplicite(b.courbe, sw, un.modele.jamshidian(sw)))};
+  const scen = (l2, rho, q) => {
+    try {
+      const cal = HJM2.bootstrap2(b.courbe, [p.lam1, l2], rho, q, p.ex, b.inst, p.bas, p.haut, e.ne), M = cal.modele;
+      const berm = HJM2.prixQuad(M, b.berm, {nGrille: e.ng, nQuad: e.nq});
+      const off = cib.map(sw => HJM.volNImplicite(b.courbe, sw, M.prixEuropeen(sw, e.ne)));
+      return {sig: cal.sigmas, eur: Math.max(...cal.modeles), berm, off};
+    } catch (err) { return {erreur: err.message}; } finally { prog(++fait / total); }
+  };
+  return {ref: refUn, rhos: e.rhos.map(r => Object.assign({v: r}, scen(p.lam2, r, p.ratio))), l2s: e.l2s.map(l => Object.assign({v: l}, scen(l, p.rho, p.ratio))),
+    qs: e.qs.map(q => Object.assign({v: q}, scen(p.lam2, p.rho, q))), erreurUn: un.erreur || null};
+}
 self.onmessage = ev => {
   const {id, type, p, e} = ev.data;
   try {
     const prog = f => self.postMessage({id, progres: f});
-    const res = type === "etudes" ? etudes(p, e, prog) : type === "lambda" ? etudeLambda(p, e, prog) : calculer(p);
+    const res = type === "etudes" ? etudes(p, e, prog) : type === "lambda" ? etudeLambda(p, e, prog) : type === "calcul2" ? calculer2(p)
+      : type === "matrice2" ? ajusterMatrice2(p, prog) : type === "facteurs2" ? etudeFacteurs2(p, e, prog) : calculer(p);
     self.postMessage({id, ok: true, res});
   } catch (err) { self.postMessage({id, ok: false, msg: err.message}); }
 };
@@ -593,7 +983,7 @@ function lire() {
 }
 
 // ---------- worker thread ----------
-const travail = UI.travailleur("src-hjm", "src-travail");
+const travail = UI.travailleur("src-hjm", "src-hjm2", "src-travail");
 let dernierId = 0, enCours = {};
 travail.onmessage = ev => { const m = ev.data, f = enCours[m.id]; if (!f) return; if (m.progres != null) { f.progres && f.progres(m.progres); return; } delete enCours[m.id]; f.fin(m); };
 function demander(type, p, e, progres) { const id = ++dernierId; return new Promise(fin => { enCours[id] = {fin, progres}; travail.postMessage({id, type, p, e}); }); }
@@ -809,12 +1199,274 @@ async function lancerLambda() {
 $("l-go").onclick = lancerLambda;
 document.addEventListener("vue", ev => { if (ev.detail === "lambda" && !lambdaFait) lancerLambda(); });
 
+// ======================================================================= two factors
+let modeleCourant = "1", fait2 = false, ajusteFait = false, facteursFait = false;
+const ongletsBtn = [...document.querySelectorAll(".onglets button[data-vue]")];
+const NOTES_MODELE = {"1": "Hull–White type: one Gaussian factor, Jamshidian's decomposition, 1-D PDE.",
+  "2": "Two correlated Gaussian factors: no Jamshidian (2-D integrals), 2-D backward induction; fits the swaption matrix."};
+function appliquerModele(m) {
+  modeleCourant = m;
+  document.querySelectorAll(".modeles button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.modele === m)));
+  ongletsBtn.forEach(b => { b.hidden = !(b.dataset.modele === m || b.dataset.modele === "*"); });
+  $("modele-note").textContent = NOTES_MODELE[m];
+}
+document.querySelectorAll(".modeles button").forEach(b => b.addEventListener("click", () => {
+  const m = b.dataset.modele;
+  if (m === modeleCourant) return;
+  appliquerModele(m); ongletsBtn.find(x => x.dataset.modele === m).click();
+}));
+document.addEventListener("vue", ev => {
+  const b = ongletsBtn.find(x => x.dataset.vue === ev.detail);
+  if (b && b.dataset.modele !== "*" && b.dataset.modele !== modeleCourant) appliquerModele(b.dataset.modele);
+  if (ev.detail === "pricer2" && !fait2) { fait2 = true; lancer2(); }
+  if (ev.detail === "marche2" && !ajusteFait) { ajusteFait = true; lancerMatrice(); }
+  if (ev.detail === "facteurs2" && !facteursFait) { facteursFait = true; lancerFacteurs(); }
+});
+
+// ---------- market data presets ----------
+const D2 = window.DONNEES.eur2016;
+const volMatrice = (e, t) => { const i = D2.expiries.indexOf(e), j = D2.tenors.indexOf(t); return i < 0 || j < 0 ? NaN : D2.vol[i][j]; };
+const courbeEUR = HJM.Courbe(D2.curve.map(c => c[0]), D2.curve.map(c => c[1]));
+const strikePar = TN => { const pay = Array.from({length: TN}, (_, i) => i + 1); return HJM.tauxSwapForward(courbeEUR, HJM.Swaption(0, TN, 0, pay, pay.map(() => 1), true)); };
+const PRESETS2 = {
+  cours: {courbe: COMMUN.courbe, ex: [[1, 80], [2, 85], [3, 90]], K: 3, terminal: 7, paie: "2 3 4 5 6 7", accr: "1 1 1 1 1 1", lam1: 0.03, lam2: 0.5, rho: -0.5, ratio: 0.6,
+    note: "Same curve, product and quotes as the one-factor Pricer; the parameters of the second factor are chosen for illustration."},
+  eur: {courbe: D2.curve.filter(c => c[0] <= 12.1).map(c => [+c[0].toFixed(6), c[1]]), ex: [1, 2, 3, 4, 5].map(e => [e, +(volMatrice(e, 10 - e) * 1e4).toFixed(4)]),
+    K: +(strikePar(10) * 100).toFixed(8), terminal: 10, paie: "1 2 3 4 5 6 7 8 9 10", accr: "1 1 1 1 1 1 1 1 1 1", lam1: 0, lam2: 0.9157, rho: -0.9799, ratio: 2.654,
+    note: "EUR curve and ATM normal vols of 30 March 2016 (course data). Bermudan into 10 years, exercisable at 1 to 5 years, struck at the 10-year par rate; the quotes are the ATM vols of the co-terminal swaptions (smile ignored). λ₂, ρ and the ratio are the global fit of the next tab."}};
+function appliquer2(nom) {
+  const d = PRESETS2[nom];
+  $("t-courbe2").tBodies[0].innerHTML = ""; d.courbe.forEach(([t, p]) => ligneCourbe2(t, p));
+  $("t-ex2").tBodies[0].innerHTML = ""; d.ex.forEach(([t, v]) => ligneEx2(t, v));
+  for (const [id, cle] of [["lam1", "lam1"], ["lam2", "lam2"], ["rho", "rho"], ["ratio", "ratio"], ["terminal2", "terminal"], ["paie2", "paie"], ["accr2", "accr"]]) $(id).value = d[cle];
+  $("strike2").value = d.K; $("preset2").value = nom; $("preset2-note").textContent = d.note;
+}
+function ligne2(html, tbody) {
+  const tr = document.createElement("tr"); tr.innerHTML = html;
+  tr.querySelector(".retirer").onclick = () => { tr.remove(); lancer2(); };
+  tbody.append(tr);
+}
+const ligneCourbe2 = (t, p) => ligne2(`<td><input type="number" step="0.25" value="${t}"></td><td><input type="number" step="0.001" value="${p}"></td><td class="zr"></td><td><button type="button" class="retirer" title="Remove">×</button></td>`, $("t-courbe2").tBodies[0]);
+const ligneEx2 = (t, v) => ligne2(`<td><input type="number" step="0.25" value="${t}"></td><td><input type="number" step="0.1" value="${v}"></td><td><button type="button" class="retirer" title="Remove">×</button></td>`, $("t-ex2").tBodies[0]);
+$("courbe-plus2").onclick = () => { const r = [...$("t-courbe2").tBodies[0].rows]; const last = r.length ? +r[r.length - 1].cells[0].querySelector("input").value : 0;
+  const pl = r.length ? +r[r.length - 1].cells[1].querySelector("input").value : 1; ligneCourbe2(Math.round(last) + 1, (pl * 0.97).toFixed(4)); lancer2(); };
+$("ex-plus2").onclick = () => { const r = [...$("t-ex2").tBodies[0].rows]; const l = r.length ? [+r[r.length - 1].cells[0].querySelector("input").value, +r[r.length - 1].cells[1].querySelector("input").value] : [0, 80]; ligneEx2(l[0] + 1, l[1]); lancer2(); };
+$("preset2").onchange = () => { appliquer2($("preset2").value); lancer2(); };
+$("defaut2").onclick = () => { appliquer2($("preset2").value); lancer2(); };
+
+function lire2() {
+  const row = (tb, n) => [...$(tb).tBodies[0].rows].map(tr => Array.from({length: n}, (_, k) => +tr.cells[k].querySelector("input").value));
+  const courbe = row("t-courbe2", 2).filter(([t, d]) => isFinite(t) && isFinite(d)).sort((a, b) => a[0] - b[0]);
+  const ex = row("t-ex2", 2).filter(r => r.every(isFinite)).sort((a, b) => a[0] - b[0]);
+  const paie = listeNombres($("paie2").value);
+  let accr = listeNombres($("accr2").value);
+  if (accr.length === 1) accr = paie.map(() => accr[0]);
+  const N = (id, d) => lireNombre($(id), d);
+  const p = {courbeT: courbe.map(c => c[0]), courbeP: courbe.map(c => c[1]), lam1: N("lam1", 0.03), lam2: N("lam2", 0.5), rho: N("rho", -0.5), ratio: N("ratio", 0.6),
+    payer: $("sens2").value === "1", K: N("strike2", 3) / 100, terminal: N("terminal2", 7), paie, accr, ex: ex.map(e => e[0]), vols: ex.map(e => e[1] / 1e4),
+    bas: N("bas2", 1e-6), haut: N("haut2", 0.2), nEur: Math.round(N("neur", 161)), ng: Math.round(N("ng2", 61)), nstd: N("nstd2", 4.5), nq: Math.round(N("nq2", 81)),
+    mc: $("mc-on2").checked, nmc: Math.round(N("nmc2", 40000)), graine: Math.round(N("graine2", 1234)), deg: Math.round(N("deg2", 2)), indep: $("indep2").checked};
+  if (!p.ex.length) throw new Error("add at least one exercise date");
+  if (paie.length !== accr.length) throw new Error(`${paie.length} payment dates but ${accr.length} accrual fractions`);
+  if (p.ex.some((t, i) => i && t === p.ex[i - 1])) throw new Error("two identical exercise dates");
+  if (p.ex[0] <= 0) throw new Error("exercise dates must be positive");
+  if (p.ex[p.ex.length - 1] >= p.terminal) throw new Error("the last exercise date must precede the final maturity T_N");
+  if (p.ex.some(t => !paie.some(u => u > t))) throw new Error("each exercise date must be followed by at least one fixed payment");
+  if (p.vols.some(v => !(v > 0))) throw new Error("normal volatilities must be positive");
+  if (!(p.lam1 >= 0 && p.lam2 >= 0)) throw new Error("λ₁ and λ₂ must be non-negative");
+  if (!(Math.abs(p.rho) <= 1)) throw new Error("ρ must lie in [−1, 1]");
+  if (!(p.ratio >= 0)) throw new Error("σ₂/σ₁ must be non-negative");
+  if (!(p.nEur >= 21 && p.nEur <= 601)) throw new Error("European integral: between 21 and 601 points per axis");
+  if (!(p.ng >= 11 && p.ng <= 121)) throw new Error("Bermudan grid: between 11 and 121 points per axis");
+  if (!(p.nq >= 11 && p.nq <= 151)) throw new Error("kernel: between 11 and 151 points per axis");
+  if (!(p.nstd > 0)) throw new Error("domain: n standard deviations > 0");
+  if (p.mc && !(p.nmc >= 100 && p.nmc <= 300000)) throw new Error("Monte Carlo paths between 100 and 300,000");
+  if (!(p.deg >= 1 && p.deg <= 4)) throw new Error("regression degree between 1 and 4");
+  if (!(p.bas > 0 && p.haut > p.bas)) throw new Error("bootstrap bounds: 0 < lowest σ < highest σ");
+  return p;
+}
+let dernier2 = null, num2 = 0;
+const lancer2 = differe(async () => {
+  let p;
+  try { p = lire2(); } catch (err) { etat2(err.message, "err"); return; }
+  [...$("t-courbe2").tBodies[0].rows].forEach(tr => { const t = +tr.cells[0].querySelector("input").value, d = +tr.cells[1].querySelector("input").value;
+    tr.querySelector(".zr").textContent = t > 0 && d > 0 ? pct(-Math.log(d) / t, 2) : "—"; });
+  etat2("Computing…");
+  const moi = ++num2, m = await demander("calcul2", p);
+  if (moi !== num2) return;
+  if (!m.ok) { etat2(m.msg, "err"); return; }
+  dernier2 = {p, r: m.res};
+  afficher2(p, m.res);
+}, 260);
+function etat2(msg, cls) { const e = $("etat2"); e.textContent = msg; e.className = "etat" + (cls ? " " + cls : ""); }
+function afficher2(p, r) {
+  const n = p.ex.length, imax = r.modeles.indexOf(Math.max(...r.modeles)), eurMax = r.modeles[imax];
+  $("alerte2").hidden = !(p.ratio === 0 || p.rho === 1 || p.rho === -1);
+  $("alerte2").textContent = p.ratio === 0 ? "σ₂/σ₁ = 0: the second factor is switched off, this is the one-factor model." : "|ρ| = 1: the two factors are perfectly (anti)correlated, the covariance is singular.";
+  $("k-q2").textContent = fmt(r.quad.prix, 8);
+  $("k-q2-s").textContent = `${p.ng}² grid · ${p.nq}² kernel · ${r.tQ} ms`;
+  if (r.mc) { $("k-mc2").textContent = fmt(r.mc.prix, 8); $("k-mc2-s").textContent = `± ${fmt(1.96 * r.mc.erreur, 6)} (95 %) · vs quadrature ${bp(r.mc.prix - r.quad.prix)} · ${r.tMc} ms`; }
+  else { $("k-mc2").textContent = "—"; $("k-mc2-s").textContent = "off"; }
+  if (r.un.erreur) { $("k-un2").textContent = "—"; $("k-un2-s").textContent = r.un.erreur; }
+  else { $("k-un2").textContent = fmt(r.un.prix, 8); $("k-un2-s").textContent = `λ = ${p.lam1} · 2 factors ${r.quad.prix >= r.un.prix ? "+" : ""}${((r.quad.prix / r.un.prix - 1) * 100).toFixed(1)} %`; }
+  $("k-eep2").textContent = fmt(r.quad.prix - eurMax, 8);
+  $("k-eep2-s").textContent = `${bp(r.quad.prix - eurMax)}` + (r.un.erreur ? "" : ` · 1 factor: ${bp(r.un.prix - r.un.eur)}`);
+  $("t-cal2").tBodies[0].innerHTML = p.ex.map((t, i) => {
+    const ec = r.modeles[i] - r.marche[i], ok = Math.abs(ec) < 1e-8;
+    return `<tr><td>${t}</td><td>${pct(r.details[i].fwd, 3)}</td><td>${r.details[i].ann.toFixed(5)}</td><td>${(p.vols[i] * 1e4).toFixed(1)} bp</td>
+      <td>${isFinite(r.details[i].volModele) ? (r.details[i].volModele * 1e4).toFixed(2) + " bp" : "—"}</td><td>${fmt(r.marche[i], 8)}</td><td>${fmt(r.modeles[i], 8)}</td>
+      <td><span class="badge ${ok ? "ok" : "av"}">${ec.toExponential(1)}</span></td><td>${(r.sigmas[i] * 1e4).toFixed(2)} bp</td><td>${(r.sigmas2[i] * 1e4).toFixed(2)} bp</td></tr>`;
+  }).join("");
+  const sx = [], s1 = [], s2 = [];
+  p.ex.forEach((t, i) => { sx.push(i ? p.ex[i - 1] : 0, t); s1.push(r.sigmas[i] * 1e4, r.sigmas[i] * 1e4); s2.push(r.sigmas2[i] * 1e4, r.sigmas2[i] * 1e4); });
+  Graphe.tracer($("g-sig2"), {series: [{nom: "σ₁(t)", x: sx, y: s1, couleur: "c1"}, {nom: "σ₂(t)", x: sx, y: s2, couleur: "c3"}], xlab: "t (years)", ylab: "σ (bp)", zero: true, yfmt: v => v.toFixed(1)});
+  const fv = r.fvol;
+  Graphe.tracer($("g-fvol2"), {series: [
+    {nom: "factor 1: σ₁e^(−λ₁τ)", x: fv.taus, y: fv.v1.map(v => v * 1e4), couleur: "c2", tirets: true},
+    {nom: "factor 2: σ₂e^(−λ₂τ)", x: fv.taus, y: fv.v2.map(v => v * 1e4), couleur: "c3", tirets: true},
+    {nom: "2 factors (total)", x: fv.taus, y: fv.tot.map(v => v * 1e4), couleur: "c1", epaisseur: 2.5},
+    ...(r.un.erreur ? [] : [{nom: "1 factor, same Europeans", x: fv.taus, y: fv.v1f.map(v => v * 1e4), couleur: "c5", epaisseur: 1.8}])],
+    xlab: "time to maturity τ (years)", ylab: "forward-rate vol (bp)", zero: true, yfmt: v => v.toFixed(0)});
+  Graphe.tracer($("g-corr2"), {series: [...r.corr.map((c, k) => ({nom: `2 factors, T₁ = ${c.T1}`, x: c.T, y: c.c, couleur: "c" + (1 + k)})),
+    {nom: "1 factor (always 1)", x: [0.25, 10], y: [1, 1], couleur: "c5", tirets: true}], xlab: "maturity T (years)", ylab: "correlation", yfmt: v => v.toFixed(2), ymax: 1.05});
+  $("g-mc2").parentElement.hidden = !r.mc;
+  if (r.mc) Graphe.tracer($("g-mc2"), {series: [{nom: "exercised paths", x: p.ex, y: r.mc.nbExerces, type: "barres", couleur: "c3"}], xlab: "exercise date", ylab: "paths", yfmt: v => v.toFixed(0)});
+  $("c-mart2").hidden = !r.mc;
+  if (r.mc) $("t-mart2").tBodies[0].innerHTML = r.mc.martingale.map(m => { const e = m.mc - m.courbe, z = m.se > 0 ? Math.abs(e) / m.se : 0;
+    return `<tr><td>${m.t}</td><td>${m.courbe.toFixed(6)}</td><td>${m.mc.toFixed(6)} <small>± ${(1.96 * m.se).toFixed(6)}</small></td><td><span class="badge ${z < 3 ? "ok" : "ko"}">${e >= 0 ? "+" : ""}${e.toExponential(1)}</span></td></tr>`; }).join("");
+  const sel = $("tranche2"), av = sel.value;
+  sel.innerHTML = r.quad.tranches.map((tr, i) => `<option value="${i}">T = ${tr.t}${i === r.quad.tranches.length - 1 ? " (last)" : ""}</option>`).join("");
+  if (av && +av < r.quad.tranches.length) sel.value = av;
+  dessinerRegion2();
+  etat2(`${p.ratio === 0 ? "One-factor limit" : "Two factors"} calibrated and priced · σ₁ = ${r.sigmas.map(s => (s * 1e4).toFixed(1)).join(" / ")} bp`, "ok");
+}
+function dessinerRegion2() {
+  if (!dernier2) return;
+  const tr = dernier2.r.quad.tranches[+$("tranche2").value || 0]; if (!tr) return;
+  const ng = tr.a1.length, s = 1e4;
+  Graphe.carte($("g-region2"), {nx: ng, ny: ng, x0: tr.a1[0] * s, x1: tr.a1[ng - 1] * s, y0: tr.a2[0] * s, y1: tr.a2[ng - 1] * s,
+    valeur: (a, b) => tr.exo[a * ng + b] ? 1 : 0, couleurs: ["c2", "c4"], xlab: "factor X¹ (bp)", ylab: "factor X² (bp)", etiquette: v => v ? "exercise" : "continue"});
+  const n1 = tr.exo.reduce((a, b) => a + b, 0);
+  $("region-note2").textContent = `At T = ${tr.t}, ${(100 * n1 / tr.exo.length).toFixed(0)} % of the grid is in the exercise region. Hover the map to read the region; the axes are the two factors in basis points, over ± n standard deviations of each.`;
+}
+$("tranche2").onchange = dessinerRegion2;
+document.querySelector("#pricer2 .reglages").addEventListener("input", lancer2);
+document.querySelector("#pricer2 .reglages").addEventListener("change", lancer2);
+
+// ---------- fit to the swaption matrix ----------
+let dernierFit = null;
+const couleurErr = (v, m) => `rgba(${v >= 0 ? "243,174,120" : "147,186,255"},${(0.08 + 0.55 * Math.min(1, Math.abs(v) / m)).toFixed(2)})`;
+function tableChaleur(ex, ten, erreurs, TN, m) {
+  return `<table class="heat"><tr><th></th>${ten.map(t => `<th>${t}y</th>`).join("")}</tr>` + ex.map((e, i) => `<tr><th>${e}y</th>` + ten.map((t, j) => {
+    const v = erreurs[i * ten.length + j], cot = Math.abs(t - (TN - e)) < 1e-9;
+    return `<td style="background:${couleurErr(v, m)}${cot ? ";outline:1px solid var(--accent);outline-offset:-1px;font-weight:600" : ""}">${Math.abs(v) < 0.05 ? "0.0" : v.toFixed(1)}</td>`; }).join("") + "</tr>").join("") + "</table>";
+}
+async function lancerMatrice() {
+  const etat = $("m-etat"), echec = msg => { etat.textContent = msg; etat.className = "etat err"; };
+  const TN = lireNombre($("m-terminal"), 10), ex = listeNombres($("m-ex").value).sort((a, b) => a - b), ten = listeNombres($("m-ten").value).sort((a, b) => a - b);
+  if (!(Number.isInteger(TN) && TN >= 2 && TN <= 30)) return echec("T_N: an integer between 2 and 30 (annual fixed leg)");
+  if (!ex.length || ex.some(e => !(e > 0 && e < TN))) return echec("exercise dates: values between 0 and T_N");
+  if (!ten.length) return echec("at least one tenor");
+  const cibles = [], volsCot = [];
+  for (const e of ex) for (const t of ten) { const v = volMatrice(e, t); if (!isFinite(v)) return echec(`no quote for ${e}y × ${t}y in the matrix (expiries 1/12 … 30, tenors 1–10, 15, 20, 25, 30)`); cibles.push({e, t, vol: v}); }
+  for (const e of ex) { const v = volMatrice(e, TN - e); if (!isFinite(v)) return echec(`no quote for the co-terminal ${e}y × ${TN - e}y`); volsCot.push(v); }
+  const pay = Array.from({length: TN}, (_, i) => i + 1), N = (id, d) => lireNombre($(id), d);
+  const p = {courbeT: D2.curve.map(c => c[0]), courbeP: D2.curve.map(c => c[1]), terminal: TN, ex, K: strikePar(TN), paie: pay, accr: pay.map(() => 1), volsCot, cibles,
+    l1: N("m-l1", 0.01), l2: N("m-l2", 1), r: N("m-r", -0.9), q: N("m-q", 1.5), libres: ["m-f1", "m-f2", "m-f3", "m-f4"].map(k => $(k).checked),
+    nGrille: Math.round(N("m-n", 61)), maxFev: Math.round(N("m-fev", 250))};
+  if (!(p.nGrille >= 21 && p.nGrille <= 201)) return echec("points per axis between 21 and 201");
+  if (!(p.maxFev >= 20 && p.maxFev <= 2000)) return echec("evaluations between 20 and 2000");
+  if (!p.libres.some(Boolean)) return echec("free at least one parameter");
+  if (!(p.q > 0) || !(p.r > -1 && p.r < 1)) return echec("start values: σ₂/σ₁ > 0 and −1 < ρ < 1");
+  $("m-go").disabled = true; $("m-prog").hidden = false; $("m-prog").value = 0; etat.className = "etat"; etat.textContent = "Fitting both models…";
+  const t0 = Date.now(), m = await demander("matrice2", p, null, f => { $("m-prog").value = f; });
+  $("m-go").disabled = false; $("m-prog").hidden = true;
+  if (!m.ok) return echec(m.msg);
+  const r = m.res, a = r.f1, b = r.f2;
+  dernierFit = {p, r}; $("m-usage").disabled = false;
+  etat.textContent = `Done in ${((Date.now() - t0) / 1000).toFixed(1)} s · ${b.n} evaluations of the 2-factor objective`; etat.className = "etat ok";
+  $("m-k1").textContent = a.rmse.toFixed(2) + " bp"; $("m-k1-s").textContent = `λ = ${a.lam.toFixed(4)}`;
+  $("m-k2").textContent = b.rmse.toFixed(2) + " bp"; $("m-k2-s").textContent = `${(a.rmse / b.rmse).toFixed(1)}× smaller than 1 factor`;
+  $("m-b1").textContent = fmt(a.berm, 6); $("m-b1-s").textContent = `premium ${bp(a.berm - a.eur, 1)}`;
+  $("m-b2").textContent = fmt(b.berm, 6); $("m-b2-s").textContent = `${((b.berm / a.berm - 1) * 100).toFixed(1)} % vs 1 factor · premium ${bp(b.berm - b.eur, 1)}`;
+  const mx = Math.max(...a.err.map(Math.abs), ...b.err.map(Math.abs), 1e-9);
+  $("m-t1").innerHTML = tableChaleur(ex, ten, a.err, TN, mx); $("m-t2").innerHTML = tableChaleur(ex, ten, b.err, TN, mx);
+  $("m-sel").innerHTML = ex.map((e, i) => `<option value="${i}">${e} year${e > 1 ? "s" : ""}</option>`).join("");
+  dessinerVolMatrice();
+  Graphe.tracer($("g-m-hist"), {series: [{nom: "RMSE (bp)", x: b.hist.map((_, k) => k + 1), y: b.hist, couleur: "c1"}], xlab: "evaluation", ylab: "RMSE (bp)", yfmt: v => v.toFixed(1)});
+  const fmtS = s => s.map(v => (v * 1e4).toFixed(0)).join(" / ");
+  $("t-m-par").tBodies[0].innerHTML =
+    `<tr><td>1 factor</td><td>${a.lam.toFixed(4)}</td><td>—</td><td>—</td><td>—</td><td>${fmtS(a.sigmas)}</td><td>${a.rmse.toFixed(2)}</td><td>${fmt(a.berm, 6)}</td><td>${fmt(a.eur, 6)}</td><td>${fmt(a.berm - a.eur, 6)}</td></tr>` +
+    `<tr><td>2 factors</td><td>${b.lam[0].toFixed(4)}</td><td>${b.lam[1].toFixed(4)}</td><td>${b.rho.toFixed(4)}</td><td>${b.ratio.toFixed(3)}</td><td>${fmtS(b.sigmas)}</td><td>${b.rmse.toFixed(2)}</td><td>${fmt(b.berm, 6)}</td><td>${fmt(b.eur, 6)}</td><td>${fmt(b.berm - b.eur, 6)}</td></tr>`;
+  $("m-note").textContent = `Bermudan into ${TN} years, exercisable at ${ex.join(", ")} years, struck at the ${TN}-year par rate ${pct(p.K, 3)}. Orange/blue cells are far from the market, the framed ones are the Bermudan's co-terminals (matched exactly). `
+    + (b.rho < -0.95 ? "ρ close to −1 and the flat valley of the objective: the improvement of the fit is solid, the individual parameters are not well identified (Theory tab, section 4)." : "");
+}
+function dessinerVolMatrice() {
+  if (!dernierFit) return;
+  const {p, r} = dernierFit, i = +$("m-sel").value || 0, ten = listeNombres($("m-ten").value).sort((a, b) => a - b), nt = ten.length;
+  const mkt = ten.map((t, j) => p.cibles[i * nt + j].vol * 1e4), m1 = mkt.map((v, j) => v + r.f1.err[i * nt + j]), m2 = mkt.map((v, j) => v + r.f2.err[i * nt + j]);
+  Graphe.tracer($("g-m-vol"), {series: [{nom: "market", x: ten, y: mkt, couleur: "c3", type: "points", rayon: 4}, {nom: "1 factor", x: ten, y: m1, couleur: "c5", tirets: true},
+    {nom: "2 factors", x: ten, y: m2, couleur: "c1", epaisseur: 2.5}], xlab: "tenor of the swap (years)", ylab: "normal vol (bp)", yfmt: v => v.toFixed(0)});
+}
+$("m-sel").onchange = dessinerVolMatrice;
+$("m-go").onclick = lancerMatrice;
+$("m-usage").onclick = () => {
+  if (!dernierFit) return;
+  const {p, r} = dernierFit, b = r.f2;
+  appliquer2("eur");
+  $("t-ex2").tBodies[0].innerHTML = ""; p.ex.forEach((e, i) => ligneEx2(e, +(p.volsCot[i] * 1e4).toFixed(4)));
+  $("terminal2").value = p.terminal; $("paie2").value = p.paie.join(" "); $("accr2").value = p.accr.join(" "); $("strike2").value = +(p.K * 100).toFixed(8);
+  $("lam1").value = +b.lam[0].toFixed(6); $("lam2").value = +b.lam[1].toFixed(6); $("rho").value = +b.rho.toFixed(6); $("ratio").value = +b.ratio.toFixed(6);
+  $("preset2-note").textContent = "Product and 2-factor parameters of the fit of the previous tab.";
+  ongletsBtn.find(x => x.dataset.vue === "pricer2").click(); lancer2();
+};
+
+// ---------- correlation studies ----------
+async function lancerFacteurs() {
+  let p; try { p = lire2(); } catch (err) { $("f-etat").textContent = err.message; $("f-etat").className = "etat err"; return; }
+  const lst = id => listeNombres($(id).value);
+  const e = {rhos: lst("f-rho").filter(v => Math.abs(v) <= 1), l2s: lst("f-l2").filter(v => v >= 0), qs: lst("f-q").filter(v => v >= 0),
+    cibles: $("f-cib").value.trim().split(/\s+/).map(s => s.split("/").map(Number)).filter(c => c.length === 2 && c.every(v => v > 0)),
+    ng: Math.round(lireNombre($("f-ng"), 41)), nq: Math.round(lireNombre($("f-nq"), 61)), ne: Math.round(lireNombre($("f-ne"), 101))};
+  if (!e.rhos.length || !e.l2s.length || !e.qs.length) { $("f-etat").textContent = "give at least one value for ρ, λ₂ and σ₂/σ₁"; $("f-etat").className = "etat err"; return; }
+  if (!(e.ng >= 11 && e.ng <= 101 && e.nq >= 11 && e.nq <= 121 && e.ne >= 21 && e.ne <= 401)) { $("f-etat").textContent = "grids: 11–101 (Bermudan), 11–121 (kernel), 21–401 (European)"; $("f-etat").className = "etat err"; return; }
+  $("f-go").disabled = true; $("f-prog").hidden = false; $("f-prog").value = 0; $("f-etat").className = "etat"; $("f-etat").textContent = "Recalibrating…";
+  const t0 = Date.now(), m = await demander("facteurs2", p, e, f => { $("f-prog").value = f; });
+  $("f-go").disabled = false; $("f-prog").hidden = true;
+  if (!m.ok) { $("f-etat").textContent = m.msg; $("f-etat").className = "etat err"; return; }
+  const r = m.res, ok = a => a.filter(o => !o.erreur), f6 = v => v.toFixed(6), R = ok(r.rhos), L = ok(r.l2s), Q = ok(r.qs);
+  const nEch = [...r.rhos, ...r.l2s, ...r.qs].filter(o => o.erreur).length;
+  $("f-etat").textContent = `${R.length + L.length + Q.length} recalibrations in ${((Date.now() - t0) / 1000).toFixed(1)} s` + (nEch ? ` · ${nEch} point(s) could not be calibrated` : "") + (r.erreurUn ? ` · 1 factor: ${r.erreurUn}` : "");
+  $("f-etat").className = "etat " + (nEch || r.erreurUn ? "err" : "ok");
+  const un = r.ref, plat = (xs, v) => xs.map(() => v);
+  Graphe.tracer($("g-f-rho"), {series: [{nom: "Bermudan, 2 factors", x: R.map(o => o.v), y: R.map(o => o.berm), couleur: "c1", marqueurs: true, epaisseur: 2.5},
+    {nom: "most expensive European", x: R.map(o => o.v), y: R.map(o => o.eur), couleur: "c3", marqueurs: true},
+    ...(un ? [{nom: "Bermudan, 1 factor", x: R.map(o => o.v), y: plat(R, un.berm), couleur: "c5", tirets: true}] : [])], xlab: "ρ", ylab: "price", yfmt: f6});
+  Graphe.tracer($("g-f-eep"), {series: [{nom: "premium, 2 factors", x: R.map(o => o.v), y: R.map(o => (o.berm - o.eur) * 1e4), couleur: "c4", marqueurs: true, epaisseur: 2.5},
+    ...(un ? [{nom: "premium, 1 factor", x: R.map(o => o.v), y: plat(R, (un.berm - un.eur) * 1e4), couleur: "c5", tirets: true}] : [])], xlab: "ρ", ylab: "Bermudan − max European (bp of notional)", yfmt: v => v.toFixed(1)});
+  const lab = e.cibles.map(c => `${c[0]}y × ${c[1]}y`), serOff = R.map((o, k) => ({nom: `ρ = ${o.v}`, x: lab.map((_, i) => i), y: o.off.map(v => v * 1e4), couleur: "c" + (1 + k % 8), marqueurs: true}));
+  if (un) serOff.push({nom: "1 factor", x: lab.map((_, i) => i), y: un.off.map(v => v * 1e4), couleur: "c5", tirets: true, marqueurs: true, epaisseur: 2.5});
+  Graphe.tracer($("g-f-off"), {series: serOff, xlab: "swaption (expiry × tenor)", ylab: "ATM normal vol (bp)", yfmt: v => v.toFixed(0),
+    xfmt: v => (Math.abs(v - Math.round(v)) < 1e-9 && lab[Math.round(v)]) ? lab[Math.round(v)] : ""});
+  Graphe.tracer($("g-f-sig"), {series: p.ex.map((t, j) => ({nom: `σ₁ up to t = ${t}`, x: R.map(o => o.v), y: R.map(o => o.sig[j] * 1e4), couleur: "c" + (1 + j % 8), marqueurs: true})), xlab: "ρ", ylab: "σ₁ (bp)", yfmt: v => v.toFixed(0)});
+  const prime = (A, nom) => [{nom: "premium, 2 factors", x: A.map(o => o.v), y: A.map(o => (o.berm - o.eur) * 1e4), couleur: "c4", marqueurs: true, epaisseur: 2.5},
+    ...(un ? [{nom: "premium, 1 factor", x: A.map(o => o.v), y: plat(A, (un.berm - un.eur) * 1e4), couleur: "c5", tirets: true}] : [])];
+  Graphe.tracer($("g-f-l2"), {series: prime(L), xlab: "λ₂", ylab: "premium (bp of notional)", yfmt: v => v.toFixed(1)});
+  Graphe.tracer($("g-f-q"), {series: prime(Q), xlab: "σ₂/σ₁", ylab: "premium (bp of notional)", yfmt: v => v.toFixed(1)});
+  const ligne = (nom, o) => o.erreur ? `<tr><td>${nom}</td><td colspan="5" class="vide">no calibration: ${o.erreur}</td></tr>`
+    : `<tr><td>${nom}</td><td>${o.sig.map(s => (s * 1e4).toFixed(1)).join(" / ")}</td><td>${f6(o.eur)}</td><td>${f6(o.berm)}</td><td>${f6(o.berm - o.eur)}</td><td>${o.off.map(v => (v * 1e4).toFixed(1)).join(" / ")}</td></tr>`;
+  $("t-f").tBodies[0].innerHTML = (un ? `<tr><td>1 factor (λ = ${p.lam1})</td><td>—</td><td>${f6(un.eur)}</td><td>${f6(un.berm)}</td><td>${f6(un.berm - un.eur)}</td><td>${un.off.map(v => (v * 1e4).toFixed(1)).join(" / ")}</td></tr>` : "")
+    + r.rhos.map(o => ligne(`ρ = ${o.v}`, o)).join("") + r.l2s.map(o => ligne(`λ₂ = ${o.v}`, o)).join("") + r.qs.map(o => ligne(`σ₂/σ₁ = ${o.v}`, o)).join("");
+}
+$("f-go").onclick = lancerFacteurs;
+
 // ---------- source code ----------
 const CODE = /*__CODE__*/;
 let codePret = false;
 document.addEventListener("vue", ev => { if (ev.detail === "code" && !codePret) { codePret = true; UI.lecteurCode($("code"), CODE, "__DEPOT__"); } });
 
 appliquer(RECOMMANDE);
+appliquer2("cours");
 lancer();
 </script>
 </body>

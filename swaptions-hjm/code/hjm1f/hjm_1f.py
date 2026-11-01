@@ -124,8 +124,9 @@ class HJM1FModel:
 
         # Loop over the piecewise-constant buckets.
         for end, sig in zip(self.sigma_curve.bucket_ends, self.sigma_curve.values):
-            # Truncate the bucket to the target horizon t.
-            right = min(end, t)
+            # Truncate the bucket to the target horizon t; the last bucket's
+            # volatility extends beyond its end, exactly as in sigma(t).
+            right = t if end == self.sigma_curve.bucket_ends[-1] else min(end, t)
 
             # Only integrate if the truncated bucket is non-empty.
             if right > left:
@@ -137,7 +138,7 @@ class HJM1FModel:
                     total += sig * sig * (math.exp(2.0 * self.lam * right) - math.exp(2.0 * self.lam * left)) / (2.0 * self.lam)
 
             # Stop as soon as we have reached t.
-            if end >= t:
+            if right >= t:
                 break
 
             # Move to the next bucket.
@@ -161,8 +162,8 @@ class HJM1FModel:
 
         # Loop bucket by bucket.
         for end, sig in zip(self.sigma_curve.bucket_ends, self.sigma_curve.values):
-            # Truncate the bucket.
-            right = min(end, t)
+            # Truncate the bucket (the last bucket extends beyond its end).
+            right = t if end == self.sigma_curve.bucket_ends[-1] else min(end, t)
 
             # Integrate only if non-empty.
             if right > left:
@@ -177,7 +178,7 @@ class HJM1FModel:
                     )
 
             # Stop once the horizon t has been covered.
-            if end >= t:
+            if right >= t:
                 break
 
             # Move to the next bucket.
@@ -198,11 +199,14 @@ class HJM1FModel:
         """
         Bond price formula from the notes:
 
-            P(t,T) = P(0,T)/P(0,t) * exp( D(t,T) * ( c(t,T) - X_t ) )
+            P(t,T) = P(0,T)/P(0,t) * exp( - D(t,T) * ( c(t,T) + X_t ) )
 
         where:
             D(t,T) = B_lambda(T) - B_lambda(t)
             c(t,T) = 0.5 * (B_lambda(T)+B_lambda(t)) * alpha(t) - gamma(t)
+
+        The convexity term enters with the same sign as X_t (no-arbitrage drift of HJM);
+        with lambda -> 0 this is the Ho-Lee bond price.
         """
         # By definition P(t,T)=1 for T<=t.
         if T <= t:
@@ -215,7 +219,7 @@ class HJM1FModel:
         c = 0.5 * (self.Bbar(T) + self.Bbar(t)) * self.alpha(t) - self.gamma(t)
 
         # Full exponent.
-        expo = d * (c - x_t)
+        expo = -d * (c + x_t)
 
         # Final bond price.
         return (self.curve.discount(T) / self.curve.discount(t)) * math.exp(expo)
@@ -226,13 +230,13 @@ class HJM1FModel:
 
         From the notes, taking T down to t yields:
 
-            r_t = f(0,t) - b(t) * ( B_lambda(t) * alpha(t) - gamma(t) - X_t )
+            r_t = f(0,t) + b(t) * ( B_lambda(t) * alpha(t) - gamma(t) + X_t )
         """
         # Initial instantaneous forward curve f(0,t).
         f0 = self.curve.inst_fwd(t)
 
         # Short-rate formula consistent with the HJM state variable X_t.
-        return f0 - self.b(t) * (self.Bbar(t) * self.alpha(t) - self.gamma(t) - x_t)
+        return f0 + self.b(t) * (self.Bbar(t) * self.alpha(t) - self.gamma(t) + x_t)
 
     def swap_value(self, swaption: CoterminalSwaption, x_expiry: float) -> float:
         """
@@ -326,23 +330,36 @@ class HJM1FModel:
         # Solve for x* such that swap_value(expiry, x*) = 0.
         x_star = brent(objective, -10.0, 10.0, tol=1e-12, max_iter=200)
 
+        # A payer swaption is a sum of bond puts, a receiver swaption a sum of bond calls.
+        option = self.zcb_put if swaption.payer else self.zcb_call
+
         # Start the decomposition sum.
         price = 0.0
 
-        # All coupons except the last one contribute K * delta_i * bond-put.
+        # All coupons except the last one contribute K * delta_i * bond option.
         for t_i, delta_i in zip(times[:-1], accruals[:-1]):
             # Bond strike induced by x*.
             k_i = self.discount_bond(swaption.expiry, t_i, x_star)
 
-            # Add the corresponding bond-put contribution.
-            price += swaption.strike * delta_i * self.zcb_put(swaption.expiry, t_i, k_i)
+            # Add the corresponding bond-option contribution.
+            price += swaption.strike * delta_i * option(swaption.expiry, t_i, k_i)
 
         # The last cashflow also contains the notional repayment term.
         last_t = times[-1]
         last_delta = accruals[-1]
         k_last = self.discount_bond(swaption.expiry, last_t, x_star)
-        price += (1.0 + swaption.strike * last_delta) * self.zcb_put(swaption.expiry, last_t, k_last)
+        price += (1.0 + swaption.strike * last_delta) * option(swaption.expiry, last_t, k_last)
 
-        # Receiver handling is not fully specialized here; the present project is
-        # focused on payer Bermudans.
-        return price if swaption.payer else price
+        return price
+
+    def zcb_call(self, option_expiry: float, bond_maturity: float, strike: float) -> float:
+        """Call on a zero-coupon bond, from put-call parity C - P = P(0,T) - K P(0,t)."""
+        return (
+            self.zcb_put(option_expiry, bond_maturity, strike)
+            + self.curve.discount(bond_maturity)
+            - strike * self.curve.discount(option_expiry)
+        )
+
+    def mean_under_forward(self, t: float, T: float) -> float:
+        """E[X_t] under the T-forward measure: -(B_lambda(T) alpha(t) - gamma(t))."""
+        return -(self.Bbar(T) * self.alpha(t) - self.gamma(t))
