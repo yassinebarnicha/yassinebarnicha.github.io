@@ -433,7 +433,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
         <ul>
           <li>Live calibration by bootstrap to co-terminal swaptions (Bachelier normal volatilities).</li>
           <li>One factor: Jamshidian and PDE (implicit or Crank–Nicolson); two factors: 2-D integrals and 2-D backward induction; both checked by Longstaff-Schwartz.</li>
-          <li>Real EUR data (30 March 2016): the second factor cuts the swaption-matrix error from 11.2 to 2.6 bp and moves the Bermudan by 5 %.</li>
+          <li>Whole EUR market (30 March 2016: 240 swaptions, 16 caps, smiles): the second factor divides the fit error by 3 (12.4 to 3.9 bp) and moves the Bermudan by −3.8 %; at fixed Europeans the correlation alone moves it by 12 %.</li>
           <li>Model review: sign error found and fixed in the bond formula, martingale test.</li>
         </ul>
         <div class="liens"><a href="swaptions-hjm/">Open the application</a><a href="swaptions-hjm/rapport/report.pdf">Report (PDF)</a><a href="swaptions-hjm/#code">Code →</a></div>

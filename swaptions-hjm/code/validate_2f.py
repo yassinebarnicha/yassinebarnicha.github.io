@@ -21,12 +21,15 @@ from hjm1f.instruments import BermudanCoterminalSwaption, CoterminalSwaption
 from hjm1f.market_quotes import forward_swap_rate
 from hjm1f.mc_1f import BermudanLSMC1F, MonteCarloSpec
 from hjm1f.pde_1f import BermudanPDE1F, PDEGrid
-from hjm2f.calibration_2f import CoterminalBootstrap2F, atm_swaption
+from hjm2f.calibration_2f import CoterminalBootstrap2F
 from hjm2f.calibration_global import fit_one_factor, fit_two_factor, from_params
-from hjm2f.hjm_2f import HJM2FModel
+from hjm2f.caps import atm_cap_strike, bachelier_cap_price, model_cap_price, model_cap_vol
+from hjm2f.market_data import MarketData, summarise
+from hjm2f.hjm_2f import HJM2FModel, normal_grid_2d, psd_sqrt
 from hjm2f.mc_2f import BermudanLSMC2F, MonteCarloSpec2F
 from hjm2f.quad_2f import BermudanQuad2F
 
+TENORS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30]
 RESULTS = []
 
 
@@ -108,60 +111,88 @@ def main() -> int:
         worst = max(worst, abs(l / q - 1))
     at_most("quadrature vs LSMC, worst relative gap over 4 scenarios (claimed 0.4 %)", worst, 0.005)
 
-    print("\n== 4. Real market data (theory 2F, section 4; report, table 1) ==")
-    d = json.loads((Path(__file__).resolve().parent / "data" / "eur_2016-03-30.json").read_text(encoding="utf-8"))
-    cv = ZeroCurve([c["t"] for c in d["curve"]], [c["df"] for c in d["curve"]])
-    mx = d["swaptionNormalVolATM"]
-    vol = lambda e, t: mx["vol"][mx["expiries"].index(float(e))][mx["tenors"].index(int(t))]
-    P10, A10 = [float(i) for i in range(1, 11)], [1.0] * 10
-    K = forward_swap_rate(cv, 0.0, 10.0, P10, A10)
-    check("10-year par rate = 0.532 %", K * 100, 0.532, 5e-4)
-    EX = [1, 2, 3, 4, 5]
-    exf = [float(e) for e in EX]
-    ins = [CalibrationInstrument(CoterminalSwaption(e, 10.0, K, P10, A10, True), vol(e, 10 - e)) for e in EX]
-    bm = BermudanCoterminalSwaption(exf, 10.0, K, P10, A10, True)
-    targets = [(atm_swaption(cv, float(e), float(t)), vol(e, t)) for e in EX for t in range(1, 11)]
-    lam1f, rmse1, err1 = fit_one_factor(cv, exf, ins, targets)
-    check("1F: best lambda = 0 (lower bound)", lam1f, 0.0, 1e-3)
-    check("1F: RMSE on the 50 swaptions = 11.2 bp", rmse1, 11.2, 0.05)
-    check("1F: largest gap = 35 bp (1y x 1y)", max(abs(x) for x in err1), 35.0, 0.5)
-    fit = fit_two_factor(cv, exf, ins, targets, from_params((0.01, 1.0), -0.9, 1.5), n_grid=61, max_fev=250)
-    check("2F: RMSE = 2.6 bp (claimed 2.58)", fit.rmse_bp, 2.58, 0.03)
-    check("2F: lambda_2 = 0.92 (claimed 0.916)", fit.lam[1], 0.916, 0.01)
-    check("2F: rho = -0.98", fit.rho, -0.98, 0.005)
-    check("2F: sigma2/sigma1 = 2.65", fit.ratio, 2.65, 0.02)
-    check("2F: largest gap = 6 bp (claimed 'about 6')", max(abs(x) for x in fit.errors_bp), 6.2, 0.3)
-    # other starting points (claimed: same fit with different parameters, or stuck at a bound)
-    alt = fit_two_factor(cv, exf, ins, targets, [-3.0, 1.5, -0.9, 0.5], n_grid=61, max_fev=300)
-    check("2F: second start reaches the same fit, 2.62 bp", alt.rmse_bp, 2.62, 0.05)
-    at_most("2F: ... with lambda_2 <= 1.05", alt.lam[1], 1.05)
-    at_most("2F: ... and rho <= -0.98 (close to -1)", alt.rho, -0.98)
-    check("2F: ... and sigma2/sigma1 = 3.0", alt.ratio, 2.99, 0.1)
-    stuck = fit_two_factor(cv, exf, ins, targets, [0.0, -1.0, 0.5, -0.5], n_grid=61, max_fev=300)
-    check("2F: a bad start stalls at 7.2 bp against lambda_2 = 3, rho = -1", stuck.rmse_bp, 7.19, 0.2)
-    c1 = CoterminalBootstrap1F(cv, lam1f, exf).calibrate(ins)
-    m1x = HJM1FModel(cv, lam1f, c1.sigma_curve)
-    b1 = BermudanPDE1F(m1x, bm, PDEGrid.around_factor_std(m1x, 5.0, 5.0, nx=801, nt=1500), theta=0.5, rannacher=2).price()
-    c2 = CoterminalBootstrap2F(cv, fit.lam, fit.rho, fit.ratio, exf).calibrate(ins)
-    m2x = HJM2FModel(cv, fit.lam, c2.sigma1, c2.sigma2, fit.rho)
-    b2 = BermudanQuad2F(m2x, bm, n_grid=81, n_quad=101).price()
-    eur = max(c2.model_prices)
-    check("Bermudan 1F = 0.0518 (claimed 0.051765)", b1, 0.051765, 2e-5)
-    check("Bermudan 2F = 0.0490 (claimed 0.048973)", b2, 0.048973, 3e-5)
-    check("exercise premium 1F = 75 bp", (b1 - eur) * 1e4, 75.2, 0.3)
-    check("exercise premium 2F = 47 bp", (b2 - eur) * 1e4, 47.2, 0.4)
-    check("Bermudan 2F vs 1F = -5.4 %", (b2 / b1 - 1) * 100, -5.4, 0.1)
+    print("\n== 4. Caps and smile (theory 2F, sections 4 and 8) ==")
+    md = MarketData()
+    check("10-year par rate = 0.532 %", md.bermudan(10, [1])[0] * 100, 0.532, 5e-4)
+    check("ATM cap strike, 10 years = 0.5257 % (course workbook), within 1 bp", atm_cap_strike(md.curve, 10.0) * 100, 0.5257, 1e-2)
+    mq = HJM2FModel(curve, (0.03, 0.5), PiecewiseConstantSigma(ex, [.009, .010, .011]), PiecewiseConstantSigma(ex, [.004, .005, .006]), -0.6)
+    k = 1.0 / 1.0145
+    put_cf = mq.zcb_put(2.0, 2.5, k)
+    # independent check: the same payoff max(k - P(2, 2.5), 0) integrated on a 2-D normal grid under the 2.5-forward measure
+    z, w = normal_grid_2d(401)
+    x = mq.mean_under_forward(2.0, 2.0) + z @ psd_sqrt(mq.cov(2.0)).T
+    pb = np.array([mq.discount_bond(2.0, 2.5, xi) for xi in x])
+    put_grid = curve.discount(2.0) * float(np.sum(w * np.maximum(k - pb, 0.0)))
+    check("bond put: closed form vs 2-D integral of the same payoff", put_cf, put_grid, 1e-4, relative=True)
+    kk = atm_cap_strike(curve, 5.0)
+    price = model_cap_price(mq, 5.0, kk)
+    at_most("cap price -> implied vol -> cap price round trip", abs(bachelier_cap_price(curve, 5.0, kk, model_cap_vol(mq, 5.0)) - price), 1e-10)
+    check("smile ratio at the money within 1.5 % of 1 (kernel mixes smiles whose ATM point differs from the matrix)", md.smile.ratio(1.0, 9.0, 0.0), 1.0, 1.5e-2)
+    ends, ins = md.bucket_plan(10, [1, 2, 3, 4, 5], use_smile=True)
+    check("bucket plan: 11 volatility segments up to 5 years", float(len(ends)), 11.0, 0.0)
+    atm_q = md.coterminal_instruments(10, [1, 2, 3, 4, 5], use_smile=False)
+    sm_q = md.coterminal_instruments(10, [1, 2, 3, 4, 5], use_smile=True)
+    strike = md.bermudan(10, [1])[0]
+    gaps = [(strike - forward_swap_rate(md.curve, float(e), 10.0, [float(i) for i in range(e + 1, 11)], [1.0] * (10 - e))) * 1e4 for e in range(1, 6)]
+    check("co-terminal strike minus forward, 1y: -7.6 bp", gaps[0], -7.6, 0.1)
+    check("co-terminal strike minus forward, 5y: -52.6 bp", gaps[4], -52.6, 0.1)
+    check("co-terminal quote 1y is left unchanged by the smile: 60.2 bp", sm_q[0].normal_vol * 1e4, 60.2, 0.1)
+    check("co-terminal quote 2y moved by the smile: 61.7 -> 61.0 bp", sm_q[1].normal_vol * 1e4, 61.0, 0.1)
+    check("co-terminal quote 5y moved by the smile: 68.6 -> 67.3 bp", sm_q[4].normal_vol * 1e4, 67.3, 0.1)
+    at_most("quotes only move by up to 1.4 bp", max(abs(a.normal_vol - b.normal_vol) for a, b in zip(atm_q, sm_q)) * 1e4, 1.4)
 
-    print("\n== 5. Exercise premium against rho, illustrative case (page and report) ==")
-    prem = {}
-    for rho in (-0.95, 0.9):
-        r = CoterminalBootstrap2F(curve, (0.03, 0.5), rho, 0.6, ex).calibrate(inst)
-        mo = HJM2FModel(curve, (0.03, 0.5), r.sigma1, r.sigma2, rho)
-        prem[rho] = (BermudanQuad2F(mo, berm, n_grid=81, n_quad=101).price() - max(r.model_prices)) * 1e4
-    check("premium at rho = -0.95 is about 19 bp", prem[-0.95], 19.3, 0.5)
-    check("premium at rho = +0.9 is about 29 bp", prem[0.9], 28.7, 0.5)
-    p1 = BermudanPDE1F(model, berm, PDEGrid.around_factor_std(model, 3.0, 5.0, nx=801, nt=1500), theta=0.5, rannacher=2).price()
-    check("1F premium = 24 bp", (p1 - max(calib.model_prices)) * 1e4, 24.2, 0.3)
+    print("\n== 5. The whole market, 5-year window (page tab 'Fit to the market'; theory 2F, section 4) ==")
+    exf = [1.0, 2.0, 3.0, 4.0, 5.0]
+    bm = BermudanCoterminalSwaption(exf, 10.0, strike, [float(i) for i in range(1, 11)], [1.0] * 10, True)
+    both = md.targets(5.0, TENORS, with_caps=True)
+    check("143 ATM swaptions fitted", float(len(both.swaptions)), 143.0, 0.0)
+    check("6 ATM caps fitted", float(len(both.caps)), 6.0, 0.0)
+    lam1, rmse1, _ = fit_one_factor(md.curve, ends, ins, both)
+    check("1F: lambda = -0.039 (swaptions and caps)", lam1, -0.0389, 2e-3)
+    c1 = CoterminalBootstrap1F(md.curve, lam1, ends).calibrate(ins)
+    zero = PiecewiseConstantSigma(ends, [0.0] * len(ends))
+    s1 = summarise(md.report_card(HJM2FModel(md.curve, (lam1, 0.5), c1.sigma_curve, zero, 0.0), 5.0, TENORS, True))
+    check("1F: fitted swaptions 12.4 bp", s1["swaptions_fitted"], 12.39, 0.1)
+    check("1F: fitted caps 21.7 bp", s1["caps_fitted"], 21.73, 0.2)
+    check("1F: swaptions beyond the window 21.4 bp", s1["swaptions_beyond"], 21.36, 0.2)
+    check("1F: caps beyond the window 7.6 bp", s1["caps_beyond"], 7.56, 0.2)
+    m1 = HJM1FModel(md.curve, lam1, c1.sigma_curve)
+    b1 = BermudanPDE1F(m1, bm, PDEGrid.around_factor_std(m1, 5.0, 5.0, nx=801, nt=1500), theta=0.5, rannacher=2).price()
+    eur1 = max(p for p, i in zip(c1.model_prices, ins) if i.swaption.expiry in exf)
+    check("1F Bermudan = 0.050057", b1, 0.050057, 3e-5)
+    check("1F exercise premium = 63.6 bp", (b1 - eur1) * 1e4, 63.6, 0.3)
+
+    lam, rho, ratio = (-0.003414, 0.533868), -0.95, 1.483256
+    f = fit_two_factor(md.curve, ends, ins, both, from_params(lam, rho, ratio), n_grid=61, max_fev=60)
+    at_most("2F: a local search around the claimed optimum finds nothing below 3.85 bp", 3.85 - f.rmse_bp, 0.0)
+    at_most("2F: ... and does not drift above 4.1 bp", f.rmse_bp, 4.1)
+    at_most("2F: rho stays at the bound -0.95", abs(f.rho) - 0.9500001, 0.0)
+    c2 = CoterminalBootstrap2F(md.curve, lam, rho, ratio, ends).calibrate(ins, n_grid=161)
+    m2 = HJM2FModel(md.curve, lam, c2.sigma1, c2.sigma2, rho)
+    s2 = summarise(md.report_card(m2, 5.0, TENORS, True))
+    check("2F: fitted swaptions 3.9 bp", s2["swaptions_fitted"], 3.92, 0.1)
+    check("2F: fitted caps 6.0 bp", s2["caps_fitted"], 5.96, 0.2)
+    check("2F: swaptions beyond the window 11.8 bp", s2["swaptions_beyond"], 11.83, 0.2)
+    check("2F: caps beyond the window 9.6 bp", s2["caps_beyond"], 9.59, 0.2)
+    b2 = BermudanQuad2F(m2, bm, n_grid=81, n_quad=101).price()
+    eur2 = max(p for p, i in zip(c2.model_prices, ins) if i.swaption.expiry in exf)
+    l2 = BermudanLSMC2F(m2, bm, MonteCarloSpec2F(200000, 11)).price()
+    check("2F Bermudan = 0.048161", b2, 0.048161, 3e-5)
+    check("2F exercise premium = 44.6 bp", (b2 - eur2) * 1e4, 44.6, 0.3)
+    check("2F Bermudan vs 1F = -3.8 %", (b2 / b1 - 1) * 100, -3.8, 0.1)
+    check("2F LSMC within 0.6 % of the quadrature (below)", l2 / b2, 0.995, 6e-3)
+    check("RMSE ratio on the fitted swaptions, 1F / 2F = 3.2", s1["swaptions_fitted"] / s2["swaptions_fitted"], 3.2, 0.1)
+
+    print("\n== 6. Same Europeans, different Bermudan: rho sweep on the real case ==")
+    prem, bermu = {}, {}
+    for rr in (-0.95, 0.9):
+        c = CoterminalBootstrap2F(md.curve, lam, rr, ratio, ends).calibrate(ins, n_grid=121)
+        mo = HJM2FModel(md.curve, lam, c.sigma1, c.sigma2, rr)
+        bermu[rr] = BermudanQuad2F(mo, bm, n_grid=61, n_quad=81).price()
+        prem[rr] = (bermu[rr] - max(p for p, i in zip(c.model_prices, ins) if i.swaption.expiry in exf)) * 1e4
+    check("premium at rho = -0.95 is about 46 bp", prem[-0.95], 46.05, 0.6)
+    check("premium at rho = +0.9 is about 102 bp", prem[0.9], 101.9, 0.8)
+    check("Bermudan moves by 12 % between rho = -0.95 and +0.9", (bermu[0.9] / bermu[-0.95] - 1) * 100, 11.6, 0.8)
 
     print(f"\n{sum(RESULTS)}/{len(RESULTS)} checks passed in {time.time() - t_start:.0f} s")
     return 0 if all(RESULTS) else 1

@@ -184,6 +184,24 @@ class HJM2FModel:
         payoff = np.maximum(self.swap_value_vec(swaption, x[:, 0], x[:, 1]), 0.0)
         return self.curve.discount(T) * float(np.sum(w * payoff))
 
+    def zcb_put(self, option_expiry: float, bond_maturity: float, strike: float) -> float:
+        """
+        Put on a zero-coupon bond, in closed form: ln P(t,T) is Gaussian under the t-forward measure with
+        total variance D' A(t) D, D = (D_1(t,T), D_2(t,T)). (Unlike a swaption, a bond option needs one
+        scalar variable, so it keeps a closed form with any number of factors.)
+        """
+        t, T = option_expiry, bond_maturity
+        p0t, p0T = self.curve.discount(t), self.curve.discount(T)
+        _, d1, d2 = self.bond_coeffs(t, T)
+        a = self.cov(t)
+        v = math.sqrt(max(d1 * d1 * a[0, 0] + 2.0 * d1 * d2 * a[0, 1] + d2 * d2 * a[1, 1], 0.0))
+        if v < 1e-14:
+            return max(strike * p0t - p0T, 0.0)
+        h = math.log(p0T / (strike * p0t)) / v + 0.5 * v
+        n1 = 0.5 * (1.0 + math.erf(-h / math.sqrt(2.0)))
+        n2 = 0.5 * (1.0 + math.erf((v - h) / math.sqrt(2.0)))
+        return strike * p0t * n2 - p0T * n1
+
     def martingale_defect(self, t: float, b: float, T: float) -> float:
         """E^T[P(t,b)/P(t,T)] - P(0,b)/P(0,T): must be 0 if the bond formula and drift are consistent."""
         cb, d1b, d2b = self.bond_coeffs(t, b)

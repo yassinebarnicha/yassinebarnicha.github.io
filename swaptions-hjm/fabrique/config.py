@@ -10,7 +10,7 @@ FICHIERS = [
                               "code/hjm1f/calibration_1f.py", "code/hjm1f/pde_1f.py", "code/hjm1f/mc_1f.py"]),
     ("Python package hjm2f (2 factors)", ["code/hjm2f/__init__.py", "code/hjm2f/hjm_2f.py", "code/hjm2f/calibration_2f.py",
                               "code/hjm2f/calibration_global.py", "code/hjm2f/optimize.py", "code/hjm2f/quad_2f.py",
-                              "code/hjm2f/mc_2f.py"]),
+                              "code/hjm2f/mc_2f.py", "code/hjm2f/caps.py", "code/hjm2f/market_data.py"]),
     ("Examples", ["code/run_example.py", "code/run_example_2f.py", "code/run_market_2f.py", "code/check_1f_consistency.py", "code/validate_2f.py",
                   "code/Main.ipynb"]),
     ("Original code, before the review", ["code/original/hjm_1f.py", "code/original/mc_1f.py"]),

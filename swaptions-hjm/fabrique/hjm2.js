@@ -156,7 +156,14 @@
       const expo = (qb.c - qT.c) - (dd[0] * m[0] + dd[1] * m[1]) + 0.5 * (dd[0] * dd[0] * C[0][0] + 2 * dd[0] * dd[1] * C[0][1] + dd[1] * dd[1] * C[1][1]);
       return Math.exp(expo) - courbe.discount(b) / courbe.discount(T);
     }
-    // volatility of the forward rate f(t, T) at time t: two factor loadings
+    // put on a zero-coupon bond, closed form: ln P(t,T) is Gaussian under the t-forward measure with variance D' A(t) D
+    function zcbPut(t, T, K) {
+      const p0t = courbe.discount(t), p0T = courbe.discount(T), q = coeffs(t, T), C = cov(t);
+      const v = Math.sqrt(Math.max(q.d1 * q.d1 * C[0][0] + 2 * q.d1 * q.d2 * C[0][1] + q.d2 * q.d2 * C[1][1], 0));
+      if (v < 1e-14) return Math.max(K * p0t - p0T, 0);
+      const h = Math.log(p0T / (K * p0t)) / v + 0.5 * v;
+      return K * p0t * H.phi(v - h) - p0T * H.phi(-h);
+    }    // volatility of the forward rate f(t, T) at time t: two factor loadings
     const sigmaA = t => {
       if (t <= 0) return [sig1[0], sig2[0]];
       let lo = 0, hi = n; while (lo < hi) { const mm = (lo + hi) >> 1; if (bucketEnds[mm] < t) lo = mm + 1; else hi = mm; }
@@ -168,7 +175,7 @@
       const den = Math.sqrt(c(a, a) * c(b, b));
       return den > 0 ? c(a, b) / den : 1;
     }
-    return {courbe, lam, rho, bucketEnds, sig1, sig2, cov, coeffs, zc, tauxCourtFixe, moyenneForward, valeursSwap, prixEuropeen, defautMartingale,
+    return {courbe, lam, rho, bucketEnds, sig1, sig2, cov, coeffs, zc, tauxCourtFixe, moyenneForward, valeursSwap, prixEuropeen, defautMartingale, zcbPut,
       sigmaA, chargements, correlationTaux};
   }
 
@@ -369,37 +376,146 @@
     let b = 0; for (let i = 1; i <= n; i++) if (values[i] < values[b]) b = i;
     return {x: simplex[b], f: values[b], nfev};
   }
-  const LAM1_MAX = 0.5, LAM2_MAX = 3;
-  const versParams = x => ({lam: [LAM1_MAX / (1 + Math.exp(-x[0])), LAM2_MAX / (1 + Math.exp(-x[1]))], rho: Math.tanh(x[2]), ratio: Math.exp(x[3])});
-  const depuisParams = (lam, rho, ratio) => {
-    const logit = (p, top) => { const q = Math.min(Math.max(p, 1e-9), top - 1e-9) / top; return Math.log(q / (1 - q)); };
-    return [logit(lam[0], LAM1_MAX), logit(lam[1], LAM2_MAX), Math.atanh(Math.min(Math.max(rho, -0.999999), 0.999999)), Math.log(ratio)];
-  };
-  // errors (model - market, bp of normal vol) on the target swaptions [{sw, volN}] for given structural parameters
-  function erreurs2(courbe, lam, rho, ratio, ex, instruments, cibles, nGrille) {
-    const cal = bootstrap2(courbe, lam, rho, ratio, ex, instruments, 1e-6, 0.2, nGrille);
-    const err = cibles.map(c => { const p = cal.modele.prixEuropeen(c.sw, nGrille); const v = p > 0 ? H.volNImplicite(courbe, c.sw, p) : 0; return (v - c.volN) * 1e4; });
+  // ------------------------------------------------------------------ bounds of the structural parameters (calibration_global.py)
+  // A negative mean reversion is allowed: forward-rate volatility then increases with the time to maturity, as in the EUR market of
+  // 2016. |rho| is kept below 0.95 (collinear factors make the exact bootstrap unstable) and the volatility ratio within [0.05, 8].
+  const LAM1 = [-0.5, 0.5], LAM2 = [-0.5, 3], RHO_MAX = 0.95, RATIO = [0.05, 8];
+  const logistique = (x, lo, hi) => lo + (hi - lo) / (1 + Math.exp(-x));
+  const logit = (p, lo, hi) => { const q = (Math.min(Math.max(p, lo + 1e-9), hi - 1e-9) - lo) / (hi - lo); return Math.log(q / (1 - q)); };
+  const versParams = x => ({lam: [logistique(x[0], LAM1[0], LAM1[1]), logistique(x[1], LAM2[0], LAM2[1])], rho: RHO_MAX * Math.tanh(x[2]),
+    ratio: Math.exp(logistique(x[3], Math.log(RATIO[0]), Math.log(RATIO[1])))});
+  const depuisParams = (lam, rho, ratio) => [logit(lam[0], LAM1[0], LAM1[1]), logit(lam[1], LAM2[0], LAM2[1]),
+    Math.atanh(Math.min(Math.max(rho / RHO_MAX, -0.999999), 0.999999)),
+    logit(Math.log(Math.min(Math.max(ratio, RATIO[0] * 1.0001), RATIO[1] * 0.9999)), Math.log(RATIO[0]), Math.log(RATIO[1]))];
+
+  // ------------------------------------------------------------------ caps on a 6-month index (caps.py)
+  // A caplet delta (L - K)^+ paid at T + delta is (1 + delta K) times a put, struck at 1/(1 + delta K), on the zero-coupon bond
+  // P(T, T + delta): closed form with one or two factors.
+  const capFixings = (maturity, delta = 0.5) => { const n = Math.round(maturity / delta), out = []; for (let i = 1; i < n; i++) out.push(delta * i); return out; };
+  function strikeATMCap(courbe, maturity, delta = 0.5) {
+    const n = Math.round(maturity / delta); let ann = 0;
+    for (let i = 1; i <= n; i++) ann += delta * courbe.discount(delta * i);
+    return (1 - courbe.discount(maturity)) / ann;
+  }
+  function prixCapBachelier(courbe, maturity, strike, volN, delta = 0.5) {
+    let tot = 0;
+    for (const t of capFixings(maturity, delta)) {
+      const p0 = courbe.discount(t), p1 = courbe.discount(t + delta), fwd = (p0 / p1 - 1) / delta, s = volN * Math.sqrt(t), d = (fwd - strike) / s;
+      tot += delta * p1 * ((fwd - strike) * H.phi(d) + s * H.pdf(d));
+    }
+    return tot;
+  }
+  const prixCapModele = (M, maturity, strike, delta = 0.5) =>
+    capFixings(maturity, delta).reduce((s, t) => s + (1 + delta * strike) * M.zcbPut(t, t + delta, 1 / (1 + delta * strike)), 0);
+  function volCapImplicite(courbe, maturity, strike, prix, delta = 0.5) {
+    return H.brent(v => prixCapBachelier(courbe, maturity, strike, v, delta) - prix, 1e-6, 0.05, 1e-12, 200);
+  }
+  function volCapModele(M, maturity, delta = 0.5) {
+    const k = strikeATMCap(M.courbe, maturity, delta), prix = prixCapModele(M, maturity, k, delta);
+    return prix > 0 ? volCapImplicite(M.courbe, maturity, k, prix, delta) : 0;
+  }
+
+  // ------------------------------------------------------------------ real market data (market_data.py)
+  // D = window.DONNEES.eur2016: curve, ATM swaption matrix, ATM caps, smiles of normal vol.
+  const MAX_HORIZON = 30;
+  const volATM = (D, e, t) => D.vol[D.expiries.indexOf(e)][D.tenors.indexOf(t)];
+  const aSwaption = (D, e, t) => D.expiries.indexOf(e) >= 0 && D.tenors.indexOf(t) >= 0 && e + t <= MAX_HORIZON + 1e-9;
+  function interpLineaire(xs, ys, x) { // np.interp: clamped beyond the ends
+    if (x <= xs[0]) return ys[0];
+    if (x >= xs[xs.length - 1]) return ys[ys.length - 1];
+    let k = 0; while (xs[k + 1] < x) k++;
+    return ys[k] + (ys[k + 1] - ys[k]) * (x - xs[k]) / (xs[k + 1] - xs[k]);
+  }
+  // vol(offset)/vol(ATM) of each tabulated smile, averaged by a Gaussian kernel in (log expiry, log tenor)
+  function Smile(D, bande = 0.8) {
+    const off = D.smile.offsetsBp, paires = D.smile.pairs.map(p => {
+      const atm = volATM(D, p.expiry, p.tenor), xs = [], ys = [];
+      p.vol.forEach((v, k) => { if (v != null) { xs.push(off[k]); ys.push(v / atm); } });
+      return {e: p.expiry, t: p.tenor, xs, ys};
+    });
+    const ratio = (e, t, offsetBp) => {
+      let num = 0, den = 0;
+      for (const p of paires) { const d2 = (Math.log(e / p.e) ** 2 + Math.log(t / p.t) ** 2) / (bande * bande), w = Math.exp(-0.5 * d2); num += w * interpLineaire(p.xs, p.ys, offsetBp); den += w; }
+      return den > 1e-300 ? num / den : 1;
+    };
+    return {ratio};
+  }
+  const tauxParSwap = (courbe, T) => { const pay = Array.from({length: T}, (_, i) => i + 1); return H.tauxSwapForward(courbe, H.Swaption(0, T, 0, pay, pay.map(() => 1), true)); };
+  // co-terminal swaptions of the Bermudan, struck at its rate; quoted along the smile if asked
+  function instrumentsCoterminaux(courbe, D, terminal, exercice, avecSmile) {
+    const strike = tauxParSwap(courbe, terminal), pay = Array.from({length: terminal}, (_, i) => i + 1), acc = pay.map(() => 1), sm = Smile(D);
+    return exercice.map(e => {
+      const sw = H.Swaption(e, terminal, strike, pay, acc, true), fwd = H.tauxSwapForward(courbe, sw);
+      let v = volATM(D, e, terminal - e);
+      if (avecSmile) v *= sm.ratio(e, terminal - e, (strike - fwd) * 1e4);
+      return {swaption: sw, volN: v};
+    });
+  }
+  // volatility segments at EVERY expiry of the matrix up to the last exercise date; each is fitted exactly
+  function planTranches(courbe, D, terminal, exercice, avecSmile) {
+    const fenetre = Math.max(...exercice), fins = D.expiries.filter(e => e <= fenetre + 1e-9), cot = instrumentsCoterminaux(courbe, D, terminal, exercice, avecSmile);
+    const instruments = fins.map(e => {
+      const k = exercice.indexOf(e);
+      if (k >= 0) return cot[k];
+      const t = Math.min(Math.max(Math.floor(terminal - e + 0.5), 1), 10);
+      return {swaption: swaptionATM(courbe, e, t), volN: volATM(D, e, t)};
+    });
+    return {fins, instruments};
+  }
+  // everything the model is asked to reproduce: ATM swaptions expiring within the window, ATM caps whose last fixing does
+  function cibles(courbe, D, fenetre, tenors, avecCaps) {
+    const sw = [], caps = [];
+    for (const e of D.expiries) if (e <= fenetre + 1e-9) for (const t of tenors) if (aSwaption(D, e, t)) sw.push({sw: swaptionATM(courbe, e, t), volN: volATM(D, e, t), e, t});
+    if (avecCaps) D.caps.maturities.forEach((m, k) => { if (m - 0.5 <= fenetre + 1e-9) caps.push({m, volN: D.caps.atmVol[k]}); });
+    return {sw, caps};
+  }
+  // model minus market on EVERY ATM swaption of the matrix and every ATM cap; group: fitted (within the window) or beyond it
+  function bulletin(M, courbe, D, fenetre, tenors, avecCaps, nGrille = 121) {
+    const sw = [], caps = [];
+    D.expiries.forEach((e, i) => D.tenors.forEach((t, j) => {
+      if (!aSwaption(D, e, t)) return;
+      const s = swaptionATM(courbe, e, t), prix = M.prixEuropeen(s, nGrille), mv = prix > 0 ? H.volNImplicite(courbe, s, prix) : 0, mk = D.vol[i][j];
+      sw.push({e, t, marche: mk, modele: mv, err: (mv - mk) * 1e4, groupe: e <= fenetre + 1e-9 ? (tenors.indexOf(t) >= 0 ? "fitted" : "window") : "beyond"});
+    }));
+    D.caps.maturities.forEach((m, k) => {
+      const mv = volCapModele(M, m), mk = D.caps.atmVol[k];
+      caps.push({m, marche: mk, modele: mv, err: (mv - mk) * 1e4, groupe: (m - 0.5 <= fenetre + 1e-9) ? (avecCaps ? "fitted" : "window") : "beyond"});
+    });
+    return {sw, caps};
+  }
+  const rmse = a => a.length ? Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length) : NaN;
+  function resume(b) {
+    const out = {};
+    for (const [nom, lst] of [["swaptions", b.sw], ["caps", b.caps]]) for (const g of ["fitted", "window", "beyond"]) {
+      const e = lst.filter(r => r.groupe === g).map(r => r.err); out[nom + "_" + g] = rmse(e); out["n_" + nom + "_" + g] = e.length;
+    }
+    return out;
+  }
+
+  // ------------------------------------------------------------------ global fit (calibration_global.py)
+  // errors (model - market, bp of normal vol) on the swaption targets then the cap targets, for given structural parameters
+  function erreurs2(courbe, lam, rho, ratio, fins, instruments, cib, nGrille) {
+    const cal = bootstrap2(courbe, lam, rho, ratio, fins, instruments, 1e-6, 0.2, nGrille);
+    const err = cib.sw.map(c => { const p = cal.modele.prixEuropeen(c.sw, nGrille); const v = p > 0 ? H.volNImplicite(courbe, c.sw, p) : 0; return (v - c.volN) * 1e4; });
+    cib.caps.forEach(c => err.push((volCapModele(cal.modele, c.m) - c.volN) * 1e4));
     return {err, cal};
   }
-  const rmse = a => Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length);
-  function ajuster2F(courbe, ex, instruments, cibles, x0, libres, nGrille = 61, maxFev = 200, progres) {
+  function ajuster2F(courbe, fins, instruments, cib, x0, libres, nGrille = 61, maxFev = 200, progres) {
     const idx = libres.map((f, i) => f ? i : -1).filter(i => i >= 0), historique = [];
     const compose = y => { const x = x0.slice(); idx.forEach((i, k) => { x[i] = y[k]; }); return x; };
     const obj = y => {
       const q = versParams(compose(y));
-      try { const r = rmse(erreurs2(courbe, q.lam, q.rho, q.ratio, ex, instruments, cibles, nGrille).err); historique.push(r); return r; } catch (e) { return 1e3; }
+      try { const r = rmse(erreurs2(courbe, q.lam, q.rho, q.ratio, fins, instruments, cib, nGrille).err); historique.push(r); return r; } catch (e) { return 1e3; }
     };
     const res = nelderMead(obj, idx.map(i => x0[i]), 0.5, maxFev, 1e-4, 1e-4, progres);
-    const q = versParams(compose(res.x)), fin = erreurs2(courbe, q.lam, q.rho, q.ratio, ex, instruments, cibles, nGrille);
+    const q = versParams(compose(res.x)), fin = erreurs2(courbe, q.lam, q.rho, q.ratio, fins, instruments, cib, nGrille);
     return {lam: q.lam, rho: q.rho, ratio: q.ratio, rmse: rmse(fin.err), erreurs: fin.err, sigmas: fin.cal.sigmas, evaluations: res.nfev, historique};
   }
-  function ajuster1F(courbe, ex, instruments, cibles, lamMax = 0.5) {
-    const erreurs1 = lam => {
-      const cal = H.bootstrap(courbe, lam, ex, instruments, 1e-6, 0.2, "corrigee");
-      return cibles.map(c => { const p = cal.modele.jamshidian(c.sw); const v = p > 0 ? H.volNImplicite(courbe, c.sw, p) : 0; return (v - c.volN) * 1e4; });
-    };
+  // one factor = a two-factor model with a vanishing second factor: best lambda in LAM1 by golden-section search
+  function ajuster1F(courbe, fins, instruments, cib, nGrille = 61) {
+    const erreurs1 = lam => erreurs2(courbe, [lam, 0.5], 0, 1e-9, fins, instruments, cib, nGrille).err;
     const f = lam => { try { return rmse(erreurs1(lam)); } catch (e) { return 1e3; } };
-    let a = 0, b = lamMax; const g = (Math.sqrt(5) - 1) / 2;
+    let a = LAM1[0], b = LAM1[1]; const g = (Math.sqrt(5) - 1) / 2;
     let c = b - g * (b - a), d = a + g * (b - a), fc = f(c), fd = f(d);
     for (let it = 0; it < 30; it++) {
       if (fc < fd) { b = d; d = c; fd = fc; c = b - g * (b - a); fc = f(c); } else { a = c; c = d; fc = fd; d = a + g * (b - a); fd = f(d); }
@@ -407,8 +523,8 @@
     const cand = [[f(a), a], [fc, c], [fd, d], [f(b), b]].sort((u, v) => u[0] - v[0])[0];
     return {lam: cand[1], rmse: cand[0], erreurs: erreurs1(cand[1])};
   }
-
   const API = {gaussLegendre, racine2x2, grilleNormale, Modele2, swaptionATM, bootstrap2, prixQuad, prixLSMC2, nelderMead, versParams, depuisParams,
-    erreurs2, ajuster2F, ajuster1F, rmse};
+    erreurs2, ajuster2F, ajuster1F, rmse, capFixings, strikeATMCap, prixCapBachelier, prixCapModele, volCapImplicite, volCapModele, Smile, volATM, aSwaption,
+    tauxParSwap, instrumentsCoterminaux, planTranches, cibles, bulletin, resume, LAM1, LAM2, RHO_MAX, RATIO};
   if (typeof module !== "undefined" && module.exports) module.exports = API; else racine.HJM2 = API;
 })(typeof self !== "undefined" ? self : this);

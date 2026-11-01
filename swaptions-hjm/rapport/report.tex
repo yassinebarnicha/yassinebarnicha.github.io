@@ -55,8 +55,9 @@ the PDE, and undervalues the reference Bermudan by $11\,\%$. We derive the corre
 issues (Monte Carlo discounting, regression bias, time scheme), and study how the mean-reversion parameter, which the
 calibration cannot identify, drives the Bermudan price through the correlation between exercise dates. Finally we add a second
 factor (\cref{sec:2f}): Jamshidian's decomposition is lost and replaced by two-dimensional integrals and a two-dimensional backward
-induction, but on a real EUR swaption matrix (30 March 2016, 50 at-the-money swaptions) the root-mean-square fit drops from $11.2$ to
-$2.6$\,bp, and the Bermudan price, which the co-terminal Europeans leave undetermined, changes by $5\,\%$. All computations are
+induction. On the complete EUR market of 30 March 2016 (240 at-the-money swaptions, 16 caps, smiles) the second factor divides
+the root-mean-square error on the fitted swaptions by $3.2$ ($12.4$ to $3.9$\,bp) and on the fitted caps by $3.6$, moves the
+Bermudan by $-3.8\,\%$, and, with the Europeans held fixed, the correlation alone moves the Bermudan by $12\,\%$. All computations are
 reproduced by the interactive page \url{https://yassinebarnicha.github.io/swaptions-hjm/}.
 \end{abstract}
 
@@ -588,20 +589,32 @@ For given $(\lambda_1,\lambda_2,\rho,\sigma_2/\sigma_1)$ the co-terminal bootstr
 parameters are invisible to the co-terminals. They are identified by swaptions of other tenors, through a global fit (Nelder--Mead on the
 root-mean-square gap in normal volatility, the level being re-bootstrapped at every evaluation).
 
-We use the market data of the ENSAE course~\cite{ensae}: the stripped EUR curve of 30 March 2016 and the matrix of at-the-money normal
-volatilities of swaptions. The Bermudan is a payer swaption into a 10-year swap, exercisable at 1 to 5 years, struck at the 10-year par rate
-($0.532\,\%$); the targets are the 50 ATM swaptions with expiries 1 to 5 years and tenors 1 to 10 years, the Bermudan's five
-co-terminals included.
+We use the whole market of the ENSAE course~\cite{ensae} (EUR, 30 March 2016): the stripped curve, the $21\times14$ matrix of ATM normal volatilities
+(240 swaptions ending within 30 years), 16 ATM caps (1 to 30 years, Euribor 6M caplets, i.e.\ puts on zero-coupon bonds, closed form in one or two factors)
+and 13 swaption smiles. The Bermudan is a payer swaption into a 10-year swap, exercisable at 1 to 5 years, struck at the 10-year par rate
+($0.532\,\%$). The model has \textbf{11 volatility segments}, one at every expiry of the matrix up to 5 years (1M, 2M, 3M, 6M, 9M, 1Y, 18M, 2Y, 3Y, 4Y, 5Y),
+each fitted exactly: on the co-terminal swaption \emph{quoted along the smile at the Bermudan's strike} (it lies $8$ to $53\,$bp below the forward swap
+rates; the smile interpolates the 13 tabulated smiles by a kernel in log-expiry and log-tenor and moves the quotes by up to $1.3\,$bp) or, for
+the other expiries, on an ATM swaption. The structural parameters are fitted on the \textbf{143 ATM swaptions and 6 ATM caps} that expire within the
+exercise window, and both models are then judged on all 240 swaptions and 16 caps. The bounds $\lambda_1\in[-0.5,0.5]$, $\lambda_2\in[-0.5,3]$,
+$|\rho|\le0.95$ and $\sigma_2/\sigma_1\in[0.05,8]$ are imposed: with $|\rho|$ closer to 1 the factors become collinear and the exact bootstrap becomes unstable.
 
 \begin{table}[ht]\centering\small
-\begin{tabular}{lcccccc}\toprule
- & $\lambda_1$ & $\lambda_2$ & $\rho$ & $\sigma_2/\sigma_1$ & RMSE (bp) & Bermudan\\\midrule
-1 factor & $0$ & -- & -- & -- & $11.2$ & $0.051765$\\
-2 factors & $\approx0$ & $0.916$ & $-0.980$ & $2.65$ & $2.58$ & $0.048973$\\\bottomrule
+\begin{tabular}{lccccccc}\toprule
+ & parameters & fitted swpt & fitted caps & beyond swpt & beyond caps & Bermudan & premium\\\midrule
+1 factor & $\lambda=-0.039$ & $12.4$ & $21.7$ & $21.4$ & $7.6$ & $0.05006$ & $64\,$bp\\
+2 factors & $\lambda=(-0.003,\,0.534)$, $\rho=-0.95$, $1.48$ & $3.9$ & $6.0$ & $11.8$ & $9.6$ & $0.04816$ & $45\,$bp\\\bottomrule
 \end{tabular}
-\caption{Fit of the 50 ATM swaptions and price of the 10-year Bermudan (exercise premium: $75\,$bp in one factor, $47\,$bp in two).
-The one-factor optimum sits on the bound $\lambda=0$.}\label{tab:fit2f}
+\caption{Root-mean-square error in bp of normal volatility on the fitted swaptions (143) and caps (6), and on those beyond the 5-year window (97 swaptions, 10 caps),
+price of the 10-year Bermudan and exercise premium (Bermudan $-$ most expensive co-terminal European). The correlation sits on its bound.}\label{tab:fit2f}
 \end{table}
+
+\paragraph{What the data say.} (i) Mean reversion is negative: forward volatility \emph{increases} with maturity (1-year cap at $21\,$bp, 1y$\times$9y swaption at $60\,$bp).
+Fitted on swaptions alone a single factor finds $\lambda=-0.04$; fitted on the six caps alone it wants $\lambda\approx-0.15$ (RMSE $6.9\,$bp against
+$21.7\,$bp at $-0.039$): \emph{one factor cannot agree with both markets}, which is the clearest case for the second factor. (ii) The second factor
+divides the error by $3.2$ on the fitted swaptions and by $3.6$ on the fitted caps, and almost halves it beyond the window ($21.4$ to $11.8\,$bp); it is not better
+everywhere (caps beyond the window: $9.6$ against $7.6\,$bp). (iii) The Bermudan is $3.8\,\%$ lower. (iv) With the window extended to 9 years the fit degrades
+($6.4\,$bp against $11.9$) and the last segments become erratic: the model is reliable up to about 5 to 7 years.
 
 \begin{figure}[ht]\centering
 \begin{tikzpicture}
@@ -618,17 +631,27 @@ The one-factor optimum sits on the bound $\lambda=0$.}\label{tab:fit2f}
   \addplot[blue,thick] table[x=tenor,y=f2_3]{data/matrice.dat}; \addlegendentry{2 factors}
 \end{axis}
 \end{tikzpicture}
-\caption{ATM normal volatility against the tenor of the swap, EUR, 30 March 2016. With one factor the volatility is nearly flat in the tenor;
-the market, and the two-factor model, are steeply increasing at short expiries.}\label{fig:fit2f}
+\caption{ATM normal volatility against the tenor of the swap, EUR, 30 March 2016 (expiries 1 and 3 years; all tenors up to 10 years are in the fit).
+With one factor the volatility is nearly flat in the tenor; the market, and the two-factor model, are steeply increasing at short expiries.}\label{fig:fit2f}
 \end{figure}
 
-\paragraph{Caveats.} The fitted $\rho$ is close to $-1$ and the objective has a flat valley: three of five starting points reach the same fit ($2.58$
-to $2.62\,$bp) with $\lambda_2\in[0.92,1.03]$, $\rho\in[-1.00,-0.98]$ and $\sigma_2/\sigma_1\in[2.65,3.0]$, while two others stall against the bounds
-($7.2\,$bp and $11.1\,$bp, the latter being the one-factor solution). The gain in fit is solid, the individual parameters are not well identified, and the
-starting point matters. In 2016 the EUR short end had
-negative rates and a very steep volatility term structure, which a Gaussian two-factor model reproduces by stretching the factors against each
-other; a third factor, a shifted diffusion or a stochastic volatility would be the next steps. The smile is ignored: ATM vols are used as the
-quotes of swaptions struck at the Bermudan's rate.
+\begin{figure}[ht]\centering
+\begin{tikzpicture}
+\begin{axis}[xlabel={cap maturity (years)},ylabel={ATM normal vol (bp)},legend pos=south east,width=0.62\linewidth]
+  \addplot[only marks,mark=*,mark size=1.6pt] table[x=mat,y=mkt]{data/caps.dat}; \addlegendentry{market}
+  \addplot[red,thick,dashed] table[x=mat,y=f1]{data/caps.dat}; \addlegendentry{1 factor}
+  \addplot[blue,thick] table[x=mat,y=f2]{data/caps.dat}; \addlegendentry{2 factors}
+\end{axis}
+\end{tikzpicture}
+\caption{ATM cap volatilities (the first six maturities are fitted, the others are predicted).}\label{fig:caps2f}
+\end{figure}
+
+\paragraph{Caveats.} The correlation sits on its bound $-0.95$: the market asks for nearly collinear factors, a stretch of the model rather than a
+measured correlation. The residuals keep a structure ($+6\,$bp at mid tenors for short expiries, $-3\,$bp at long tenors): an exponential volatility
+profile has too little shape for this market. The objective has a flat valley and the individual parameters are not sharply identified. The smile is
+ignored by the models: it is only used to quote the co-terminals at the Bermudan's strike (the market normal vol at $\pm25\,$bp is $10$ to $15\,\%$ above
+the ATM one at a 1-year expiry). Cap conventions are simplified (single curve, $0.5$-year accruals). Not used: the cap smiles, the multi-curve data of another
+date and the SABR calibrations. A third factor, a shifted diffusion or a stochastic volatility would be the next steps.
 
 \subsection{The Bermudan on a two-dimensional grid}
 In two factors the PDE has a cross-derivative, but between exercise dates the factors are exactly Gaussian, so time need not be discretised.
@@ -640,18 +663,19 @@ where $X_{T_{j+1}}-X_{T_j}\sim\N\big(m(T_{j+1};T_N)-m(T_j;T_N),\,A(T_{j+1})-A(T_
 Gaussian kernel integrated against a bilinear interpolation of $U_{j+1}$; the only errors are the grid and the kernel ($1.2\,\%$ at $41\times61$, $0.2\,\%$ at
 $101\times141$). Longstaff--Schwartz runs on the same deflated values with a two-variable polynomial basis and brackets the grid price from below.
 
-\paragraph{The Europeans do not determine the Bermudan.} On the illustrative case of the page, every point of \cref{fig:rho2f} is calibrated to the
-same three Europeans; the exercise premium moves from $19$ to $29\,$bp as $\rho$ goes from $-0.95$ to $+0.9$, against $24\,$bp in one factor.
-This is model risk made visible, and also the freedom that lets the model fit other swaptions or a quoted Bermudan.
+\paragraph{The Europeans do not determine the Bermudan.} On the real case ($\lambda_2=0.534$, $\sigma_2/\sigma_1=1.48$), every point of \cref{fig:rho2f} is
+recalibrated to the same 11 volatility segments, hence to the same Europeans; the exercise premium moves from $46\,$bp at $\rho=-0.95$ (the fitted value) to
+$102\,$bp at $\rho=+0.9$, and the Bermudan from $0.0483$ to $0.0539$ ($12\,\%$). The one-factor model with $\lambda=\lambda_1$ gives $0.0510$ ($73\,$bp).
+This is model risk made visible, and also the freedom that lets the model fit the rest of the market: the global fit is what selects $\rho$.
 
 \begin{figure}[ht]\centering
 \begin{tikzpicture}
 \begin{axis}[xlabel={$\rho$},ylabel={Bermudan $-$ max European (bp)},legend pos=south east]
   \addplot[blue,thick,mark=*,mark size=1.4pt] table[x=rho,y=prem]{data/rho2f.dat}; \addlegendentry{2 factors}
-  \addplot[red,thick,dashed,domain=-0.95:0.9] {24.19}; \addlegendentry{1 factor}
+  \addplot[red,thick,dashed,domain=-0.95:0.9] {72.91}; \addlegendentry{1 factor, $\lambda=\lambda_1$}
 \end{axis}
 \end{tikzpicture}
-\caption{Exercise premium against $\rho$ ($\lambda_1=0.03$, $\lambda_2=0.5$, $\sigma_2/\sigma_1=0.6$), each point recalibrated to the three co-terminal Europeans.}\label{fig:rho2f}
+\caption{Exercise premium against $\rho$ ($\lambda=(-0.003,0.534)$, $\sigma_2/\sigma_1=1.48$), each point recalibrated to the 11 volatility segments of the real case.}\label{fig:rho2f}
 \end{figure}
 
 \subsection{What is lost, what is gained}
@@ -660,8 +684,9 @@ This is model risk made visible, and also the freedom that lets the model fit ot
  & 1 factor & 2 factors\\\midrule
 European swaption & closed form (Jamshidian) & \textbf{lost}: 2-D integral, about $26{,}000$ points\\
 Bermudan engine & tridiagonal PDE, a few ms & \textbf{lost}: 2-D grid, $0.4$--$1.5\,$s; three factors would need Monte Carlo\\
-Co-terminal calibration & exact bootstrap & still exact, but three structural parameters are not identified by it\\
-Swaptions of other tenors & RMSE $11.2\,$bp & \textbf{gained}: $2.6\,$bp\\
+Co-terminal calibration & exact bootstrap & still exact, but four structural parameters need a global fit (one bound active)\\
+Fitted swaptions (143) & RMSE $12.4\,$bp & \textbf{gained}: $3.9\,$bp\\
+Fitted caps (6) & $21.7\,$bp; swaptions and caps ask for different $\lambda$ & \textbf{gained}: $6.0\,$bp, same parameters\\
 Correlation of forward rates & $1$ for all maturities & \textbf{gained}: free\\
 Bermudan with the same Europeans & almost fixed by $\lambda$ & \textbf{gained}: set by the dependence (model risk as well)\\
 Hedging factors & parallel shift & \textbf{gained}: level and slope\\\bottomrule
@@ -672,8 +697,10 @@ Hedging factors & parallel shift & \textbf{gained}: level and slope\\\bottomrule
 \subsection{Validation}
 (i) The martingale defect is zero. (ii) With $\sigma_2=0$ the European integral reproduces Jamshidian ($4\cdot10^{-4}$ relative) and the grid reproduces the
 corrected one-factor PDE ($0.2\,\%$). (iii) With $\rho=1$, $\lambda_1=\lambda_2$ and $\sigma_1+\sigma_2=\sigma$ the one-factor price is recovered.
-(iv) Grid and Monte Carlo agree within $0.4\,\%$ on four scenarios. (v) The JavaScript engine of the page and the Python package \texttt{hjm2f} agree to $10^{-16}$ on
-prices, covariances and bootstrap, and find the same global fit on the real data.
+(iv) Grid and Monte Carlo agree within $0.4\,\%$ on four scenarios. (v) The closed-form bond put agrees with the two-dimensional integral of the same payoff, and
+the cap strike with the course workbook ($0.5257\,\%$, within $1\,$bp). (vi) The JavaScript engine of the page and the Python package \texttt{hjm2f} agree to $10^{-13}$ or better on
+prices, covariances, caps, smile, segments and bootstrap, and the global fit returns the same parameters and errors in both. (vii) Every number of this section is recomputed
+by \texttt{validate\_2f.py}.
 
 %======================================================================
 \section{Validation}
@@ -689,9 +716,10 @@ Monte Carlo as an independent check. The review shows the value of model-level t
 calibration was caught by a martingale test and by the inconsistency between methods, and it moved the Bermudan price by
 $12\,\%$. The remaining model risk sits in $\lambda$, which the calibration does not determine and which moves the Bermudan by
 $12\,\%$ over a plausible range. The two-factor version trades the closed forms for integrals and a two-dimensional grid, and in
-return fits the whole swaption matrix instead of its diagonal; on real data it makes the Bermudan price depend on information that
-the co-terminal Europeans do not contain. Natural extensions are a dual upper bound for the Monte Carlo, a third factor or a shifted
-diffusion for the negative-rate regime, and the use of the smile.
+return fits the whole market (240 swaptions and 16 caps) instead of its diagonal: on the real EUR data the error on the fitted swaptions falls from
+$12.4$ to $3.9\,$bp and the Bermudan is $3.8\,\%$ lower. With the Europeans held fixed, the correlation alone moves the Bermudan by $12\,\%$, and the fit to
+the rest of the market is what selects it. Limits: the correlation sits on its bound, the model degrades beyond 5 to 7 years, and the smile is ignored. Natural
+extensions are a dual upper bound for the Monte Carlo, a third factor or a shifted diffusion for the negative-rate regime, and a stochastic volatility.
 
 \begin{thebibliography}{99}\small
 \bibitem{and} L.~Andersen and M.~Broadie. Primal-dual simulation algorithm for pricing multidimensional American options.
