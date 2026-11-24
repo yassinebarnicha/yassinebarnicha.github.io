@@ -153,6 +153,25 @@ details.plus summary{cursor:pointer;font-weight:600;min-height:44px;display:flex
 .methodes li:last-child{border-bottom:0}
 .methodes .ou{color:var(--ink2);font-size:12.5px}
 
+/* interview-prep lock (interview-prep/verrou.js): a button opens a password dialog; once unlocked the hub link appears */
+[hidden]{display:none!important}
+.verrou{flex:none;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;cursor:pointer;
+  border:1px solid rgb(255 255 255 / 13%);background:rgb(255 255 255 / 5%);color:var(--ink2);transition:color .24s ease,background .24s ease}
+.verrou:hover{color:var(--ink);background:rgb(255 255 255 / 10%)}
+.verrou[aria-pressed="true"]{color:#a5f0ce;border-color:rgb(165 240 206 / 35%)}
+.verrou svg{width:17px;height:17px}
+.barre nav a.prep{color:#a5f0ce}
+dialog.mdp{width:min(380px,calc(100vw - 32px));padding:22px;border:1px solid var(--edge);border-radius:20px;background:#111827;color:var(--ink)}
+dialog.mdp::backdrop{background:rgb(4 6 10 / 70%);backdrop-filter:blur(4px)}
+dialog.mdp h2{font-size:20px;letter-spacing:-.02em;margin:0 0 6px}
+dialog.mdp p{margin:0 0 14px;color:var(--ink2);font-size:14px}
+dialog.mdp input{width:100%;min-height:46px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);font:16px var(--sans)}
+dialog.mdp .ligne{display:flex;gap:10px;margin-top:14px}
+dialog.mdp button{min-height:42px;padding:0 16px;border-radius:999px;border:1px solid rgb(255 255 255 / 15%);background:rgb(255 255 255 / 5%);
+  color:var(--ink);font:600 13px var(--sans);cursor:pointer}
+dialog.mdp button.plein{background:linear-gradient(125deg,#93baff,#b2a4ff);color:#10182a;border-color:transparent}
+dialog.mdp .erreur{color:#ff999e;font-size:13px;min-height:1.4em;margin-top:10px}
+
 footer{padding:32px 0 48px;color:var(--ink2);font-size:13px}
 footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-between}
 
@@ -200,6 +219,7 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
     <span class="mono-nom" aria-hidden="true">MYB</span>
     <span class="nom">Mohammed-Yassine Barnicha</span>
     <nav aria-label="Sections">
+      <a class="prep" id="lien-prep" href="interview-prep/" hidden>Interview prep</a>
       <a href="#parcours">Background</a>
       <a href="#applications">Apps</a>
       <a href="#calibration">BTC</a>
@@ -207,8 +227,20 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
       <a href="#data">Data &amp; AI</a>
       <a href="#methodes">Methods</a>
     </nav>
+    <button class="verrou" id="verrou" type="button" aria-pressed="false" aria-label="Unlock interview prep" title="Interview prep">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path id="anse" d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    </button>
   </div>
 </div>
+<dialog class="mdp" id="dialogue-prep" aria-labelledby="titre-prep">
+  <form method="dialog" id="form-prep" autocomplete="off">
+    <h2 id="titre-prep">Interview prep</h2>
+    <p>Private notes. Enter the password to unlock them on this device.</p>
+    <input id="mdp-prep" type="password" autocomplete="current-password" aria-label="Password" required>
+    <div class="ligne"><button class="plein" type="submit" id="ok-prep">Unlock</button><button type="button" id="annuler-prep">Cancel</button></div>
+    <div class="erreur" id="erreur-prep" role="alert"></div>
+  </form>
+</dialog>
 
 <main>
 <header class="entete">
@@ -599,5 +631,40 @@ footer .page{display:flex;flex-wrap:wrap;gap:12px 32px;justify-content:space-bet
   </div>
 </footer>
 
+<script src="interview-prep/verrou.js"></script>
+<script>
+/* lock button: locked -> password dialog; unlocked -> shows the hub link, a second press locks again */
+(function () {
+  "use strict";
+  var V = window.VerrouHub, bouton = document.getElementById("verrou"), lien = document.getElementById("lien-prep");
+  var dlg = document.getElementById("dialogue-prep"), champ = document.getElementById("mdp-prep"), err = document.getElementById("erreur-prep");
+  var anse = document.getElementById("anse");
+  function etat() {
+    var ouvert = V.estOuvert();
+    bouton.setAttribute("aria-pressed", ouvert ? "true" : "false");
+    bouton.setAttribute("aria-label", ouvert ? "Lock interview prep" : "Unlock interview prep");
+    bouton.title = ouvert ? "Lock interview prep" : "Interview prep";
+    anse.setAttribute("d", ouvert ? "M8 11V7a4 4 0 0 1 7.6-1.7" : "M8 11V7a4 4 0 0 1 8 0v4");
+    lien.hidden = !ouvert;
+  }
+  bouton.addEventListener("click", function () {
+    if (V.estOuvert()) { V.verrouiller(); etat(); return; }
+    err.textContent = ""; champ.value = "";
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+    champ.focus();
+  });
+  document.getElementById("annuler-prep").addEventListener("click", function () { dlg.close ? dlg.close() : dlg.removeAttribute("open"); });
+  document.getElementById("form-prep").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var ok = document.getElementById("ok-prep"); ok.disabled = true; err.textContent = "Checking…";
+    V.deverrouiller(champ.value).then(function () {
+      champ.value = ""; dlg.close ? dlg.close() : dlg.removeAttribute("open"); etat(); location.href = "interview-prep/";
+    }, function (e) {
+      err.textContent = e.message === "wrong password" ? "Wrong password." : e.message; champ.select();
+    }).then(function () { ok.disabled = false; });
+  });
+  etat();
+})();
+</script>
 </body>
 </html>

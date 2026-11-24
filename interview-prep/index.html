@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Interview prep — Mohammed-Yassine Barnicha</title>
+<meta name="theme-color" content="#080b12">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23080b12'/%3E%3Cpath d='M7 22 13 10l5 12 7-13' stroke='%2391b9ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../kit/style.css">
+<style>
+/* Hub of interview topics. Same dark theme as the project pages (kit/style.css); everything else is here. */
+main.page{padding-top:28px;padding-bottom:64px}
+.tete{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px;margin-bottom:22px}
+.tete h1{margin:0;font-size:clamp(28px,4.4vw,42px);line-height:1.08;letter-spacing:-.04em}
+.tete p{margin:6px 0 0;color:var(--ink2);max-width:70ch}
+.tete .actions{margin-left:auto}
+.btn-v{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid rgb(255 255 255 / 15%);
+  background:rgb(255 255 255 / 5%);color:var(--ink);font:600 13px var(--sans);cursor:pointer;text-decoration:none}
+.btn-v:hover{background:rgb(255 255 255 / 10%);color:var(--ink)}
+.btn-v.plein{background:linear-gradient(125deg,#93baff,#b2a4ff);color:#10182a;border-color:transparent}
+.btn-v svg{width:16px;height:16px;flex:none}
+.verrouille{max-width:420px;margin:8vh auto 0;padding:26px 24px;border:1px solid var(--edge);border-radius:22px;background:var(--glass)}
+.verrouille h2{margin:0 0 6px;font-size:22px}
+.verrouille p{margin:0 0 16px;color:var(--ink2)}
+.verrouille label{display:block;font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--ink2);margin-bottom:6px}
+.verrouille input{width:100%;min-height:46px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);font:16px var(--sans)}
+.verrouille .ligne{display:flex;gap:10px;margin-top:14px;align-items:center}
+.erreur{color:var(--bad);font-size:13px;min-height:1.4em;margin-top:10px}
+.groupe{margin:26px 0 0}
+.groupe h2{font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.09em;color:var(--accent);margin:0 0 10px}
+.grille{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.matiere{display:flex;flex-direction:column;gap:8px;padding:16px 18px;border:1px solid var(--edge);border-radius:18px;background:var(--glass);
+  color:var(--ink);text-align:left;font:inherit;cursor:pointer;transition:border-color .25s ease,transform .3s cubic-bezier(.2,.8,.2,1)}
+.matiere:hover{border-color:rgb(145 185 255 / 45%);transform:translateY(-2px)}
+.matiere h3{margin:0;font-size:16px;line-height:1.35}
+.matiere p{margin:0;color:var(--ink2);font-size:13.5px;line-height:1.55}
+.matiere .pied{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:4px;font:12px var(--mono);color:var(--ink2)}
+.matiere .pied .ouvrir{margin-left:auto;color:#c4d8ff;font-weight:600}
+.matiere .pied a{color:var(--ink2)}
+.etat{font:12px var(--mono);color:var(--ink2);min-height:1.5em;margin-top:18px}
+/* in-page viewer: the pages are decrypted as images, so every browser (phones included) shows them without a PDF plug-in */
+.lecteur{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:#0b0f18}
+.lecteur .haut{flex:none;display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgb(255 255 255 / 9%);background:rgb(8 11 18 / 92%)}
+.lecteur .haut h2{flex:1;min-width:0;margin:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lecteur .haut .compte{font:12px var(--mono);color:var(--ink2);white-space:nowrap}
+.lecteur .defile{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:14px 10px 40px}
+.feuille{position:relative;width:100%;max-width:900px;margin:0 auto 12px;background:#fff;border-radius:4px;box-shadow:0 6px 24px rgb(0 0 0 / 40%)}
+.feuille img{display:block;width:100%;height:100%;border-radius:4px}
+.feuille .attente{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:12px var(--mono);color:#7a8599}
+@media (max-width:640px){.lecteur .defile{padding:8px 0 30px}.feuille{border-radius:0;margin-bottom:6px}.feuille img{border-radius:0}}
+@media (max-width:640px){
+  main.page{padding-top:18px}
+  .tete .actions{margin-left:0}
+  .grille{grid-template-columns:1fr}
+}
+</style>
+<script src="verrou.js"></script>
+</head>
+<body>
+<header class="barre">
+  <div class="page">
+    <a class="mono-nom" href="../">YB</a>
+    <span class="titre">Interview prep</span>
+    <nav aria-label="Site"><a href="../">Home</a></nav>
+  </div>
+</header>
+
+<main class="page">
+  <div class="tete">
+    <div>
+      <h1>Interview prep</h1>
+      <p>One focused document per topic: every result derived step by step, the tool named at each step, and the usual slips in red.</p>
+    </div>
+    <div class="actions"><button class="btn-v" id="fermer" type="button" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Lock</button></div>
+  </div>
+
+  <form class="verrouille" id="formulaire" hidden autocomplete="off">
+    <h2>Locked</h2>
+    <p>Enter the password to decrypt the documents on this device.</p>
+    <label for="mdp">Password</label>
+    <input id="mdp" type="password" autocomplete="current-password" required>
+    <div class="ligne"><button class="btn-v plein" type="submit" id="valider">Unlock</button><a class="btn-v" href="../">Back</a></div>
+    <div class="erreur" id="erreur" role="alert"></div>
+  </form>
+
+  <div id="liste" hidden></div>
+  <div class="etat" id="etat" role="status"></div>
+</main>
+
+<div class="lecteur" id="lecteur" hidden role="dialog" aria-modal="true" aria-labelledby="lecteur-titre">
+  <div class="haut">
+    <button class="btn-v" id="lecteur-retour" type="button" aria-label="Back to the topics">←</button>
+    <h2 id="lecteur-titre"></h2>
+    <span class="compte" id="lecteur-compte"></span>
+    <button class="btn-v" id="lecteur-pdf" type="button">PDF ↓</button>
+  </div>
+  <div class="defile" id="lecteur-pages"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var V = window.VerrouHub;
+  var form = document.getElementById("formulaire"), liste = document.getElementById("liste"), etat = document.getElementById("etat");
+  var fermer = document.getElementById("fermer"), erreur = document.getElementById("erreur");
+  var urls = [];
+
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  function taille(o) { return o > 1e6 ? (o / 1e6).toFixed(1) + " MB" : Math.round(o / 1e3) + " kB"; }
+
+  function afficherVerrou(msg) {
+    liste.hidden = true; liste.textContent = ""; fermer.hidden = true; form.hidden = false; etat.textContent = "";
+    erreur.textContent = msg || "";
+    if (!V.disponible()) erreur.textContent = "This browser cannot decrypt (WebCrypto needs https).";
+    document.getElementById("mdp").focus();
+  }
+
+  /* ---- in-page viewer ---- */
+  var lecteur = document.getElementById("lecteur"), zone = document.getElementById("lecteur-pages");
+  var compte = document.getElementById("lecteur-compte"), docCourant = null, observateur = null, urlsPages = [];
+
+  function fermerLecteur() {
+    if (observateur) observateur.disconnect();
+    urlsPages.forEach(URL.revokeObjectURL); urlsPages = [];
+    zone.textContent = ""; lecteur.hidden = true; docCourant = null; document.body.style.overflow = "";
+  }
+
+  function chargerPage(feuille) {
+    if (feuille.dataset.etat) return;
+    feuille.dataset.etat = "1";
+    V.page(docCourant.images[+feuille.dataset.i]).then(function (url) {
+      if (!feuille.isConnected) { URL.revokeObjectURL(url); return; }
+      urlsPages.push(url);
+      var img = el("img"); img.alt = "Page " + (+feuille.dataset.i + 1); img.src = url;
+      feuille.textContent = ""; feuille.appendChild(img);
+    }, function (e) { feuille.dataset.etat = ""; feuille.querySelector(".attente").textContent = "Could not decrypt: " + e.message; });
+  }
+
+  function afficherLecteur(doc) {
+    fermerLecteur();
+    docCourant = doc;
+    document.getElementById("lecteur-titre").textContent = doc.title;
+    compte.textContent = doc.images.length + (doc.images.length > 1 ? " pages" : " page");
+    doc.images.forEach(function (im, i) {
+      var f = el("div", "feuille"); f.dataset.i = i; f.style.aspectRatio = im.w + " / " + im.h;
+      f.appendChild(el("div", "attente", "Decrypting page " + (i + 1) + "…"));
+      zone.appendChild(f);
+    });
+    lecteur.hidden = false; document.body.style.overflow = "hidden"; zone.scrollTop = 0;
+    var feuilles = Array.prototype.slice.call(zone.children);
+    if ("IntersectionObserver" in window) {
+      observateur = new IntersectionObserver(function (entrees) {
+        entrees.forEach(function (en) { if (en.isIntersecting) chargerPage(en.target); });
+      }, { root: zone, rootMargin: "1200px 0px" });
+      feuilles.forEach(function (f) { observateur.observe(f); });
+    } else {
+      feuilles.forEach(chargerPage);
+    }
+    document.getElementById("lecteur-retour").focus();
+  }
+
+  // the viewer has its own history entry: the phone's back button closes it
+  function lireAncre() { var m = /^#doc=([\w-]+)$/.exec(location.hash); return m ? m[1] : null; }
+  function synchroniser() {
+    var id = lireAncre(), doc = id && catalogueCourant.filter(function (d) { return d.id === id; })[0];
+    if (doc && doc.images && doc.images.length && V.estOuvert()) { if (docCourant !== doc) afficherLecteur(doc); }
+    else if (docCourant) fermerLecteur();
+  }
+  var catalogueCourant = [];
+  window.addEventListener("popstate", synchroniser);
+  window.addEventListener("hashchange", synchroniser);
+  document.getElementById("lecteur-retour").addEventListener("click", function () {
+    if (lireAncre()) history.back(); else fermerLecteur();
+  });
+  document.getElementById("lecteur-pdf").addEventListener("click", function () { if (docCourant) ouvrirDoc(docCourant, true); });
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && docCourant) document.getElementById("lecteur-retour").click(); });
+
+  function lire(doc) {
+    if (!doc.images || !doc.images.length) return ouvrirDoc(doc, false);   // older data without page images
+    history.pushState(null, "", "#doc=" + doc.id);
+    afficherLecteur(doc);
+  }
+
+  function ouvrirDoc(doc, telecharger) {
+    // a tab opened during the click itself is not blocked; it receives the PDF once decrypted
+    var onglet = telecharger ? null : window.open("", "_blank");
+    etat.textContent = "Decrypting " + doc.title + "…";
+    V.ouvrir(doc).then(function (url) {
+      urls.push(url);
+      etat.textContent = "";
+      if (telecharger) {
+        var a = el("a"); a.href = url; a.download = doc.id + ".pdf"; document.body.appendChild(a); a.click(); a.remove();
+      } else if (onglet) {
+        onglet.location.href = url;
+      } else {
+        location.href = url;
+      }
+    }, function (e) {
+      if (onglet) onglet.close();
+      etat.textContent = "Could not open the document: " + e.message;
+      if (e.message === "locked") afficherVerrou();
+    });
+  }
+
+  function afficherListe(docs) {
+    catalogueCourant = docs;
+    form.hidden = true; fermer.hidden = false; liste.hidden = false; liste.textContent = ""; etat.textContent = "";
+    var groupes = [];
+    docs.forEach(function (d) {
+      var g = groupes.filter(function (x) { return x.nom === d.part; })[0];
+      if (!g) { g = { nom: d.part, docs: [] }; groupes.push(g); }
+      g.docs.push(d);
+    });
+    groupes.forEach(function (g) {
+      var s = el("section", "groupe"); s.appendChild(el("h2", null, g.nom));
+      var grille = el("div", "grille");
+      g.docs.forEach(function (d) {
+        var carte = el("div", "matiere"); carte.tabIndex = 0; carte.setAttribute("role", "button");
+        carte.appendChild(el("h3", null, d.title));
+        carte.appendChild(el("p", null, d.summary));
+        var pied = el("div", "pied");
+        pied.appendChild(el("span", null, d.pages + (d.pages > 1 ? " pages" : " page") + " · " + taille(d.bytes)));
+        var dl = el("a", null, "Download"); dl.href = "#";
+        dl.addEventListener("click", function (ev) { ev.preventDefault(); ev.stopPropagation(); ouvrirDoc(d, true); });
+        pied.appendChild(dl);
+        pied.appendChild(el("span", "ouvrir", "Open →"));
+        carte.appendChild(pied);
+        carte.addEventListener("click", function () { lire(d); });
+        carte.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); lire(d); } });
+        grille.appendChild(carte);
+      });
+      s.appendChild(grille); liste.appendChild(s);
+    });
+  }
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var champ = document.getElementById("mdp"), bouton = document.getElementById("valider");
+    bouton.disabled = true; erreur.textContent = ""; etat.textContent = "Checking…";
+    V.deverrouiller(champ.value).then(function (docs) { champ.value = ""; afficherListe(docs); synchroniser(); }, function (e) {
+      etat.textContent = ""; erreur.textContent = e.message === "wrong password" ? "Wrong password." : e.message;
+      champ.select();
+    }).then(function () { bouton.disabled = false; });
+  });
+
+  fermer.addEventListener("click", function () {
+    fermerLecteur();
+    V.verrouiller();
+    urls.forEach(URL.revokeObjectURL); urls = [];
+    afficherVerrou();
+  });
+
+  etat.textContent = "Loading…";
+  V.catalogue().then(function (docs) { if (docs) { afficherListe(docs); synchroniser(); } else afficherVerrou(); },
+                     function (e) { afficherVerrou(e.message); });
+})();
+</script>
+</body>
+</html>
